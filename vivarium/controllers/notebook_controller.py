@@ -99,9 +99,9 @@ class Entity:
         info_lines.append(f"Subtype: {self.subtype_label}")
         info_lines.append(f"Idx: {self.idx}")
         info_lines.append(f"Exists: {self.exists}")
-
-        # Position
         info_lines.append(f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}")
+        info_lines.append(f"Diameter: {self.diameter:.2f}")
+        info_lines.append(f"Color: {self.color}")
         info_lines.append("")
         
         return print("\n".join(info_lines))
@@ -302,7 +302,7 @@ class Agent(Entity):
             info_lines.append(f"Eating range: {self.eating_range}")
             info_lines.append("\nConfiguration Details:")
             for k, v in dict_infos.items():
-                if k not in ['x_position', 'y_position', 'behavior', 'left_motor', 'right_motor', 'params', 'sensed']:
+                if k not in ['x_position', 'y_position', 'diameter', 'color', 'behavior', 'left_motor', 'right_motor', 'params', 'sensed']:
                     info_lines.append(f"  - {k}: {v}")
 
         info_lines.append("")
