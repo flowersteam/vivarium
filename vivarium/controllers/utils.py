@@ -129,7 +129,7 @@ class RoutineHandler(object):
         """Print the behaviors and active behaviors of the agent"""
         with self._lock:
             if len(self._routines) == 0:
-                print("No behaviors attached")
+                print("No routines attached")
             else:
                 available_routines = list(self._routines.keys())
                 active_routines = list(self._active_routines.keys())
