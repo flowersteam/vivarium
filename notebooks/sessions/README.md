@@ -1,8 +1,8 @@
 This directory contains educational sessions that enable you controlling a simulation from a Notebook controller.
 
-- For MacOS and Windows: If Python and/or Jupyter Notebook is not installed on your computer, install [install Anaconda](https://www.anaconda.com/).
 - If not already done, first install the required software by following the instructions in the main [README](../../).
-- Once the simulator is open, launch `jupyter notebook` by opening another terminal (on Windows: open Anaconda Prompt instead) and executing:
+    - For MacOS and Windows: If Python and/or Jupyter Notebook is not installed on your computer, first [install Anaconda](https://www.anaconda.com/).
+- Launch `jupyter notebook` by opening another terminal (on Windows: open Anaconda Prompt instead) and executing:
 ```bash
 cd <PATH_TO_LOCAL_VIVARIUM_REPO>
 source env_vivarium/bin/activate
