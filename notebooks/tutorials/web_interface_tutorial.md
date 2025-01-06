@@ -29,7 +29,7 @@ From top to bottom can be found:
 - **The start/stop button for the plot update**, which sets if the plot should periodically refresh or not; the time step for the refresh can be set with the slider next to it.
 - **The simulator plot**, with the agents (circles) and objects (squares); on the right are some tools that can be used to select these entities (see the [Bokeh documentation](https://docs.bokeh.org/en/latest/docs/user_guide/interaction/tools.html#ug-interaction-tools-pandrag) for more information). The most useful tools are:
     - The `Lasso/Box select` ![](https://docs.bokeh.org/en/latest/_images/LassoSelect.png), to easily select multiple entities at once;
-    - The `Point Draw Tool` ![](https://docs.bokeh.org/en/latest/_images/PointDraw.png), that can be used to move the entities by dragging them around the plot (the server and plot update must be stopped beforehand);
+    - The `Point Draw Tool` ![](https://docs.bokeh.org/en/latest/_images/PointDraw.png), that can be used to move the entities by dragging them around the plot (**important current limitation**: the plot update must be stopped beforehand in order to use this tool);
     - The `Reset` tool ![](https://docs.bokeh.org/en/latest/_images/Reset.png), which sets back the plot to its original position if it has been moved around too much.
 
 ## Configurations
