@@ -147,7 +147,7 @@ def start_server_and_interface(
         lg.warning(
             "Instead, start the server and interface by running the following command from the root directory in a Windows Powershell (make sure to activate the virtual environment before). Then click on the link to open the web interface:"
         )
-        lg.warning(f"\n.\start_all.bat {scene_name}")
+        lg.warning(f"\nstart_all.bat {scene_name}")
         return
 
     # first ensure no interface or server is running
