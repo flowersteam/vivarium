@@ -25,7 +25,8 @@ cd vivarium/
 
 ```bash
 python -m venv env_vivarium
-source env_vivarium/bin/activate
+source env_vivarium/bin/activate #(for Linux users)
+env_vivarium\Scripts\Activate.ps1 #(for Windows users)
 ```
 
 3- Install the dependencies:

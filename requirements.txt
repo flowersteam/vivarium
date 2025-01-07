@@ -21,3 +21,6 @@ black
 
 # Configurations
 hydra-core
+
+# Notebooks
+notebook
