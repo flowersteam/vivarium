@@ -2,8 +2,9 @@ This directory contains educational sessions that enable you controlling a simul
 
 You will need a set of software tools installed on your computer, which are listed below. **If you are unsure about how to install or use them, first ask a professor or another student, we will help you.**
 - A Python distribution
-    - On MacOS and Windows, the recommended one is [Anaconda](https://www.anaconda.com/)
     - On Linux it is usually pre-installed
+    - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
+    - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform.
 - A virtual environment
     - Either `venv` or `conda`
 - [pip](https://pypi.org/project/pip/)
