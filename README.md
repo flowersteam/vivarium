@@ -35,6 +35,8 @@ pip install -r requirements.txt
 pip install -e . 
 ```
 
+If your are a UPF student, continue from [here](notebooks/sessions/README.md).
+
 ## 🚀 Usage
 
 Vivarium can be used in three main ways:  
