@@ -6,7 +6,7 @@ You will need a set of software tools installed on your computer, which are list
     - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
     - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform.
 - A virtual environment
-    - Either `venv` or `conda`
+    - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
 - [pip](https://pypi.org/project/pip/)
 - [git](https://git-scm.com/)
 - [Jupyter](https://jupyter.org/)
