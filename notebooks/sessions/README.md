@@ -35,9 +35,9 @@ You will need a set of software tools installed on your computer, which are list
         python3 -m venv env_vivarium
 
         # if the above command doesn't work and you are asked to install the `venv` module
-        # it will give you a command to do so, just add `sudo` at the beginning of it
-        # it should look like this, it will ask you to confirm the installation by typing `y` and pressing `Enter` when you run it:
-        sudo apt install python3.10-venv
+        # it will give you a command to do so, just add `sudo` at the beginning of it and a -y at the end
+        # it should look like this:
+        sudo apt install -y python3.10-venv
         # then run the first command again to create the virtual environment
 
         # activate the virtual environment
