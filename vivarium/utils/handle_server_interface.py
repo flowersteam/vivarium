@@ -145,7 +145,7 @@ def start_server_and_interface(
             "The 'start_server_and_interface' function is not supported on Windows OS"
         )
         lg.warning(
-            "Instead, start the server and interface by running the following command from the project root directory:"
+            "Instead, start the server and interface by running the following command from the root directory in a Windows Powershell (make sure to activate the virtual environment before). Then click on the link to open the web interface:"
         )
         lg.warning(f"\nstart_all.bat {scene_name}")
         return
