@@ -4,24 +4,83 @@ You will need a set of software tools installed on your computer, which are list
 - A Python distribution
     - On Linux it is usually pre-installed
     - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
-    - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform.
+    - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
 - A virtual environment
     - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
 - [pip](https://pypi.org/project/pip/)
 - [git](https://git-scm.com/)
-- [Jupyter](https://jupyter.org/)
-    - It can usually be installed with `pip`
 
-- If not already done, first install the required software by following the instructions in the main [README](../../).
-    - First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
-    - Just follow the steps in the "Installation" section of the README, then come back here.
-- Launch `jupyter lab` (or `jupyter notebook`) by opening another terminal (on Windows: open Anaconda Prompt instead) and executing:
-```bash
-cd <PATH_TO_LOCAL_VIVARIUM_REPO>
-source env_vivarium/bin/activate
-jupyter notebook
-```
+
+- First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
+- Just follow the installation steps below.
+
+    - #### 1- Clone the repository:
+
+        Before following the next instructions, make sure you have Python installed with a version between 3.10 and 3.12. 
+
+        ```bash
+        # first clone the repository (copy and execute the right command for your case)
+        git clone git@github.com:flowersteam/vivarium.git #(if you have a GitHub account and SSH keys set up)
+        git clone https://github.com/flowersteam/vivarium.git #(if you don't have a GitHub account)
+
+        # then go to the repository directory
+        cd vivarium/
+        ```
+    - #### 2- Create and activate a virtual environment:
+
+        For Linux users:
+
+        ```bash
+        # create a virtual environment
+        python3 -m venv env_vivarium
+
+        # activate the virtual environment
+        source env_vivarium/bin/activate #(for Linux users)
+        ```
+
+        For Windows users (in PowerShell):
+        ```bash
+        # create a virtual environment
+        python -m venv env_vivarium
+
+        # activate the virtual environment
+        env_vivarium\Scripts\Activate.ps1 #(for Windows users)
+        ```
+
+    - #### 3- Install the dependencies:
+
+        You should now have an indication in your terminal that you are in the virtual environment, e.g. `(env_vivarium)`. You can now install the dependencies inside:
+
+        ```bash
+        pip install -r requirements.txt
+        pip install -e . 
+        ```
+
+        Now you are ready to start the Jupyter Notebook server and open the educational sessions.
+
+- From now on you will start every session by launching `jupyter lab` (or `jupyter notebook`). To do so, open another terminal (on Windows: use PowerShell), navigate to the repository directory, activate the virtual environment, and start the Jupyter Notebook server:
+
+    ```bash
+    # go to the repository directory
+    cd <PATH_TO_LOCAL_VIVARIUM_REPO>
+
+    # download the latest changes from the repository if there are any
+    git pull
+
+    # activate the virtual environment to have access to the installed dependencies
+    source env_vivarium/bin/activate #(for Linux users)
+    env_vivarium\Scripts\Activate.ps1 #(for Windows users)
+
+    # start the Jupyter Notebook server
+    jupyter notebook
+    ```
 - This will open a web page in the browser with a list of files and directories. Go to `notebooks/sessions` and open the practical session you want to do (`session_1.ipynb` if it is the first class).
+
+- if you are a Windows user without WSL, you will also need to start the server and the interface manually from command line (it will be mentionned in the notebook). To do so, open a new terminal (PowerShell) and navigate to the repository directory, activate the virtual environment, and start them with the following commands:
+
+    ```bash
+    .\start_all.bat session_1 # for the first session, change the number for the desired session
+    ```
 
 The rest of the session is described in this newly opened document, please continue from there. 
 Here is a quick overview of the available sessions:
