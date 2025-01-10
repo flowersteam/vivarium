@@ -1,18 +1,36 @@
 This directory contains educational sessions that enable you controlling a simulation from a Notebook controller.
 
 You will need a set of software tools installed on your computer, which are listed below. **If you are unsure about how to install or use them, first ask a professor or another student, we will help you.**
-- A Python distribution
-    - On Linux it is usually pre-installed
-    - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
-    - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
-- A virtual environment
-    - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
-- [pip](https://pypi.org/project/pip/)
-- [git](https://git-scm.com/)
+
+- ## 1 - Installation of the required software tools
+
+    - A Python distribution
+        - On Linux it is usually pre-installed
+        - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
+        - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
+    - A virtual environment
+        - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
+    - [pip](https://pypi.org/project/pip/)
+    - [git](https://git-scm.com/)
 
 
-- First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
-- Just follow the installation steps below.
+    - First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
+    - Just follow the installation steps below.
+
+- ## 2 - Installation of the Vivarium project
+
+    - ### 2.1 - Automatic installation
+
+    - If you work from an UPF computer with Ubuntu (Linux) or with any Linux distribution with Python 3.10, you can simply install the project by downloading this file: [linux_install.sh](https://github.com/flowersteam/vivarium/blob/main/linux_install.sh). Then, open a terminal, navigate to the vivarium directory you created and copy the file here. Finally execute the following commands:
+
+        ```bash
+        chmod u+x ./linux_install.sh 
+        ./install.sh
+        ```
+
+    - This will install the project and all its dependencies. You can then skip to the next sub-sections and directly start the educational sessions (see how to do it in part 3 below).
+
+    - ### 2.1 - Manual installation
 
     - #### 1- Clone the repository:
 
@@ -20,8 +38,8 @@ You will need a set of software tools installed on your computer, which are list
 
         ```bash
         # first clone the repository (copy and execute the right command for your case)
-        git clone git@github.com:flowersteam/vivarium.git #(if you have a GitHub account and SSH keys set up)
         git clone https://github.com/flowersteam/vivarium.git #(if you don't have a GitHub account)
+        git clone git@github.com:flowersteam/vivarium.git #(if you have a GitHub account and SSH keys set up)
 
         # then go to the repository directory
         cd vivarium/
@@ -64,29 +82,31 @@ You will need a set of software tools installed on your computer, which are list
 
         Now you are ready to start the Jupyter Notebook server and open the educational sessions.
 
-- From now on you will start every session by launching `jupyter lab` (or `jupyter notebook`). To do so, open another terminal (on Windows: use PowerShell), navigate to the repository directory, activate the virtual environment, and start the Jupyter Notebook server:
+- ## 3 - Use the project
 
-    ```bash
-    # go to the repository directory
-    cd <PATH_TO_LOCAL_VIVARIUM_REPO>
+    - From now on you will start every session by launching `jupyter lab` (or `jupyter notebook`). To do so, open another terminal (on Windows: use PowerShell), navigate to the repository directory, activate the virtual environment, and start the Jupyter Notebook server:
 
-    # download the latest changes from the repository if there are any
-    git pull
+        ```bash
+        # go to the repository directory
+        cd <PATH_TO_LOCAL_VIVARIUM_REPO>
 
-    # activate the virtual environment to have access to the installed dependencies
-    source env_vivarium/bin/activate #(for Linux users)
-    env_vivarium\Scripts\Activate.ps1 #(for Windows users)
+        # download the latest changes from the repository if there are any
+        git pull
 
-    # start the Jupyter Notebook server
-    jupyter notebook
-    ```
-- This will open a web page in the browser with a list of files and directories. Go to `notebooks/sessions` and open the practical session you want to do (`session_1.ipynb` if it is the first class).
+        # activate the virtual environment to have access to the installed dependencies
+        source env_vivarium/bin/activate #(for Linux users)
+        env_vivarium\Scripts\Activate.ps1 #(for Windows users)
 
-- if you are a Windows user without WSL, you will also need to start the server and the interface manually from command line (it will be mentionned in the notebook). To do so, open a new terminal (PowerShell) and navigate to the repository directory, activate the virtual environment, and start them with the following commands:
+        # start the Jupyter Notebook server
+        jupyter notebook
+        ```
+    - This will open a web page in the browser with a list of files and directories. Go to `notebooks/sessions` and open the practical session you want to do (`session_1.ipynb` if it is the first class).
 
-    ```bash
-    .\start_all.bat session_1 # for the first session, change the number for the desired session
-    ```
+    - if you are a Windows user without WSL, you will also need to start the server and the interface manually from command line (it will be mentionned in the notebook). To do so, open a new terminal (PowerShell) and navigate to the repository directory, activate the virtual environment, and start them with the following commands:
+
+        ```bash
+        .\start_all.bat session_1 # for the first session, change the number for the desired session
+        ```
 
 The rest of the session is described in this newly opened document, please continue from there. 
 Here is a quick overview of the available sessions:
