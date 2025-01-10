@@ -162,14 +162,14 @@ class BehaviorHandler(object):
             isinstance(interval, int) and interval > 0
         ), "Interval must be a positive integer"
         assert (
-            isinstance(weight, (int, float)) and weight > 0
+            isinstance(weight, (int, float)) and weight >= 0
         ), "Weight must be a positive number"
         with self._lock:
-            self._behaviors[name or behavior_fn.__name__] = (
+            self._behaviors[name or behavior_fn.__name__] = [
                 behavior_fn,
                 interval,
                 weight,
-            )
+            ]
         if start:
             self.start_behavior(name or behavior_fn.__name__)
 
@@ -215,6 +215,22 @@ class BehaviorHandler(object):
             if n in self._started_behaviors:
                 del self._started_behaviors[n]
 
+    def change_behavior_weight(self, name, new_weight):
+        """Change the weight of a behavior
+
+        :param name: behavior name
+        :param new_weight: new weight
+        """
+        assert (
+            isinstance(new_weight, (int, float)) and new_weight >= 0
+        ), "New weight must be a positive number"
+        with self._lock:
+            n = name.__name__ if hasattr(name, "__name__") else name
+            # update the weight of the behavior in the behaviors and started_behaviors tuples
+            self._behaviors[n][2] = new_weight
+            if n in self._started_behaviors:
+                self._started_behaviors[n][2] = new_weight
+
     def behave(self, agent, time):
         """Make the agent behave according to its active behaviors
 
@@ -236,7 +252,10 @@ class BehaviorHandler(object):
                     motor_value for (motor_value, _) in motor_contributions
                 )
                 total_weights = sum(weight for (_, weight) in motor_contributions)
-                motor_values = total_motor_values / total_weights
+                if total_weights == 0:
+                    motor_values = np.zeros(2)
+                else:
+                    motor_values = total_motor_values / total_weights
             # else keep the current motor values
             else:
                 motor_values = [agent.left_motor, agent.right_motor]

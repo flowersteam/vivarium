@@ -243,6 +243,14 @@ class Agent(Entity):
         """Print the behaviors and active behaviors of the agent"""
         self.behavior_handler.print_behaviors()
 
+    def change_behavior_weight(self, name, new_weight):
+        """Change the weight of a behavior of the agent
+
+        :param name: behavior name
+        :param new_weight: new weight of the behavior
+        """
+        self.behavior_handler.change_behavior_weight(name, new_weight)
+
     def behave(self, time):
         """Make the agent behave according to its active behaviors
 
