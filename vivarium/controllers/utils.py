@@ -215,6 +215,22 @@ class BehaviorHandler(object):
             if n in self._started_behaviors:
                 del self._started_behaviors[n]
 
+    def change_behavior_weight(self, name, new_weight):
+        """Change the weight of a behavior
+
+        :param name: behavior name
+        :param new_weight: new weight
+        """
+        assert (
+            isinstance(new_weight, (int, float)) and new_weight >= 0
+        ), "New weight must be a positive number"
+        with self._lock:
+            n = name.__name__ if hasattr(name, "__name__") else name
+            # update the weight of the behavior in the behaviors and started_behaviors tuples
+            self._behaviors[n][2] = new_weight
+            if n in self._started_behaviors:
+                self._started_behaviors[n][2] = new_weight
+
     def behave(self, agent, time):
         """Make the agent behave according to its active behaviors
 
