@@ -5,7 +5,7 @@ git clone https://github.com/flowersteam/vivarium.git
 cd vivarium/
 
 # install venv module if not already done
-sudo apt install -y python3.10-venv
+sudo apt install -y python3-venv
 
 # create a virtual environment
 python3 -m venv env_vivarium

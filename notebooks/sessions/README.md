@@ -19,18 +19,26 @@ You will need a set of software tools installed on your computer, which are list
 
 - ## 2 - Installation of the Vivarium project
 
-    - ### 2.1 - Automatic installation
+    - ### 2.1 - Automatic installation (not available for Windows)
 
-    - If you work from an UPF computer with Ubuntu (Linux) or with any Linux distribution with Python 3.10, you can simply install the project by downloading this file: [linux_install.sh](https://github.com/flowersteam/vivarium/blob/main/linux_install.sh). Then, open a terminal, navigate to the vivarium directory you created and copy the file here. Finally execute the following commands:
+    - If you work from an UPF computer with Ubuntu (Linux), or from a machine with any Unix distribution (Linux or Mac OS), you can do an automatic installation of the project. To do so open a terminal, navigate to the vivarium directory that you created and execute the following commands:
 
         ```bash
-        chmod u+x ./linux_install.sh 
+        # update the package list (you might need to enter your password)
+        sudo apt update
+        # install wget if you don't have it
+        sudo apt install wget
+        # download the automatic installation script
+        wget https://raw.githubusercontent.com/flowersteam/vivarium/refs/heads/main/linux_install.sh
+        # make it executable
+        chmod u+x linux_install.sh
+        # run the script
         ./install.sh
         ```
 
     - This will install the project and all its dependencies. You can then skip to the next sub-sections and directly start the educational sessions (see how to do it in part 3 below).
 
-    - ### 2.1 - Manual installation
+    - ### 2.1 - Manual installation (for all platforms)
 
     - #### 1- Clone the repository:
 
@@ -52,11 +60,9 @@ You will need a set of software tools installed on your computer, which are list
         # create a virtual environment
         python3 -m venv env_vivarium
 
-        # if the above command doesn't work and you are asked to install the `venv` module
-        # it will give you a command to do so, just add `sudo` at the beginning of it and a -y at the end
-        # it should look like this:
-        sudo apt install -y python3.10-venv
-        # then run the first command again to create the virtual environment
+        # if the above command doesn't work and you are asked to install the `venv` module, execute this:
+        sudo apt install -y python3-venv
+        # (then run the first command again to create the virtual environment)
 
         # activate the virtual environment
         source env_vivarium/bin/activate #(for Linux users)
