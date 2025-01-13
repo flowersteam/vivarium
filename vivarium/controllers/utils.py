@@ -51,8 +51,8 @@ class RoutineHandler(object):
     def attach_routine(self, routine_fn, name=None, interval=1, start=True):
         """Attach a routine to the entity
 
-        :param routine_fn: routine_fn
-        :param name: routine name, defaults to None
+        :param routine_fn: routine function
+        :param name: routine name, defaults to None (routine function name)
         :param interval: routine execution interval, defaults to 1
         :param start: whether to start the routine, defaults to True
         """
@@ -64,32 +64,38 @@ class RoutineHandler(object):
         if start:
             self.start_routine(name or routine_fn.__name__)
 
-    def start_routine(self, name):
+    def start_routine(self, routine_fn):
         """Start a routine of the entity
 
-        :param name: routine name
+        :param routine_fn: routine function or its name as a string
         """
         with self._lock:
-            n = name.__name__ if hasattr(name, "__name__") else name
-            self._active_routines[n] = self._routines[n]
+            name = routine_fn.__name__ if hasattr(routine_fn, "__name__") else routine_fn
+            self._active_routines[name] = self._routines[name]
 
-    def stop_routine(self, name):
+    def stop_routine(self, routine_fn):
         """Stop a routine of the entity
 
-        :param name: routine name
+         :param routine_fn: routine function or its name as a string
         """
         with self._lock:
+            name = routine_fn.__name__ if hasattr(routine_fn, "__name__") else routine_fn
             if name in self._active_routines:
                 del self._active_routines[name]
+            else:
+                lg.warning(f"Routine {name} is not started")
 
-    def detach_routine(self, name):
+    def detach_routine(self, routine_fn):
         """Detach a routine from the entity
 
-        :param name: routine name
+         :param routine_fn: routine function or its name as a string
         """
         with self._lock:
+            name = routine_fn.__name__ if hasattr(routine_fn, "__name__") else routine_fn
             if name in self._routines:
                 del self._routines[name]
+            else:
+                lg.warning(f"Routine {name} is not attached")
             if name in self._active_routines:
                 del self._active_routines[name]
 
@@ -148,12 +154,12 @@ class BehaviorHandler(object):
         self._lock = threading.Lock()
 
     def attach_behavior(
-        self, behavior_fn, name=None, interval=5, weight=1.0, start=True
+        self, behavior_fn, name=None, interval=1, weight=1.0, start=True
     ):
         """Attach a behavior to the agent with a given weight
 
         :param behavior_fn: behavior function
-        :param name: behavior name, defaults to None
+        :param name: behavior name, defaults to None (behavior function name)
         :param interval: behavior execution interval, defaults to 1
         :param weight: behavior weight, defaults to 1.
         :param start: whether to start the behavior, defaults to True
@@ -173,63 +179,67 @@ class BehaviorHandler(object):
         if start:
             self.start_behavior(name or behavior_fn.__name__)
 
-    def detach_behavior(self, name):
+    def detach_behavior(self, behavior_fn):
         """Detach a behavior from the agent
 
-        :param name: behavior name
+        :param behavior_fn: behavior function or its name as a string
         """
         with self._lock:
-            n = name.__name__ if hasattr(name, "__name__") else name
-            if n in self._behaviors:
-                del self._behaviors[n]
-            if n in self._started_behaviors:
-                del self._started_behaviors[n]
+            name = behavior_fn.__name__ if hasattr(behavior_fn, "__name__") else behavior_fn
+            if name in self._behaviors:
+                del self._behaviors[name]
+            else:
+                lg.warning(f"Behavior {name} is not attached")
+            if name in self._started_behaviors:
+                del self._started_behaviors[name]
 
     def detach_all_behaviors(self):
         """Detach all behaviors from the agent"""
-        for n in list(self._behaviors.keys()):
-            self.detach_behavior(n)
+        for name in list(self._behaviors.keys()):
+            self.detach_behavior(name)
 
-    def start_behavior(self, name):
+    def start_behavior(self, behavior_fn):
         """Start a behavior of the agent
 
-        :param name: behavior name
+        :param behavior_fn: behavior function or its name as a string
         """
         with self._lock:
-            n = name.__name__ if hasattr(name, "__name__") else name
-            self._started_behaviors[n] = self._behaviors[n]
+            name = behavior_fn.__name__ if hasattr(behavior_fn, "__name__") else behavior_fn
+            self._started_behaviors[name] = self._behaviors[name]
 
     def start_all_behaviors(self):
         """Start all behaviors of the agent"""
         with self._lock:
-            for n in self._behaviors:
-                self._started_behaviors[n] = self._behaviors[n]
+            for name in self._behaviors:
+                self._started_behaviors[name] = self._behaviors[name]
 
-    def stop_behavior(self, name):
+    def stop_behavior(self, behavior_fn):
         """Stop a behavior of the agent
 
-        :param name: behavior name
+        :param behavior_fn: behavior function or its name as a string
         """
         with self._lock:
-            n = name.__name__ if hasattr(name, "__name__") else name
-            if n in self._started_behaviors:
-                del self._started_behaviors[n]
+            name = behavior_fn.__name__ if hasattr(behavior_fn, "__name__") else behavior_fn
+            if name in self._started_behaviors:
+                del self._started_behaviors[name]
+            else:
+                lg.warning(f"Behavior {name} is not started")
 
-    def change_behavior_weight(self, name, new_weight):
+    def change_behavior_weight(self, behavior_fn, new_weight):
         """Change the weight of a behavior
 
-        :param name: behavior name
+        :param behavior_fn: behavior function or its name as a string
         :param new_weight: new weight
         """
         assert (
             isinstance(new_weight, (int, float)) and new_weight >= 0
         ), "New weight must be a positive number"
         with self._lock:
-            n = name.__name__ if hasattr(name, "__name__") else name
+            name = behavior_fn.__name__ if hasattr(behavior_fn, "__name__") else behavior_fn
             # update the weight of the behavior in the behaviors and started_behaviors tuples
-            self._behaviors[n][2] = new_weight
-            if n in self._started_behaviors:
-                self._started_behaviors[n][2] = new_weight
+            self._behaviors[name][2] = new_weight
+            if name in self._started_behaviors:
+                self._started_behaviors[name][2] = new_weight
 
     def behave(self, agent, time):
         """Make the agent behave according to its active behaviors
@@ -267,7 +277,7 @@ class BehaviorHandler(object):
 
         agent.left_motor, agent.right_motor = motor_values
 
-    def print_behaviors(self):
+    def print_behaviors(self, full_infos=False):
         """Print the behaviors and active behaviors of the agent"""
         with self._lock:
             if len(self._behaviors) == 0:
@@ -281,3 +291,6 @@ class BehaviorHandler(object):
                     else f"Started behaviors: {started_behaviors}"
                 )
                 print(f"Attached behaviors: {attached_behaviors}, {started_print}")
+                if full_infos:
+                    for name, (fn, interval, weight) in self._behaviors.items():
+                        print(f"Behavior {name}: interval={interval}, weight={weight}")

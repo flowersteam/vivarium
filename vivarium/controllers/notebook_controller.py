@@ -239,9 +239,9 @@ class Agent(Entity):
         if stop_motors:
             self.stop_motors()
 
-    def print_behaviors(self):
+    def print_behaviors(self, full_infos=False):
         """Print the behaviors and active behaviors of the agent"""
-        self.behavior_handler.print_behaviors()
+        self.behavior_handler.print_behaviors(full_infos)
 
     def change_behavior_weight(self, name, new_weight):
         """Change the weight of a behavior of the agent
