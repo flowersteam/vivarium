@@ -158,7 +158,7 @@ class Agent(Entity):
             right = right if sensed_type_right in sensed_entities else 0
         return [left, right]
 
-    def sensed_entities(self):
+    def entity_sensors(self):
         """Return the left and right sensed entities of the agent if they are sensed, else None
 
         :return: sensed entities
@@ -172,14 +172,14 @@ class Agent(Entity):
         )
         return [left_ent, right_ent]
 
-    def sense_attributes(self, sensed_attribute, default_value=None):
+    def attribute_sensors(self, sensed_attribute, default_value=None):
         """Return the sensed attribute of the left and right sensed entities
 
         :param sensed_attribute: sensed_attribute
         :param default_value: default value if the attribute is not found, defaults to None
         :return: sensed attributes
         """
-        left_ent, right_ent = self.sensed_entities()
+        left_ent, right_ent = self.entity_sensors()
         # get the sensed attribute of the entities with a getattr, specify a default value if the attribute is not found
         return (
             getattr(left_ent, sensed_attribute, default_value),
