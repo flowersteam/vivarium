@@ -39,7 +39,11 @@ class Entity:
         if item in self.config.param_names():
             return getattr(self.config, item)
         else:
-            return super().__getattr__(item)
+            try:
+                return super().__getattr__(item)
+            except AttributeError as e:
+                print(f"{self.__class__.__name__} has no attribute {item}")
+                raise
 
     # TODO : Add a check to ensure that the attribute's value is authorized (according to params bounds)
     def __setattr__(self, item, val):
