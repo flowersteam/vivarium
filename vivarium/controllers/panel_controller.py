@@ -112,14 +112,6 @@ class PanelController(SimulatorController):
             selected.param.watch(
                 self.pull_selected_panel_configs, ["selection"], onlychanged=True
             )
-        # Add this to force non existing entities to be hidden at the initialization of the interface
-        threading.Timer(1.0, self.trigger_hide_non_existing).start()
-
-    def trigger_hide_non_existing(self):
-        """Triggers the hide_non_existing parameter change"""
-        self.panel_simulator_config.hide_non_existing = False
-        time.sleep(0.1)
-        self.panel_simulator_config.hide_non_existing = True
 
     def watch_selected_configs(self):
         """Watch the selected configurations"""

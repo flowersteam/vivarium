@@ -43,7 +43,7 @@ class EntityManager:
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
         self.panel_simulator_config.param.watch(
-            self.hide_all_non_existing, "hide_non_existing"
+            self.hide_all_non_existing, "hide_non_existing", onlychanged=False, 
         )
         selected.param.watch(
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
@@ -51,7 +51,7 @@ class EntityManager:
         for i, pc in enumerate(self.panel_configs):
             pc.param.watch(self.update_cds_view, pc.param_names(), onlychanged=True)
             self.config[i].param.watch(
-                self.hide_non_existing, "exists", onlychanged=True
+                self.hide_non_existing, "exists", onlychanged=False
             )
 
     def drag_cb(self, attr, old, new):
