@@ -123,3 +123,5 @@ Here is a quick overview of the available sessions:
 - [Session 4](session_4.ipynb): Modulating internal states and sensing other agent's attributes
 - [Session 5](session_5_logging.ipynb): Logging and plotting data
 - [Session 6](session_6_bonus.ipynb): Understanding routines and creating a simple Eco-Evolutionary simulation
+
+If you have to configure your own simulation for a project, you can have a look at the [custom scene creation tutorial (student version)](./create_custom_scene_tutorial_simple.md).
