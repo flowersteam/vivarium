@@ -59,6 +59,8 @@ left, right = agent.sensors(sensed_entities=["obstacles"])
 
  On the other hand, entity types are predefined in Vivarium: an entity is either of type `AGENT` or `OBJECT`. Entities with type `AGENT` are represented as circles in the interface, they are equipped with sensors and motors and we can attach behaviors to them. Entities with type `OBJECT` are represented as squares in the interface and we cannot attach behaviors to them. See also the [web interface tutorial](https://github.com/flowersteam/vivarium/blob/main/notebooks/tutorials/web_interface_tutorial.md).
 
+ The definition of entity subtypes, i.e. the list of arbitrary subtypes below `EntitySubTypes` has to be in the following order: first agent's subtype, then object subtypes. Since in this simple scene we only have one subtype per entity type, we first indicate `robots`, then `obstacles`.
+
 Note that the initial positions and orientations of entities are not specified in the scene file. Instead, they will be set randomly at the start of the simulation. If you need to configure intitial positions and orientations, you can do it directly in the jupyter notebook using the `x_position`, `y_position` and `orientation` attributes of any entity, e.g. `agent_0.x_position = 25`. Note that two entities cannot be positioned at the exact same place in the scene. 
 
 ## A more complex scene
@@ -114,6 +116,8 @@ Here we defined 2 subtypes of agents (`PREDATORS` and `PREYS`) and 2 subtypes of
 Here is the render of the scene:
 
 ![simple_scene](../../images/simple_scene_add_entities.png "Simple Scene")
+
+Remind that the definition of entity subtypes, i.e. the list of arbitrary subtypes below `EntitySubTypes` has to be in the following order: first agent's subtypes, then object subtypes. Therefore, in this more complex scene, we first define `PREDATORS` and `PREYS` (whose type is `AGENT`), then `RESOURCES` and `POISON` (whose type is `OBJECT`).
 
 In Vivarium, we can set the maximum number of entities of a given subtype with the `num` parameter, as well as the actual number initially present in the scene with the `existing` parameter. As you can see in the scene rendering above, the number of each entity subtype correspond to the one specified in the `existing` parameter of the scene file. If `existing` in not specified, the initial number will be the maximum number defined in `num`. In the Jupyter Notebook, we can add or remove an entity by modifying its `exists` attribute of any entity. For instance:
 
