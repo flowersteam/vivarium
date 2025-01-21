@@ -477,7 +477,12 @@ def init_state(
             # handle behaviors
             behavior_list = []
             # create a behavior list for all behaviors of the agent
-            for beh_name, behavior_data in data["selective_behaviors"].items():
+            if 'selective_behaviors' not in data:
+                agent_behaviors = {}
+                agent_behaviors['manual'] = {'beh': 'MANUAL', 'sensed': ent_sub_types}
+            else:
+                agent_behaviors = data['selective_behaviors']
+            for beh_name, behavior_data in agent_behaviors.items():
                 beh_name = behavior_data["beh"]
                 behavior_id = Behaviors[beh_name].value
                 # Init an empty mask

@@ -17,13 +17,6 @@ entities_data:
       existing: 1
       color: blue
       diameter: 10
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - agents
-            - resources
-            - obstacles
       
     resources:
       type: OBJECT

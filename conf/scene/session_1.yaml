@@ -14,12 +14,6 @@ entities_data:
       num: 1
       existing: 1
       color: blue
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - agents
-            - objects
       
     objects:
       type: OBJECT

@@ -18,14 +18,6 @@ entities_data:
       num: 3
       color: blue
       diameter: 10
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - agents
-            - resources
-            - s_obstacles
-            - b_obstacles
       
     resources:
       type: OBJECT
