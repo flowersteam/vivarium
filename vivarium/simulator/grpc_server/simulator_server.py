@@ -35,6 +35,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
     :param simulator_pb2_grpc: The gRPC server for the simulator.
     """
+
     def __init__(self, simulator):
         self.simulator = simulator
         self.recorded_change_dict = defaultdict(dict)
@@ -57,11 +58,11 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def GetObjectState(self, request, context):
         object_state = self.simulator.state.object_state
         return object_state_to_proto(object_state)
-    
+
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
         return simulator_pb2.Scene(scene_name=scene_name)
-    
+
     def GetSubtypesLabels(self, request, context):
         subtype_labels_dict = self.simulator.ent_sub_types
         return simulator_pb2.SubtypesLabels(data=subtype_labels_dict)
@@ -82,8 +83,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
             ent_idx = request.ent_idx
             col_idx = request.col_idx
             self.simulator.set_state(
-                request.nested_field, ent_idx, col_idx,
-                proto_to_ndarray(request.value)
+                request.nested_field, ent_idx, col_idx, proto_to_ndarray(request.value)
             )
         return Empty()
 
@@ -95,7 +95,9 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
 def serve(simulator):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    simulator_pb2_grpc.add_SimulatorServerServicer_to_server(SimulatorServerServicer(simulator), server)
-    server.add_insecure_port('[::]:50051')
+    simulator_pb2_grpc.add_SimulatorServerServicer_to_server(
+        SimulatorServerServicer(simulator), server
+    )
+    server.add_insecure_port("[::]:50051")
     server.start()
     server.wait_for_termination()

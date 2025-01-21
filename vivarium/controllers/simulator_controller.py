@@ -15,7 +15,14 @@ param.Dynamic.time_dependent = True
 
 class SimulatorController(param.Parameterized):
     """Base controller class to interact with the simulator."""
-    configs = param.Dict({StateType.SIMULATOR: SimulatorConfig(), StateType.AGENT: [], StateType.OBJECT: []})
+
+    configs = param.Dict(
+        {
+            StateType.SIMULATOR: SimulatorConfig(),
+            StateType.AGENT: [],
+            StateType.OBJECT: [],
+        }
+    )
     refresh_change_period = param.Number(1)
     change_time = param.Integer(0)
 
@@ -35,7 +42,15 @@ class SimulatorController(param.Parameterized):
 
     def watch_configs(self):
         """Watch the parameters of the configs to push the changes to the simulator."""
-        watchers = {etype: [config.param.watch(self.push_state, config.param_names(), onlychanged=True) for config in configs] for etype, configs in self.configs.items()}
+        watchers = {
+            etype: [
+                config.param.watch(
+                    self.push_state, config.param_names(), onlychanged=True
+                )
+                for config in configs
+            ]
+            for etype, configs in self.configs.items()
+        }
         return watchers
 
     @property
@@ -51,7 +66,7 @@ class SimulatorController(param.Parameterized):
         state_changes = converters.events_to_state_changes(events, self.state)
         for sc in state_changes:
             self.client.set_state(**sc._asdict())
-    
+
     @contextmanager
     def dont_push_entity_configs(self):
         """Context manager to avoid pushing the entity configs to the simulator."""
@@ -108,7 +123,7 @@ class SimulatorController(param.Parameterized):
         """Get the NVE state of the simulator."""
         self.state = self.client.get_nve_state()
         return self.state
-    
+
     def get_scene_name(self):
         """Get the scene name of the simulator."""
         self.client.get_scene_name()

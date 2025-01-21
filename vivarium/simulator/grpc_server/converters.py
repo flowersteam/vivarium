@@ -2,8 +2,16 @@ from jax_md.rigid_body import RigidBody
 
 import simulator_pb2
 
-from vivarium.simulator.grpc_server.numproto.numproto import proto_to_ndarray, ndarray_to_proto
-from vivarium.simulator.simulator_states import SimulatorState, EntityState, AgentState, ObjectState
+from vivarium.simulator.grpc_server.numproto.numproto import (
+    proto_to_ndarray,
+    ndarray_to_proto,
+)
+from vivarium.simulator.simulator_states import (
+    SimulatorState,
+    EntityState,
+    AgentState,
+    ObjectState,
+)
 from vivarium.simulator.simulator_states import SimState as State
 
 
@@ -17,8 +25,9 @@ def proto_to_state(state):
         simulator_state=proto_to_simulator_state(state.simulator_state),
         entity_state=proto_to_nve_state(state.entity_state),
         agent_state=proto_to_agent_state(state.agent_state),
-        object_state=proto_to_object_state(state.object_state)
+        object_state=proto_to_object_state(state.object_state),
     )
+
 
 # Added time, sensed, params and entity subtypes
 def proto_to_simulator_state(simulator_state):
@@ -40,8 +49,9 @@ def proto_to_simulator_state(simulator_state):
         to_jit=proto_to_ndarray(simulator_state.to_jit).astype(int),
         use_fori_loop=proto_to_ndarray(simulator_state.use_fori_loop).astype(int),
         collision_eps=proto_to_ndarray(simulator_state.collision_eps).astype(float),
-        collision_alpha=proto_to_ndarray(simulator_state.collision_alpha).astype(float)
+        collision_alpha=proto_to_ndarray(simulator_state.collision_alpha).astype(float),
     )
+
 
 def proto_to_nve_state(entity_state):
     """Convert a protobuf entity state to an EntityState object.
@@ -52,23 +62,32 @@ def proto_to_nve_state(entity_state):
     return EntityState(
         position=RigidBody(
             center=proto_to_ndarray(entity_state.position.center).astype(float),
-            orientation=proto_to_ndarray(entity_state.position.orientation).astype(float)),
+            orientation=proto_to_ndarray(entity_state.position.orientation).astype(
+                float
+            ),
+        ),
         momentum=RigidBody(
             center=proto_to_ndarray(entity_state.momentum.center).astype(float),
-            orientation=proto_to_ndarray(entity_state.momentum.orientation).astype(float)),
+            orientation=proto_to_ndarray(entity_state.momentum.orientation).astype(
+                float
+            ),
+        ),
         force=RigidBody(
             center=proto_to_ndarray(entity_state.force.center).astype(float),
-            orientation=proto_to_ndarray(entity_state.force.orientation).astype(float)),
+            orientation=proto_to_ndarray(entity_state.force.orientation).astype(float),
+        ),
         mass=RigidBody(
             center=proto_to_ndarray(entity_state.mass.center).astype(float),
-            orientation=proto_to_ndarray(entity_state.mass.orientation).astype(float)),
+            orientation=proto_to_ndarray(entity_state.mass.orientation).astype(float),
+        ),
         entity_type=proto_to_ndarray(entity_state.entity_type).astype(int),
         ent_subtype=proto_to_ndarray(entity_state.ent_subtype).astype(int),
         entity_idx=proto_to_ndarray(entity_state.entity_idx).astype(int),
         diameter=proto_to_ndarray(entity_state.diameter).astype(float),
         friction=proto_to_ndarray(entity_state.friction).astype(float),
-        exists=proto_to_ndarray(entity_state.exists).astype(int)
+        exists=proto_to_ndarray(entity_state.exists).astype(int),
     )
+
 
 def proto_to_agent_state(agent_state):
     """Convert a protobuf agent state to an AgentState object.
@@ -78,11 +97,19 @@ def proto_to_agent_state(agent_state):
     """
     return AgentState(
         ent_idx=proto_to_ndarray(agent_state.ent_idx).astype(int),
-        proximity_map_dist=proto_to_ndarray(agent_state.proximity_map_dist).astype(float),
-        proximity_map_theta=proto_to_ndarray(agent_state.proximity_map_theta).astype(float),
+        proximity_map_dist=proto_to_ndarray(agent_state.proximity_map_dist).astype(
+            float
+        ),
+        proximity_map_theta=proto_to_ndarray(agent_state.proximity_map_theta).astype(
+            float
+        ),
         prox=proto_to_ndarray(agent_state.prox).astype(float),
-        prox_sensed_ent_type=proto_to_ndarray(agent_state.prox_sensed_ent_type).astype(int),
-        prox_sensed_ent_idx=proto_to_ndarray(agent_state.prox_sensed_ent_idx).astype(int),
+        prox_sensed_ent_type=proto_to_ndarray(agent_state.prox_sensed_ent_type).astype(
+            int
+        ),
+        prox_sensed_ent_idx=proto_to_ndarray(agent_state.prox_sensed_ent_idx).astype(
+            int
+        ),
         motor=proto_to_ndarray(agent_state.motor).astype(float),
         behavior=proto_to_ndarray(agent_state.behavior).astype(int),
         params=proto_to_ndarray(agent_state.params).astype(float),
@@ -96,6 +123,7 @@ def proto_to_agent_state(agent_state):
         color=proto_to_ndarray(agent_state.color).astype(float),
     )
 
+
 def proto_to_object_state(object_state):
     """Convert a protobuf object state to an ObjectState object.
 
@@ -107,6 +135,7 @@ def proto_to_object_state(object_state):
         color=proto_to_ndarray(object_state.color).astype(float),
     )
 
+
 def state_to_proto(state):
     """Convert a State object to a protobuf state.
 
@@ -117,8 +146,9 @@ def state_to_proto(state):
         simulator_state=simulator_state_to_proto(state.simulator_state),
         entity_state=nve_state_to_proto(state.entity_state),
         agent_state=agent_state_to_proto(state.agent_state),
-        object_state=object_state_to_proto(state.object_state)
+        object_state=object_state_to_proto(state.object_state),
     )
+
 
 def simulator_state_to_proto(simulator_state):
     """Convert a SimulatorState object to a protobuf simulator state.
@@ -139,8 +169,9 @@ def simulator_state_to_proto(simulator_state):
         to_jit=ndarray_to_proto(simulator_state.to_jit),
         use_fori_loop=ndarray_to_proto(simulator_state.use_fori_loop),
         collision_eps=ndarray_to_proto(simulator_state.collision_eps),
-        collision_alpha=ndarray_to_proto(simulator_state.collision_alpha)
+        collision_alpha=ndarray_to_proto(simulator_state.collision_alpha),
     )
+
 
 def nve_state_to_proto(entity_state):
     """Convert an EntityState object to a protobuf entity state.
@@ -151,27 +182,28 @@ def nve_state_to_proto(entity_state):
     return simulator_pb2.EntityState(
         position=simulator_pb2.RigidBody(
             center=ndarray_to_proto(entity_state.position.center),
-            orientation=ndarray_to_proto(entity_state.position.orientation)
+            orientation=ndarray_to_proto(entity_state.position.orientation),
         ),
         momentum=simulator_pb2.RigidBody(
             center=ndarray_to_proto(entity_state.momentum.center),
-            orientation=ndarray_to_proto(entity_state.momentum.orientation)
+            orientation=ndarray_to_proto(entity_state.momentum.orientation),
         ),
         force=simulator_pb2.RigidBody(
             center=ndarray_to_proto(entity_state.force.center),
-            orientation=ndarray_to_proto(entity_state.force.orientation)
+            orientation=ndarray_to_proto(entity_state.force.orientation),
         ),
         mass=simulator_pb2.RigidBody(
             center=ndarray_to_proto(entity_state.mass.center),
-            orientation=ndarray_to_proto(entity_state.mass.orientation)
+            orientation=ndarray_to_proto(entity_state.mass.orientation),
         ),
         entity_type=ndarray_to_proto(entity_state.entity_type),
         ent_subtype=ndarray_to_proto(entity_state.ent_subtype),
         entity_idx=ndarray_to_proto(entity_state.entity_idx),
         diameter=ndarray_to_proto(entity_state.diameter),
         friction=ndarray_to_proto(entity_state.friction),
-        exists=ndarray_to_proto(entity_state.exists)
+        exists=ndarray_to_proto(entity_state.exists),
     )
+
 
 def agent_state_to_proto(agent_state):
     """Convert an AgentState object to a protobuf agent state.
@@ -199,6 +231,7 @@ def agent_state_to_proto(agent_state):
         color=ndarray_to_proto(agent_state.color),
     )
 
+
 def object_state_to_proto(object_state):
     """Convert an ObjectState object to a protobuf object state.
 
@@ -207,5 +240,5 @@ def object_state_to_proto(object_state):
     """
     return simulator_pb2.ObjectState(
         ent_idx=ndarray_to_proto(object_state.ent_idx),
-        color=ndarray_to_proto(object_state.color)
+        color=ndarray_to_proto(object_state.color),
     )

@@ -6,24 +6,17 @@ prox_dist_max: 60
 # Entity data definitions
 entities_data:
   EntitySubTypes:
-    - robots
+    - agents
     - resources
     - obstacles
 
   Entities:
-    robots:
+    agents:
       type: AGENT
       num: 2
       existing: 1
       color: blue
       diameter: 10
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - robots
-            - resources
-            - obstacles
       
     resources:
       type: OBJECT

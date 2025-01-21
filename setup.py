@@ -18,23 +18,23 @@ import setuptools
 
 # https://packaging.python.org/guides/making-a-pypi-friendly-readme/
 this_directory = os.path.abspath(os.path.dirname(__file__))
-with io.open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
-  long_description = f.read()
+with io.open(os.path.join(this_directory, "README.md"), encoding="utf-8") as f:
+    long_description = f.read()
 
 setuptools.setup(
-    name='vivarium',
-    version='0.0.1',
-    license='MIT',
-    author='Clément Moulin-Frier',
-    author_email='clement.moulinfrier@gmail.com',
+    name="vivarium",
+    version="0.0.1",
+    license="MIT",
+    author="Clément Moulin-Frier",
+    author_email="clement.moulinfrier@gmail.com",
     packages=setuptools.find_packages(),
-
     classifiers=[
-        'Programming Language :: Python :: 3.10',
+        "Programming Language :: Python :: 3.10",
         # 'License :: OSI Approved :: Apache Software License',
-        'Operating System :: MacOS',
-        'Operating System :: POSIX :: Linux',
-        'Topic :: Scientific/Engineering',
-        'Intended Audience :: Science/Research',
-        'Intended Audience :: Developers',
-    ])
+        "Operating System :: MacOS",
+        "Operating System :: POSIX :: Linux",
+        "Topic :: Scientific/Engineering",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
+    ],
+)

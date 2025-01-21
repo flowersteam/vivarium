@@ -3,7 +3,7 @@
 # from vivarium.controllers.notebook_controller import NotebookController
 # from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 
-# RUN_TIME = 7  
+# RUN_TIME = 7
 # RESOURCE_SPAWN_INTERVAL = 30
 # NUM_STEPS = 100
 
@@ -36,7 +36,7 @@
 #     controller = NotebookController()
 
 #     try:
-#         controller.run(num_steps=100) 
+#         controller.run(num_steps=100)
 
 #         # Initial states
 #         initial_positions = get_agents_positions()

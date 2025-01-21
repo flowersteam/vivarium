@@ -11,26 +11,16 @@ class Behaviors(Enum):
     NOOP = 4
     MANUAL = 5
 
+
 behavior_params = {
-    Behaviors.FEAR.value: jnp.array(
-        [[1., 0., 0.], 
-         [0., 1., 0.]]),
-    Behaviors.AGGRESSION.value: jnp.array(
-        [[0., 1., 0.], 
-         [1., 0., 0.]]),
-    Behaviors.LOVE.value: jnp.array(
-        [[-1., 0., 1.], 
-         [0., -1., 1.]]),
-    Behaviors.SHY.value: jnp.array(
-        [[0., -1., 1.], 
-         [-1., 0., 1.]]),
-    Behaviors.NOOP.value: jnp.array(
-        [[0., 0., 0.], 
-         [0., 0., 0.]]),
-    Behaviors.MANUAL.value: jnp.array(
-        [[0., 0., 0.], 
-         [0., 0., 0.]])
+    Behaviors.FEAR.value: jnp.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+    Behaviors.AGGRESSION.value: jnp.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]),
+    Behaviors.LOVE.value: jnp.array([[-1.0, 0.0, 1.0], [0.0, -1.0, 1.0]]),
+    Behaviors.SHY.value: jnp.array([[0.0, -1.0, 1.0], [-1.0, 0.0, 1.0]]),
+    Behaviors.NOOP.value: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+    Behaviors.MANUAL.value: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
 }
+
 
 def behavior_to_params(behavior):
     """Return the params associated to a behavior.

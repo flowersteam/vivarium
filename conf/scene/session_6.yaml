@@ -7,26 +7,18 @@ prox_dist_max: 60
 entities_data:
   EntitySubTypes:
   ## Care : make sure to order entities in a good order (first the agents and then the objects) ...
-    - robots
+    - agents
     - resources
     - s_obstacles
     - b_obstacles
 
   Entities:
-    robots:
+    agents:
       type: AGENT
       num: 10
       existing: 4
       color: blue
       diameter: 10
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - robots
-            - resources
-            - s_obstacles
-            - b_obstacles
       
     resources:
       type: OBJECT

@@ -4,7 +4,12 @@ import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
 
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
-from vivarium.simulator.grpc_server.converters import proto_to_state, proto_to_nve_state, proto_to_agent_state, proto_to_object_state
+from vivarium.simulator.grpc_server.converters import (
+    proto_to_state,
+    proto_to_nve_state,
+    proto_to_agent_state,
+    proto_to_object_state,
+)
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
 
@@ -14,9 +19,10 @@ class SimulatorGRPCClient(SimulatorClient):
 
     :param SimulatorClient: Abstract base class for simulator clients.
     """
+
     def __init__(self, name=None):
         self.name = name
-        channel = grpc.insecure_channel('localhost:50051')
+        channel = grpc.insecure_channel("localhost:50051")
         self.stub = simulator_pb2_grpc.SimulatorServerStub(channel)
         self.streaming_started = False
         self.state = self.get_state()
@@ -44,9 +50,10 @@ class SimulatorGRPCClient(SimulatorClient):
         :param value: value to set
         """
         state_change = simulator_pb2.StateChange(
-            nested_field=nested_field, 
-            ent_idx=ent_idx, col_idx=column_idx,
-            value=ndarray_to_proto(value)
+            nested_field=nested_field,
+            ent_idx=ent_idx,
+            col_idx=column_idx,
+            value=ndarray_to_proto(value),
         )
         self.stub.SetState(state_change)
 
@@ -81,7 +88,7 @@ class SimulatorGRPCClient(SimulatorClient):
         """
         object_state = self.stub.GetObjectState(Empty())
         return proto_to_object_state(object_state)
-    
+
     def get_scene_name(self):
         """Get the scene name of the simulator.
 
@@ -90,7 +97,7 @@ class SimulatorGRPCClient(SimulatorClient):
         response = self.stub.GetSceneName(Empty())
         scene_name = response.scene_name
         return scene_name
-    
+
     def get_subtypes_labels(self):
         """Get the subtypes labels of the simulator.
 

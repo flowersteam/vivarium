@@ -5,14 +5,15 @@ from vivarium.environments.braitenberg.selective_sensing.init import init_state
 
 
 def test_init_default_state():
-    """ Test the initialization of state without arguments """
+    """Test the initialization of state without arguments"""
     state = init_state()
 
     assert state
 
 
 def test_init_default_state_config():
-    """ Test the initialization of state with default config arguments """
+    """Test the initialization of state with default config arguments"""
+
     def load_default_config():
         with initialize(config_path="../conf", version_base=None):
             # Load the config (you can specify the config name here or leave it default)
@@ -25,5 +26,3 @@ def test_init_default_state_config():
     state = init_state(**config)
 
     assert state
-
-

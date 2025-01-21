@@ -10,9 +10,10 @@ panel==1.3.8
 param==2.0.2
 matplotlib==3.8.2
 
-# Client-server communication
+# Client-server communication and subprocesses
 grpcio==1.60.0
 grpcio-tools
+psutil
 
 # Tests and code formatting
 pytest==8.0.0
@@ -20,3 +21,6 @@ black
 
 # Configurations
 hydra-core
+
+# Notebooks
+notebook

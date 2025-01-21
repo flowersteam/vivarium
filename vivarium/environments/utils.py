@@ -1,7 +1,8 @@
 import jax.numpy as jnp
-from jax import vmap 
+from jax import vmap
 
-@vmap 
+
+@vmap
 def normal(theta):
     """Returns the cos and the sin of an angle
 
@@ -9,6 +10,7 @@ def normal(theta):
     :return: cos and sin
     """
     return jnp.array([jnp.cos(theta), jnp.sin(theta)])
+
 
 def distance(displacement_fn, point1, point2):
     """Returns the distance between two points
@@ -21,6 +23,7 @@ def distance(displacement_fn, point1, point2):
     diff = displacement_fn(point1, point2)
     squared_diff = jnp.sum(jnp.square(diff))
     return jnp.sqrt(squared_diff)
+
 
 def relative_position(displ, theta):
     """

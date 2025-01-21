@@ -5,22 +5,17 @@ prox_dist_max: 60
 # Entity data definitions
 entities_data:
   EntitySubTypes:
-    - AGENTS
-    - OBJECTS
+    - agents
+    - objects
 
   Entities:
-    AGENTS:
+    agents:
       type: AGENT
       num: 1
+      existing: 1
       color: blue
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - AGENTS
-            - OBJECTS
       
-    OBJECTS:
+    objects:
       type: OBJECT
       num: 8
       color: red

@@ -13,6 +13,7 @@ class EntityType(Enum):
     def to_state_type(self):
         return StateType(self.value)
 
+
 class StateType(Enum):
     AGENT = 0
     OBJECT = 1
@@ -39,8 +40,10 @@ class EntityState(simulate.NVEState):
     @property
     def velocity(self) -> util.Array:
         return self.momentum / self.mass
-    
+
+
 # TODO : ent idx and color already in Particle state in env side
+
 
 @dataclass
 class AgentState:
@@ -62,6 +65,7 @@ class AgentState:
     proxs_dist_max: util.Array
     proxs_cos_min: util.Array
     color: util.Array
+
 
 @dataclass
 class ObjectState:
@@ -89,15 +93,24 @@ class SimulatorState:
     # DONE : Added time
     @staticmethod
     def get_type(attr):
-        if attr in ['idx', 'max_agents', 'max_objects', 'num_steps_lax']:
+        if attr in ["idx", "max_agents", "max_objects", "num_steps_lax"]:
             return int
-        elif attr in ['time', 'box_size', 'dt', 'freq', 'neighbor_radius', 'collision_alpha', 'collision_eps']:
+        elif attr in [
+            "time",
+            "box_size",
+            "dt",
+            "freq",
+            "neighbor_radius",
+            "collision_alpha",
+            "collision_eps",
+        ]:
             return float
-        elif attr in ['to_jit', 'use_fori_loop']:
+        elif attr in ["to_jit", "use_fori_loop"]:
             return bool
         else:
             raise ValueError(f"Unknown attribute {attr}")
-     
+
+
 @dataclass
 class SimState:
     simulator_state: SimulatorState
@@ -106,9 +119,11 @@ class SimState:
     object_state: ObjectState
 
     def field(self, stype_or_nested_fields):
-        if isinstance(stype_or_nested_fields, StateType) or isinstance(stype_or_nested_fields, Enum):
+        if isinstance(stype_or_nested_fields, StateType) or isinstance(
+            stype_or_nested_fields, Enum
+        ):
             name = stype_or_nested_fields.name.lower()
-            nested_fields = (f'{name}_state', )
+            nested_fields = (f"{name}_state",)
         else:
             nested_fields = stype_or_nested_fields
         # TODO : what does this line do ?
@@ -122,21 +137,29 @@ class SimState:
         return self.field(etype).ent_idx[entity_idx]
 
     def e_idx(self, etype):
-        return self.entity_state.entity_idx[self.entity_state.entity_type == etype.value]
+        return self.entity_state.entity_idx[
+            self.entity_state.entity_type == etype.value
+        ]
 
     def e_cond(self, etype):
         return self.entity_state.entity_type == etype.value
 
     def row_idx(self, field, ent_idx):
-        return ent_idx if field == 'entity_state' else self.entity_state.entity_idx[jnp.array(ent_idx)]
+        return (
+            ent_idx
+            if field == "entity_state"
+            else self.entity_state.entity_idx[jnp.array(ent_idx)]
+        )
 
     def __getattr__(self, name):
         def wrapper(e_type):
             value = getattr(self.entity_state, name)
             if isinstance(value, rigid_body.RigidBody):
-                return rigid_body.RigidBody(center=value.center[self.e_cond(e_type)],
-                                            orientation=value.orientation[self.e_cond(e_type)])
+                return rigid_body.RigidBody(
+                    center=value.center[self.e_cond(e_type)],
+                    orientation=value.orientation[self.e_cond(e_type)],
+                )
             else:
                 return value[self.e_cond(e_type)]
-        return wrapper
 
+        return wrapper

@@ -15,11 +15,22 @@ import jax.numpy as jnp
 import numpy as np
 import matplotlib.colors as mcolors
 
-from vivarium.controllers.config import AgentConfig, ObjectConfig, SimulatorConfig, stype_to_config, config_to_stype
-from vivarium.simulator.simulator_states import SimulatorState, AgentState, ObjectState, StateType
+from vivarium.controllers.config import (
+    AgentConfig,
+    ObjectConfig,
+    SimulatorConfig,
+    stype_to_config,
+    config_to_stype,
+)
+from vivarium.simulator.simulator_states import (
+    SimulatorState,
+    AgentState,
+    ObjectState,
+    StateType,
+)
 
 lg = logging.getLogger(__name__)
-    
+
 if logging.root.handlers:
     lg.setLevel(logging.root.level)
 
@@ -31,13 +42,18 @@ class StateFieldInfo:
     state_to_config: typing.Callable
     config_to_state: typing.Callable
 
-EntityTuple = namedtuple('EntityTuple', ['idx', 'col', 'val'])
-ValueTuple = namedtuple('ValueData', ['ent_idx', 'col_idx', 'row_map', 'col_map', 'val'])
-StateChangeTuple = namedtuple('StateChange', ['nested_field', 'ent_idx', 'column_idx', 'value'])
+
+EntityTuple = namedtuple("EntityTuple", ["idx", "col", "val"])
+ValueTuple = namedtuple(
+    "ValueData", ["ent_idx", "col_idx", "row_map", "col_map", "val"]
+)
+StateChangeTuple = namedtuple(
+    "StateChange", ["nested_field", "ent_idx", "column_idx", "value"]
+)
 
 
 def events_to_nve_data(events, state):
-    """Convert events to a dictionary of nested field to entity tuples. 
+    """Convert events to a dictionary of nested field to entity tuples.
     NVE corresponds to this jax-md naming convention: https://jax-md.readthedocs.io/en/main/jax_md.simulate.html#jax_md.simulate.nve
 
     :param events: list of events to convert
@@ -57,13 +73,17 @@ def events_to_nve_data(events, state):
         if state_field_info.column_idx is None:
             nve_data[nested_field].append(EntityTuple(idx, None, val))
         elif isinstance(state_field_info.column_idx, int):
-            nve_data[nested_field].append(EntityTuple(idx, state_field_info.column_idx, val))
+            nve_data[nested_field].append(
+                EntityTuple(idx, state_field_info.column_idx, val)
+            )
         elif isinstance(state_field_info.column_idx, slice):
-            nve_data[nested_field].append(EntityTuple(idx, state_field_info.column_idx, val))
+            nve_data[nested_field].append(
+                EntityTuple(idx, state_field_info.column_idx, val)
+            )
         else:
             for c, v in zip(state_field_info.column_idx, val):
                 nve_data[nested_field].append(EntityTuple(idx, c, v))
-    
+
     return nve_data
 
 
@@ -90,7 +110,9 @@ def nve_data_to_state_changes(nve_data, state):
         else:
             col_idx = sorted(list(set([t.col for t in nve_tuples])))
             col_map = {idx: i for i, idx in enumerate(col_idx)}
-            val = np.array(state.field(nf)[np.ix_(state.row_idx(nf[0], ent_idx), col_idx)])
+            val = np.array(
+                state.field(nf)[np.ix_(state.row_idx(nf[0], ent_idx), col_idx)]
+            )
         value_data[nf] = ValueTuple(ent_idx, col_idx, row_map, col_map, val)
 
     state_changes = []
@@ -105,10 +127,11 @@ def nve_data_to_state_changes(nve_data, state):
             else:
                 col = value_tuple.col_map[nve_tuple.col]
                 value_tuple.val[row, col] = nve_tuple.val
-        state_changes.append(StateChangeTuple(
-            nf, value_data[nf].ent_idx,
-            value_data[nf].col_idx, value_tuple.val
-        ))
+        state_changes.append(
+            StateChangeTuple(
+                nf, value_data[nf].ent_idx, value_data[nf].col_idx, value_tuple.val
+            )
+        )
 
     return state_changes
 
@@ -143,13 +166,22 @@ def rec_set_dataclass(var, nested_field, row_idx, column_idx, value):
         if isinstance(column_idx, slice):
             column_idx = np.arange(
                 column_idx.start if column_idx.start is not None else 0,
-                column_idx.stop if column_idx.stop is not None else getattr(var, field).shape[1],
-                column_idx.step if column_idx.step is not None else 1, dtype=int
+                (
+                    column_idx.stop
+                    if column_idx.stop is not None
+                    else getattr(var, field).shape[1]
+                ),
+                column_idx.step if column_idx.step is not None else 1,
+                dtype=int,
             )
         if column_idx is None or len(column_idx) == 0:
             d = {field: getattr(var, field).at[row_idx].set(value.reshape(-1))}
         else:
-            d = {field: getattr(var, field).at[jnp.ix_(row_idx, column_idx)].set(value.reshape(len(row_idx), len(column_idx)))}
+            d = {
+                field: getattr(var, field)
+                .at[jnp.ix_(row_idx, column_idx)]
+                .set(value.reshape(len(row_idx), len(column_idx)))
+            }
         return d
     else:
         next_var = getattr(var, nested_field[0])
@@ -170,7 +202,7 @@ def set_configs_from_state(state, config_dict=None):
             stype = StateType(stype_int)
             config_dict[stype].append(stype_to_config[stype](idx=idx))
         config_dict[StateType.SIMULATOR].append(SimulatorConfig())
-    
+
     for stype in config_dict.keys():
         for param, state_field_info in configs_to_state_dict[stype].items():
             value = state
@@ -211,74 +243,280 @@ object_common_fields = [f for f in object_config_fields if f in object_state_fie
 # Define config fields for simulator
 simulator_config_fields = SimulatorConfig.param.objects().keys()
 simulator_state_fields = [f.name for f in jax_md.dataclasses.fields(SimulatorState)]
-simulator_common_fields = [f for f in simulator_config_fields if f in simulator_state_fields]
+simulator_common_fields = [
+    f for f in simulator_config_fields if f in simulator_state_fields
+]
 
 
 # Define conversions between agents configs and state dictionary
 agent_configs_to_state_dict = {
-    'x_position': StateFieldInfo(('entity_state', 'position', 'center'), 0, identity_s_to_c, identity_c_to_s),
-    'y_position': StateFieldInfo(('entity_state', 'position', 'center'), 1, identity_s_to_c, identity_c_to_s),
-    'orientation': StateFieldInfo(('entity_state', 'position', 'orientation'), None, identity_s_to_c, identity_c_to_s),
-    'mass_center': StateFieldInfo(('entity_state', 'mass', 'center'), np.array([0]), mass_center_s_to_c, mass_center_c_to_s),
-    'mass_orientation': StateFieldInfo(('entity_state', 'mass', 'orientation'), None, identity_s_to_c, identity_c_to_s),
-    'diameter': StateFieldInfo(('entity_state', 'diameter'), None, identity_s_to_c, identity_c_to_s),
-    'friction': StateFieldInfo(('entity_state', 'friction'), None, identity_s_to_c, identity_c_to_s),
-    'left_motor': StateFieldInfo(('agent_state', 'motor',), 0, identity_s_to_c, identity_c_to_s),
-    'right_motor': StateFieldInfo(('agent_state', 'motor',), 1, identity_s_to_c, identity_c_to_s),
-    'left_prox': StateFieldInfo(('agent_state', 'prox',), 0, identity_s_to_c, identity_c_to_s),
-    'right_prox': StateFieldInfo(('agent_state', 'prox',), 1, identity_s_to_c, identity_c_to_s),
-    'prox_sensed_ent_type': StateFieldInfo(('agent_state', 'prox_sensed_ent_type',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'prox_sensed_ent_idx': StateFieldInfo(('agent_state', 'prox_sensed_ent_idx',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'proximity_map_dist': StateFieldInfo(('agent_state', 'proximity_map_dist',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'proximity_map_theta': StateFieldInfo(('agent_state', 'proximity_map_theta',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'params': StateFieldInfo(('agent_state', 'params',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'sensed': StateFieldInfo(('agent_state', 'sensed',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'behavior': StateFieldInfo(('agent_state', 'behavior',), slice(None), array_map_s_to_c, identity_c_to_s),
-    'color': StateFieldInfo(('agent_state', 'color',), np.arange(3), color_s_to_c, color_c_to_s),
-    'idx': StateFieldInfo(('agent_state', 'ent_idx',), None, identity_s_to_c, identity_c_to_s),
-    'exists': StateFieldInfo(('entity_state', 'exists'), None, identity_s_to_c, int_c_to_s),
-    'subtype': StateFieldInfo(('entity_state', 'ent_subtype'), None, identity_s_to_c, int_c_to_s)
+    "x_position": StateFieldInfo(
+        ("entity_state", "position", "center"), 0, identity_s_to_c, identity_c_to_s
+    ),
+    "y_position": StateFieldInfo(
+        ("entity_state", "position", "center"), 1, identity_s_to_c, identity_c_to_s
+    ),
+    "orientation": StateFieldInfo(
+        ("entity_state", "position", "orientation"),
+        None,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "mass_center": StateFieldInfo(
+        ("entity_state", "mass", "center"),
+        np.array([0]),
+        mass_center_s_to_c,
+        mass_center_c_to_s,
+    ),
+    "mass_orientation": StateFieldInfo(
+        ("entity_state", "mass", "orientation"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "diameter": StateFieldInfo(
+        ("entity_state", "diameter"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "friction": StateFieldInfo(
+        ("entity_state", "friction"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "left_motor": StateFieldInfo(
+        (
+            "agent_state",
+            "motor",
+        ),
+        0,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "right_motor": StateFieldInfo(
+        (
+            "agent_state",
+            "motor",
+        ),
+        1,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "left_prox": StateFieldInfo(
+        (
+            "agent_state",
+            "prox",
+        ),
+        0,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "right_prox": StateFieldInfo(
+        (
+            "agent_state",
+            "prox",
+        ),
+        1,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "prox_sensed_ent_type": StateFieldInfo(
+        (
+            "agent_state",
+            "prox_sensed_ent_type",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "prox_sensed_ent_idx": StateFieldInfo(
+        (
+            "agent_state",
+            "prox_sensed_ent_idx",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "proximity_map_dist": StateFieldInfo(
+        (
+            "agent_state",
+            "proximity_map_dist",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "proximity_map_theta": StateFieldInfo(
+        (
+            "agent_state",
+            "proximity_map_theta",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "params": StateFieldInfo(
+        (
+            "agent_state",
+            "params",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "sensed": StateFieldInfo(
+        (
+            "agent_state",
+            "sensed",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "behavior": StateFieldInfo(
+        (
+            "agent_state",
+            "behavior",
+        ),
+        slice(None),
+        array_map_s_to_c,
+        identity_c_to_s,
+    ),
+    "color": StateFieldInfo(
+        (
+            "agent_state",
+            "color",
+        ),
+        np.arange(3),
+        color_s_to_c,
+        color_c_to_s,
+    ),
+    "idx": StateFieldInfo(
+        (
+            "agent_state",
+            "ent_idx",
+        ),
+        None,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "exists": StateFieldInfo(
+        ("entity_state", "exists"), None, identity_s_to_c, int_c_to_s
+    ),
+    "subtype": StateFieldInfo(
+        ("entity_state", "ent_subtype"), None, identity_s_to_c, int_c_to_s
+    ),
 }
 
 agent_configs_to_state_dict.update(
-    {f: StateFieldInfo(('agent_state', f,), None, identity_s_to_c, identity_c_to_s) for f in agent_common_fields if f not in agent_configs_to_state_dict}
+    {
+        f: StateFieldInfo(
+            (
+                "agent_state",
+                f,
+            ),
+            None,
+            identity_s_to_c,
+            identity_c_to_s,
+        )
+        for f in agent_common_fields
+        if f not in agent_configs_to_state_dict
+    }
 )
 
 # Define conversions between objects configs and state dictionary
 object_configs_to_state_dict = {
-    'x_position': StateFieldInfo(('entity_state', 'position', 'center'), 0, identity_s_to_c, identity_c_to_s),
-    'y_position': StateFieldInfo(('entity_state', 'position', 'center'), 1, identity_s_to_c, identity_c_to_s),
-    'orientation': StateFieldInfo(('entity_state', 'position', 'orientation'), None, identity_s_to_c, identity_c_to_s),
-    'mass_center': StateFieldInfo(('entity_state', 'mass', 'center'), np.array([0]), mass_center_s_to_c, mass_center_c_to_s),
-    'mass_orientation': StateFieldInfo(('entity_state', 'mass', 'orientation'), None, identity_s_to_c, identity_c_to_s),
-    'diameter': StateFieldInfo(('entity_state', 'diameter'), None, identity_s_to_c, identity_c_to_s),
-    'friction': StateFieldInfo(('entity_state', 'friction'), None, identity_s_to_c, identity_c_to_s),
-    'color': StateFieldInfo(('object_state', 'color',), np.arange(3), color_s_to_c, color_c_to_s),
-    'idx': StateFieldInfo(('object_state', 'ent_idx',), None, identity_s_to_c, identity_c_to_s),
-    'exists': StateFieldInfo(('entity_state', 'exists'), None, identity_s_to_c, int_c_to_s),
-    'subtype': StateFieldInfo(('entity_state', 'ent_subtype'), None, identity_s_to_c, int_c_to_s)
+    "x_position": StateFieldInfo(
+        ("entity_state", "position", "center"), 0, identity_s_to_c, identity_c_to_s
+    ),
+    "y_position": StateFieldInfo(
+        ("entity_state", "position", "center"), 1, identity_s_to_c, identity_c_to_s
+    ),
+    "orientation": StateFieldInfo(
+        ("entity_state", "position", "orientation"),
+        None,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "mass_center": StateFieldInfo(
+        ("entity_state", "mass", "center"),
+        np.array([0]),
+        mass_center_s_to_c,
+        mass_center_c_to_s,
+    ),
+    "mass_orientation": StateFieldInfo(
+        ("entity_state", "mass", "orientation"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "diameter": StateFieldInfo(
+        ("entity_state", "diameter"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "friction": StateFieldInfo(
+        ("entity_state", "friction"), None, identity_s_to_c, identity_c_to_s
+    ),
+    "color": StateFieldInfo(
+        (
+            "object_state",
+            "color",
+        ),
+        np.arange(3),
+        color_s_to_c,
+        color_c_to_s,
+    ),
+    "idx": StateFieldInfo(
+        (
+            "object_state",
+            "ent_idx",
+        ),
+        None,
+        identity_s_to_c,
+        identity_c_to_s,
+    ),
+    "exists": StateFieldInfo(
+        ("entity_state", "exists"), None, identity_s_to_c, int_c_to_s
+    ),
+    "subtype": StateFieldInfo(
+        ("entity_state", "ent_subtype"), None, identity_s_to_c, int_c_to_s
+    ),
 }
 
 object_configs_to_state_dict.update(
-    {f: StateFieldInfo(('object_state', f,), None, identity_s_to_c, identity_c_to_s) for f in object_common_fields if f not in object_configs_to_state_dict}
+    {
+        f: StateFieldInfo(
+            (
+                "object_state",
+                f,
+            ),
+            None,
+            identity_s_to_c,
+            identity_c_to_s,
+        )
+        for f in object_common_fields
+        if f not in object_configs_to_state_dict
+    }
 )
 
 simulator_configs_to_state_dict = {}
-simulator_configs_to_state_dict.update({f: StateFieldInfo(('simulator_state', f,), None, identity_s_to_c, identity_c_to_s) for f in simulator_common_fields if f not in simulator_configs_to_state_dict})
+simulator_configs_to_state_dict.update(
+    {
+        f: StateFieldInfo(
+            (
+                "simulator_state",
+                f,
+            ),
+            None,
+            identity_s_to_c,
+            identity_c_to_s,
+        )
+        for f in simulator_common_fields
+        if f not in simulator_configs_to_state_dict
+    }
+)
 
 # Define conversions between objects configs and state dictionary
 configs_to_state_dict = {
     StateType.AGENT: agent_configs_to_state_dict,
     StateType.OBJECT: object_configs_to_state_dict,
-    StateType.SIMULATOR: simulator_configs_to_state_dict
+    StateType.SIMULATOR: simulator_configs_to_state_dict,
 }
-
 
 
 # Define state fields for each state type
 state_fields_dict = {
     StateType.AGENT: agent_state_fields,
     StateType.OBJECT: object_state_fields,
-    StateType.SIMULATOR: simulator_state_fields
+    StateType.SIMULATOR: simulator_state_fields,
 }
-

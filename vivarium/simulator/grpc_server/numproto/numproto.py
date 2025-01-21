@@ -1,8 +1,10 @@
 """NumPy ndarray to protobuf serialization and deserialization"""
+
 from io import BytesIO
 
 import numpy as np
 from vivarium.simulator.grpc_server.simulator_pb2 import NDArray
+
 # from numproto.protobuf.ndarray_pb2 import NDArray
 
 

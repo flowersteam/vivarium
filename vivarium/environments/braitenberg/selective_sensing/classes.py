@@ -12,6 +12,7 @@ class EntityType(Enum):
     AGENT = 0
     OBJECT = 1
 
+
 # Already incorporates position, momentum, force, mass and velocity
 @md_dataclass
 class EntityState(simulate.NVEState):
@@ -21,11 +22,13 @@ class EntityState(simulate.NVEState):
     diameter: jnp.array
     friction: jnp.array
     exists: jnp.array
-    
+
+
 @md_dataclass
 class ParticleState:
     ent_idx: jnp.array
     color: jnp.array
+
 
 @md_dataclass
 class AgentState(ParticleState):
@@ -41,13 +44,15 @@ class AgentState(ParticleState):
     wheel_diameter: jnp.array
     speed_mul: jnp.array
     max_speed: jnp.array
-    theta_mul: jnp.array    
+    theta_mul: jnp.array
     proxs_dist_max: jnp.array
     proxs_cos_min: jnp.array
+
 
 @md_dataclass
 class ObjectState(ParticleState):
     pass
+
 
 @md_dataclass
 class State(BaseState):
@@ -60,7 +65,8 @@ class State(BaseState):
     ent_sub_types: dict
     entities: EntityState
     agents: AgentState
-    objects: ObjectState    
+    objects: ObjectState
+
 
 # Not part of the state but part of the environment
 @md_dataclass

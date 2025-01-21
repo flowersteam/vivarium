@@ -1,4 +1,4 @@
-# Default scene is a prey predator one. This file shows how to init a simulation with multiple entities, as well as selective sensing for agents
+# Default scene attributes
 seed: 0
 n_dims: 2
 box_size: 100
