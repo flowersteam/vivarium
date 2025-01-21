@@ -29,7 +29,7 @@ class Logger(object):
         :return: data associated with the log_field
         """
         if log_field not in self.logs:
-            print("No data in " + log_field)
+            print("No topic called " + log_field)
             return []
         else:
             return self.logs[log_field]
