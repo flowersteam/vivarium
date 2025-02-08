@@ -1,0 +1,59 @@
+seed: 42
+box_size: 300
+neighbor_radius: 300
+prox_dist_max: 60
+
+# Entity data definitions
+entities_data:
+  EntitySubTypes:
+  ## Care : make sure to order entities in a good order (first the agents and then the objects) ...
+    - A
+    - B
+    - C
+    - resources
+
+  Entities:
+    A:
+      type: AGENT
+      num: 20
+      existing: 15
+      color: red
+      diameter: 10
+      selective_behaviors:
+        aggr:
+          beh: MANUAL
+          sensed: 
+            - A
+            - B
+            - C  
+    B:
+      type: AGENT
+      num: 20
+      existing: 15
+      color: green
+      diameter: 10
+      selective_behaviors:
+        aggr:
+          beh: MANUAL
+          sensed: 
+            - A
+            - B
+            - C
+    C:
+      type: AGENT
+      num: 20
+      existing: 15
+      color: blue
+      diameter: 10
+      selective_behaviors:
+        aggr:
+          beh: MANUAL
+          sensed: 
+            - A
+            - B
+            - C
+    resources:
+      type: OBJECT
+      num: 20
+      existing: 19
+      color: green
