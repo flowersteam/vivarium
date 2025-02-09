@@ -15,12 +15,16 @@ class ParticleState(simulate.NVEState):
     sigma_g: jnp.array
     c_rep: jnp.array
     exists: jnp.array
+    friction: jnp.array
+    diameter: jnp.array
 
 @md_dataclass
 class State(BaseState):
     max_particles: jnp.int32
     neighbor_radius: jnp.float32
     dt: jnp.float32  # Give a more explicit name
+    collision_alpha: jnp.float32
+    collision_eps: jnp.float32
     particle_state: ParticleState
 
     @property
