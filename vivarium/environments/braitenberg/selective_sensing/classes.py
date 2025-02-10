@@ -3,9 +3,8 @@ from enum import Enum
 import jax.numpy as jnp
 
 from jax_md.dataclasses import dataclass as md_dataclass
-from jax_md import simulate
 
-from vivarium.environments.base_env import BaseState
+from vivarium.environments.base_env import BaseState, BaseEntityState
 
 
 class EntityType(Enum):
@@ -15,13 +14,10 @@ class EntityType(Enum):
 
 # Already incorporates position, momentum, force, mass and velocity
 @md_dataclass
-class EntityState(simulate.NVEState):
-    entity_type: jnp.array
+class EntityState(BaseEntityState):
     ent_subtype: jnp.array
-    entity_idx: jnp.array
     diameter: jnp.array
     friction: jnp.array
-    exists: jnp.array
 
 
 @md_dataclass

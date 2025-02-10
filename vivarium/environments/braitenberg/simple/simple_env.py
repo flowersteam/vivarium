@@ -13,8 +13,9 @@ from jax_md import space, rigid_body, partition, quantity
 from vivarium.environments.base_env import BaseEnv
 from vivarium.environments.utils import normal, distance, relative_position
 from vivarium.environments.physics_engine import (
-    total_collision_energy,
-    friction_force,
+    collision_force_fn,
+    friction_force_fn,
+    sum_force_fns,
     dynamics_fn,
 )
 from vivarium.environments.braitenberg.simple.init import init_state
@@ -195,28 +196,8 @@ def braintenberg_force_fn(displacement):
     :param displacement: displacement function to compute distances between entities
     :return: force function
     """
-    coll_force_fn = quantity.force(
-        partial(total_collision_energy, displacement=displacement)
-    )
 
-    def collision_force(state, neighbor, exists_mask):
-        """Returns the collision force function of the environment
-
-        :param state: state
-        :param neighbor: neighbor maps of entities
-        :param exists_mask: mask on existing entities
-        :return: collision force function
-        """
-        return coll_force_fn(
-            state.entities.position.center,
-            neighbor=neighbor,
-            exists_mask=exists_mask,
-            diameter=state.entities.diameter,
-            epsilon=state.collision_eps,
-            alpha=state.collision_alpha,
-        )
-
-    def motor_force(state, exists_mask):
+    def motor_force(state, neighbor, exists_mask):
         """Returns the motor force function of the environment
 
         :param state: state
@@ -277,23 +258,7 @@ def braintenberg_force_fn(displacement):
 
         return rigid_body.RigidBody(center=center, orientation=orientation)
 
-    def force_fn(state, neighbor, exists_mask):
-        """Returns the total force applied on the environment
-
-        :param state: state
-        :param neighbor: neighbor map
-        :param exists_mask: existing entities mask
-        :return: total force
-        """
-        mf = motor_force(state, exists_mask)
-        cf = collision_force(state, neighbor, exists_mask)
-        ff = friction_force(state, exists_mask)
-
-        center = cf + ff + mf.center
-        orientation = mf.orientation
-        return rigid_body.RigidBody(center=center, orientation=orientation)
-
-    return force_fn
+    return motor_force
 
 
 # --- 4 Define the environment class with its different functions (step ...) ---#
@@ -303,7 +268,11 @@ class BraitenbergEnv(BaseEnv):
         self.init_key = random.PRNGKey(seed)
         self.displacement, self.shift = space.periodic(state.box_size)
         self.init_fn, self.apply_physics = dynamics_fn(
-            self.displacement, self.shift, braintenberg_force_fn
+            self.displacement, self.shift,
+            sum_force_fns(self.displacement,
+                          [collision_force_fn,
+                           friction_force_fn,
+                           braintenberg_force_fn])
         )
         self.neighbor_fn = partition.neighbor_list(
             self.displacement,

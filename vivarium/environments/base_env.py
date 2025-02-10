@@ -5,7 +5,9 @@ from typing import Tuple
 
 import jax.numpy as jnp
 from jax import jit
+from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import dataclass as md_dataclass
+from jax_md import simulate
 
 
 @md_dataclass
@@ -13,6 +15,33 @@ class BaseState:
     time: jnp.int32
     box_size: jnp.int32
 
+class Unified:
+    def __init__(self, entity_state):
+        self._entitiy_state = entity_state
+
+    def __getattribute__(self, name):
+        field = getattr(self._entitiy_state, name)
+        if isinstance(field, RigidBody):
+            return getattr(field, 'center')
+        return field
+
+@md_dataclass
+class BaseEntityState(simulate.NVEState):
+    entity_type: jnp.array
+    entity_idx: jnp.array
+    exists: jnp.array
+
+    def is_rigid_body(self):
+        return hasattr(self.position, 'center')
+
+    def __getattr__(self, name):
+        if name.startswith("unified_"):
+            attr = name[len("unified_"):]
+            if isinstance(getattr(self, attr), RigidBody):
+                return getattr(self, attr).center
+            return getattr(self, attr)           
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+            
 
 @md_dataclass
 class Neighbors:
@@ -38,6 +67,6 @@ class BaseEnv:
         raise (NotImplementedError)
 
     def allocate_neighbors(self, state: BaseState, position=None):
-        position = state.entities.position.center if position is None else position
+        position = state.entities.unified_position if position is None else position
         neighbors = self.neighbor_fn.allocate(position)
         return neighbors

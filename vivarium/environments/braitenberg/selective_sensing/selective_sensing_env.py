@@ -12,7 +12,12 @@ from jax_md import space, partition
 
 from vivarium.environments.utils import distance
 from vivarium.environments.base_env import BaseEnv
-from vivarium.environments.physics_engine import dynamics_fn
+from vivarium.environments.physics_engine import (
+    collision_force_fn,
+    friction_force_fn,
+    sum_force_fns,
+    dynamics_fn,
+)
 from vivarium.environments.braitenberg.behaviors import Behaviors
 from vivarium.environments.braitenberg.selective_sensing.classes import (
     State,
@@ -350,7 +355,11 @@ class SelectiveSensorsEnv(BaseEnv):
         self.init_key = random.PRNGKey(seed)
         self.displacement, self.shift = space.periodic(state.box_size)
         self.init_fn, self.apply_physics = dynamics_fn(
-            self.displacement, self.shift, braintenberg_force_fn
+            self.displacement, self.shift,
+            sum_force_fns(self.displacement,
+                          [collision_force_fn,
+                           friction_force_fn,
+                           braintenberg_force_fn])
         )
         # Do a warning at the moment if neighbor radius is < box_size
         if state.neighbor_radius < state.box_size:

@@ -16,8 +16,8 @@ BOX_SIZE = 100
 MASS = 1.0
 DIAMETER = 0.2
 NEIGHBOR_RADIUS = 100.0
-COLLISION_ALPHA = 0.5
-COLLISION_EPS = 0.1
+COLLISION_ALPHA = 2.
+COLLISION_EPS = 1.
 DT = 0.1
 FRICTION = 1.
 
@@ -51,7 +51,9 @@ def init_state(
     key = random.PRNGKey(seed)
     #key, key_pos = random.split(key, 2)
 
-    particle_state = init_particle_state(
+    entities = init_entities(
+        entity_idx_offset=0,
+        entity_type=0,
         max_particles=max_particles,
         n_dims=n_dims,
         box_size=box_size,
@@ -65,10 +67,12 @@ def init_state(
     return State(time=0, box_size=box_size, max_particles=max_particles, 
                  neighbor_radius=neighbor_radius, dt=dt, 
                  collision_alpha=collision_alpha, collision_eps=collision_eps,
-                 particle_state=particle_state)
+                 entities=entities)
 
 
-def init_particle_state(
+def init_entities(
+    entity_idx_offset=0,
+    entity_type=0,
     max_particles=MAX_PARTICLES,
     n_dims=N_DIMS,
     box_size=BOX_SIZE,
@@ -76,12 +80,6 @@ def init_particle_state(
     mass=MASS,
     friction=FRICTION,
     diameter=DIAMETER,
-    # mu_k=MU_K,
-    # sigma_k=SIGMA_K,
-    # w_k=W_K,
-    # mu_g=MU_G,
-    # sigma_g=SIGMA_G,
-    # c_rep=C_REP,
     key=random.PRNGKey(SEED),
     **kwargs):
 
@@ -101,13 +99,15 @@ def init_particle_state(
             kwargs[param] = jnp.full((max_particles,), val)
         elif isinstance(val, tuple) and len(val) == 2:
             mean, std = val
-            key, key_param = random.split(key)
+            key, key_param = random.split(key)  
             kwargs[param] = random.normal(key_param, (max_particles,)) * std + mean
         elif isinstance(val, (np.ndarray, jnp.ndarray)):
             kwargs[param] = val
 
 
     return ParticleState(
+        entity_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + max_particles)), 
+        entity_type=jnp.full((max_particles,), entity_type),
         position=particle_positions,
         momentum=None,
         force=jnp.zeros((max_particles, 2)),

@@ -1,12 +1,12 @@
 import jax.numpy as jnp
 from jax_md.dataclasses import dataclass as md_dataclass
-from jax_md import simulate
+from vivarium.environments.base_env import BaseEntityState
 from vivarium.environments.base_env import BaseState
 
 
 
 @md_dataclass
-class ParticleState(simulate.NVEState):
+class ParticleState(BaseEntityState):
     idx: jnp.array
     mu_k: jnp.array
     sigma_k: jnp.array
@@ -25,8 +25,4 @@ class State(BaseState):
     dt: jnp.float32  # Give a more explicit name
     collision_alpha: jnp.float32
     collision_eps: jnp.float32
-    particle_state: ParticleState
-
-    @property
-    def entities(self):
-        return self.particle_state
+    entities: ParticleState
