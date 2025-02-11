@@ -46,15 +46,17 @@ def get_relative_displacement(state, agents_neighs_idx, displacement_fn):
     :param displacement_fn: jax md function enabling to know the distance between points
     :return: distance array, angles array, distance map for all agents, angles map for all agents
     """
-    body = state.entities.position
+    # body = state.entities.position
+    position = state.entities.unified_position
+    orientation = state.entities.unified_orientation
     senders, receivers = agents_neighs_idx
-    Ra = body.center[senders]
-    Rb = body.center[receivers]
+    Ra = position[senders]
+    Rb = position[receivers]
     dR = -space.map_bond(displacement_fn)(
         Ra, Rb
     )  # Looks like it should be opposite, but don't understand why
 
-    dist, theta = proximity_map(dR, body.orientation[senders])
+    dist, theta = proximity_map(dR, orientation[senders])
     proximity_map_dist = jnp.zeros(
         (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
     )
@@ -464,7 +466,7 @@ class SelectiveSensorsEnv(BaseEnv):
         state = state.set(time=state.time + 1, entities=entities)
 
         # Update the neighbors storage
-        neighbors = neighbors.update(state.entities.position.center)
+        neighbors = neighbors.update(state.entities.unified_position)
         neighbors_storage = Neighbors(
             neighbors=neighbors,
             agents_neighs_idx=agents_neighs_idx,
@@ -544,7 +546,7 @@ class SelectiveSensorsEnv(BaseEnv):
         :return: Neighbors object with neighbors (sparse representation), idx of agent's neighbors, neighbors (dense representation)
         """
         # get the sparse representation of neighbors (shape=(n_neighbors_pairs, 2))
-        position = state.entities.position.center if position is None else position
+        position = state.entities.unified_position if position is None else position
         neighbors = self.neighbor_fn.allocate(position)
 
         # Also update the neighbor idx of agents

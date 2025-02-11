@@ -207,8 +207,8 @@ def braintenberg_force_fn(displacement):
         agent_idx = state.agents.ent_idx
 
         body = rigid_body.RigidBody(
-            center=state.entities.position.center[agent_idx],
-            orientation=state.entities.position.orientation[agent_idx],
+            center=state.entities.unified_position[agent_idx],
+            orientation=state.entities.unified_orientation[agent_idx],
         )
 
         n = normal(body.orientation)
@@ -218,44 +218,53 @@ def braintenberg_force_fn(displacement):
             state.entities.diameter[agent_idx],
             state.agents.wheel_diameter,
         )
+        
+        # TODO CMF: is this really needed? The max speed is for state.agents.motor, whereas fwd is the body forward speed
         # `a_max` arg is deprecated in recent versions of jax, replaced by `max`
-        fwd = jnp.clip(fwd, a_max=state.agents.max_speed)
+        # fwd = jnp.clip(fwd, a_max=state.agents.max_speed)
 
         cur_vel = (
-            state.entities.momentum.center[agent_idx]
-            / state.entities.mass.center[agent_idx]
+            state.entities.unified_momentum[agent_idx]
+            / state.entities.unified_mass[agent_idx]
         )
         cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
-        cur_rot_vel = (
-            state.entities.momentum.orientation[agent_idx]
-            / state.entities.mass.orientation[agent_idx]
-        )
 
         fwd_delta = fwd - cur_fwd_vel
-        rot_delta = rot - cur_rot_vel
 
         fwd_force = (
             n
             * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
             * jnp.tile(state.agents.speed_mul, (SPACE_NDIMS, 1)).T
         )
-        rot_force = rot_delta * state.agents.theta_mul
+
 
         center = (
-            jnp.zeros_like(state.entities.position.center).at[agent_idx].set(fwd_force)
-        )
-        orientation = (
-            jnp.zeros_like(state.entities.position.orientation)
-            .at[agent_idx]
-            .set(rot_force)
+            jnp.zeros_like(state.entities.unified_position).at[agent_idx].set(fwd_force)
         )
 
+        # TODO CMF: if I get rid of RigidBody, do I also get rid of mass.orientation?
+        if state.entities.is_rigid_body():
+            cur_rot_vel = (
+                state.entities.momentum.orientation[agent_idx]
+                / state.entities.mass.orientation[agent_idx]
+            )
+            rot_delta = rot - cur_rot_vel
+            rot_force = rot_delta * state.agents.theta_mul
+            orientation = (
+                jnp.zeros_like(state.entities.unified_orientation)
+                .at[agent_idx]
+                .set(rot_force)
+            )
+            orientation = jnp.where(exists_mask, orientation, 0.0)
+
         # apply mask to make non existing agents stand still
-        orientation = jnp.where(exists_mask, orientation, 0.0)
+        
         # Because position has SPACE_NDMS dims, need to stack the mask to give it the same shape as center
         exists_mask = jnp.stack([exists_mask] * SPACE_NDIMS, axis=1)
         center = jnp.where(exists_mask, center, 0.0)
 
+        if not state.entities.is_rigid_body():
+            return center
         return rigid_body.RigidBody(center=center, orientation=orientation)
 
     return motor_force

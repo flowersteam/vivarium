@@ -29,12 +29,12 @@ def render(state):
     exists_agents = jnp.where(exists_agents != 0)
     exists_objects = jnp.where(exists_objects != 0)
 
-    agents_pos = state.entities.position.center[:max_agents][exists_agents]
-    agents_theta = state.entities.position.orientation[:max_agents][exists_agents][
+    agents_pos = state.entities.unified_position[:max_agents][exists_agents]
+    agents_theta = state.entities.unified_orientation[:max_agents][exists_agents][
         exists_agents
     ]
     agents_diameter = state.entities.diameter[:max_agents][exists_agents][exists_agents]
-    objects_pos = state.entities.position.center[max_agents:][exists_objects]
+    objects_pos = state.entities.unified_position[max_agents:][exists_objects]
     object_diameter = state.entities.diameter[max_agents:][exists_objects]
 
     x_agents, y_agents = agents_pos[:, 0], agents_pos[:, 1]
@@ -110,12 +110,12 @@ def render_history(state_history, pause=0.001, skip_frames=1):
         exists_agents = jnp.where(exists_agents != 0)
         exists_objects = jnp.where(exists_objects != 0)
 
-        agents_pos = entities.position.center[:max_agents][exists_agents]
-        agents_theta = entities.position.orientation[:max_agents][exists_agents][
+        agents_pos = entities.unified_position[:max_agents][exists_agents]
+        agents_theta = entities.unified_orientation[:max_agents][exists_agents][
             exists_agents
         ]
         agents_diameter = entities.diameter[:max_agents][exists_agents][exists_agents]
-        objects_pos = entities.position.center[max_agents:][exists_objects]
+        objects_pos = entities.unified_position[max_agents:][exists_objects]
         object_diameter = entities.diameter[max_agents:][exists_objects]
 
         x_agents, y_agents = agents_pos[:, 0], agents_pos[:, 1]

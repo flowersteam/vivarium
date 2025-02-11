@@ -37,6 +37,10 @@ class BaseEntityState(simulate.NVEState):
     def __getattr__(self, name):
         if name.startswith("unified_"):
             attr = name[len("unified_"):]
+            if attr == 'orientation':
+                if isinstance(self.position, RigidBody):
+                    return self.position.orientation
+                return self.orientation
             if isinstance(getattr(self, attr), RigidBody):
                 return getattr(self, attr).center
             return getattr(self, attr)           

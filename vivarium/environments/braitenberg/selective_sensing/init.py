@@ -194,15 +194,15 @@ def init_entities(
     friction=CONFIG.friction,
     agents_pos=None,
     objects_pos=None,
-    key_agents_pos=random.PRNGKey(CONFIG.seed),
-    key_objects_pos=random.PRNGKey(CONFIG.seed + 1),
-    key_orientations=random.PRNGKey(CONFIG.seed + 2),
+    key=random.PRNGKey(CONFIG.seed),
 ):
     """Init the sub entities state (field of state)"""
     n_entities = (
         max_agents + max_objects
     )  # we store the entities data in jax arrays of length max_agents + max_objects
     # Assign random positions to each entity in the environment
+
+    key_agents_pos, key_objects_pos, key_orientations = random.split(key, 3)
     agents_positions = random.uniform(key_agents_pos, (max_agents, n_dims)) * box_size
     objects_positions = (
         random.uniform(key_objects_pos, (max_objects, n_dims)) * box_size
@@ -415,7 +415,7 @@ def init_state(
 ) -> State:
     """Init the jax state of the simulation from classical python / yaml scene arguments"""
     key = random.PRNGKey(seed)
-    key, key_agents_pos, key_objects_pos, key_orientations = random.split(key, 4)
+    key, key_entities= random.split(key, 2)
 
     # create an enum for entities subtypes
     ent_sub_types = entities_data["EntitySubTypes"]
@@ -585,9 +585,7 @@ def init_state(
         friction=friction,
         agents_pos=agents_pos,
         objects_pos=objects_pos,
-        key_agents_pos=key_agents_pos,
-        key_objects_pos=key_objects_pos,
-        key_orientations=key_orientations,
+        key=key_entities
     )
 
     agents = init_agents(
