@@ -8,6 +8,8 @@ from vivarium.environments.particle.state import (
     ParticleState
 )
 
+from vivarium.environments.braitenberg.point_particle.init import init_entities
+
 # Constants
 SEED = 0
 MAX_PARTICLES = 10
@@ -31,6 +33,30 @@ LENIA_PARAMS = {
     'c_rep': 1.0
 }
 
+def init_particles(
+    entity_idx_offset=0,
+    max_particles=MAX_PARTICLES,
+    key=random.PRNGKey(SEED),
+    **kwargs):
+    for param, defaut_val in LENIA_PARAMS.items():
+        val = kwargs[param] if param in kwargs else defaut_val
+        if isinstance(val, float):
+            kwargs[param] = jnp.full((max_particles,), val)
+        elif isinstance(val, tuple) and len(val) == 2:
+            mean, std = val
+            key, key_param = random.split(key)  
+            kwargs[param] = random.normal(key_param, (max_particles,)) * std + mean
+        elif isinstance(val, (np.ndarray, jnp.ndarray)):
+            kwargs[param] = val
+
+
+    return ParticleState(
+        ent_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + max_particles)), 
+        # entity_type=jnp.full((max_particles,), entity_type),
+        idx=jnp.array(range(max_particles)),
+        **kwargs
+    )
+
 
 def init_state(
     box_size=BOX_SIZE,
@@ -49,72 +75,35 @@ def init_state(
 ) -> State:
 
     key = random.PRNGKey(seed)
-    #key, key_pos = random.split(key, 2)
+    key, s_key = random.split(key, 2)
+
+    ent_sub_types = {'AGENTS': (0, 0), 'PARTICLES': (1, max_particles)}
 
     entities = init_entities(
-        entity_idx_offset=0,
-        entity_type=0,
-        max_particles=max_particles,
-        n_dims=n_dims,
+        max_agents=0,
+        max_objects=max_particles,
+        ent_sub_types=ent_sub_types,  # e.g. {'PREYS': (0, 5), 'PREDS': (1, 5), 'RESOURCES': (2, 5), 'POISON': (3, 5)}
+        n_dims=N_DIMS,
         box_size=box_size,
-        existing_particles=existing_particles,
-        mass=mass,
+        existing_agents=None,
+        existing_objects=None,
+        mass_center=mass,
+        mass_orientation=1.,
+        diameter=diameter,
         friction=friction,
-        key=key,
+        agents_pos=None,
+        objects_pos=None,
+        key=s_key)
+
+    particles = init_particles(
+        entity_idx_offset=0,
+        max_particles=max_particles,
         **kwargs
     )
 
     return State(time=0, box_size=box_size, max_particles=max_particles, 
                  neighbor_radius=neighbor_radius, dt=dt, 
                  collision_alpha=collision_alpha, collision_eps=collision_eps,
-                 entities=entities)
+                 entities=entities, objects=particles)
 
 
-def init_entities(
-    entity_idx_offset=0,
-    entity_type=0,
-    max_particles=MAX_PARTICLES,
-    n_dims=N_DIMS,
-    box_size=BOX_SIZE,
-    existing_particles=None,
-    mass=MASS,
-    friction=FRICTION,
-    diameter=DIAMETER,
-    key=random.PRNGKey(SEED),
-    **kwargs):
-
-    existing_particles = existing_particles or max_particles
-     # Define arrays with existing entities
-    exists_particles = jnp.concatenate(
-        (jnp.ones((existing_particles)), jnp.zeros((max_particles - existing_particles)))
-    )
-
-    key, key_pos = random.split(key)   
-    particle_positions = random.uniform(key_pos, (max_particles, n_dims)) * box_size
-    
-
-    for param, defaut_val in LENIA_PARAMS.items():
-        val = kwargs[param] if param in kwargs else defaut_val
-        if isinstance(val, float):
-            kwargs[param] = jnp.full((max_particles,), val)
-        elif isinstance(val, tuple) and len(val) == 2:
-            mean, std = val
-            key, key_param = random.split(key)  
-            kwargs[param] = random.normal(key_param, (max_particles,)) * std + mean
-        elif isinstance(val, (np.ndarray, jnp.ndarray)):
-            kwargs[param] = val
-
-
-    return ParticleState(
-        entity_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + max_particles)), 
-        entity_type=jnp.full((max_particles,), entity_type),
-        position=particle_positions,
-        momentum=None,
-        force=jnp.zeros((max_particles, 2)),
-        mass=jnp.full((max_particles, 1), mass),
-        diameter=jnp.full((max_particles,), diameter),
-        friction=jnp.full((max_particles,), friction),
-        idx=jnp.array(range(max_particles)),
-        exists=exists_particles,
-        **kwargs
-    )

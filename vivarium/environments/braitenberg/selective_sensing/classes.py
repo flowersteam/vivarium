@@ -4,7 +4,7 @@ import jax.numpy as jnp
 
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.base_env import BaseState, BaseEntityState
+from vivarium.environments.base_env import BaseState, BaseEntityState, BaseParticleState
 
 
 class EntityType(Enum):
@@ -21,8 +21,7 @@ class EntityState(BaseEntityState):
 
 
 @md_dataclass
-class ParticleState:
-    ent_idx: jnp.array
+class ParticleState(BaseParticleState):
     color: jnp.array
 
 

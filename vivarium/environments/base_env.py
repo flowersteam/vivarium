@@ -15,15 +15,6 @@ class BaseState:
     time: jnp.int32
     box_size: jnp.int32
 
-class Unified:
-    def __init__(self, entity_state):
-        self._entitiy_state = entity_state
-
-    def __getattribute__(self, name):
-        field = getattr(self._entitiy_state, name)
-        if isinstance(field, RigidBody):
-            return getattr(field, 'center')
-        return field
 
 @md_dataclass
 class BaseEntityState(simulate.NVEState):
@@ -45,7 +36,10 @@ class BaseEntityState(simulate.NVEState):
                 return getattr(self, attr).center
             return getattr(self, attr)           
         raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-            
+
+@md_dataclass
+class BaseParticleState:
+    ent_idx: jnp.array
 
 @md_dataclass
 class Neighbors:

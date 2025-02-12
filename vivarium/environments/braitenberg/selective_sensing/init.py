@@ -183,7 +183,7 @@ def set_to_none_if_all_none(lst):
 def init_entities(
     max_agents,
     max_objects,
-    ent_sub_types,
+    ent_sub_types,  # e.g. {'PREYS': (0, 5), 'PREDS': (1, 5), 'RESOURCES': (2, 5), 'POISON': (3, 5)}
     n_dims=CONFIG.n_dims,
     box_size=CONFIG.box_size,
     existing_agents=None,

@@ -1,27 +1,25 @@
 import logging as lg
 
 from functools import partial
-from typing import Tuple
 
-import jax
 import jax.numpy as jnp
 
 from jax import vmap, jit
-from jax import random, ops
+from jax import random
 
-from jax_md import space, simulate, partition, quantity
+from jax_md import space, partition, quantity
 
 
 
 from vivarium.environments.base_env import BaseEnv
-from vivarium.environments.utils import normal, distance, relative_position
+from vivarium.environments.utils import distance
 from vivarium.environments.physics_engine import (
     collision_force_fn,
     friction_force_fn,
     sum_force_fns,
     dynamics_fn,
 )
-from vivarium.environments.particle import init_state, LENIA_PARAMS, N_DIMS
+from vivarium.environments.particle import init_state, LENIA_PARAMS
 from vivarium.environments.particle.state import State
 
 
@@ -30,25 +28,25 @@ def disp(displacement, position, other_positions):
     return vmap(displacement, (None, 0))(position, other_positions)
 
 def peak_f(x, mu, sigma):
-  return jnp.exp(-((x-mu)/sigma)**2)
+  return jnp.exp(-((x - mu)/sigma)**2)
 
 
 def lenia_energy_fn(displacement):
     def lenia_energy(positions, x_position, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep):
         r = jnp.sqrt(jnp.square(disp(displacement, x_position, positions)).sum(-1).clip(1e-10))
-        U = peak_f(r, mu_k, sigma_k).sum()*w_k
+        U = peak_f(r, mu_k, sigma_k).sum() * w_k
         G = peak_f(U, mu_g, sigma_g)
-        R = c_rep/2 * ((1.0-r).clip(0.0)**2).sum()
+        R = c_rep/2 * ((1.0 - r).clip(0.0) ** 2).sum()
         E = R - G
         return E
     return lenia_energy
 
 def particle_lenia_force_fn(displacement):
-    energy_fn = vmap(lenia_energy_fn(displacement), (None, 0, None, None, None, None, None, None))
+    # energy_fn = vmap(lenia_energy_fn(displacement), (None, 0, None, None, None, None, None, None))
     
     def force_fn(state, neighbor, exists_mask):
        force = quantity.force(lambda x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep : lenia_energy_fn(displacement)(state.entities.position, x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep))
-       return vmap(force)(state.entities.position, state.entities.mu_k, state.entities.sigma_k, state.entities.w_k, state.entities.mu_g, state.entities.sigma_g, state.entities.c_rep)
+       return vmap(force)(state.entities.position, state.objects.mu_k, state.objects.sigma_k, state.objects.w_k, state.objects.mu_g, state.objects.sigma_g, state.objects.c_rep)
     return force_fn
 
 
@@ -106,21 +104,16 @@ class ParticleEnv(BaseEnv):
         self.neighbors = neighbors
         return state
 
-    def allocate_neighbors(self, state, position=None):
-        position = position or state.entities.position
-        neighbors = self.neighbor_fn.allocate(position)
-        return neighbors
-
 
 if __name__ == "__main__":
     std = 0.
     params = {param: (mean, std) for param, mean in LENIA_PARAMS.items()}
     params['c_rep'] = 0.
-    state = init_state(box_size=24., max_particles=800, dt=0.1, friction=0.25, **params)
+    state = init_state(box_size=12., max_particles=200, dt=0.1, friction=0.25, **params)
     env = ParticleEnv(state)
 
     state_hist = []
-    n_steps  = 10000
+    n_steps  = 100
     for _ in range(n_steps):
         state = env.step(state)
         state_hist.append(state)
