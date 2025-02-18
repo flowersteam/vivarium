@@ -1,14 +1,39 @@
+from jax import random
 import jax.numpy as jnp
 import numpy as np
-
-from jax import random
-
-from vivarium.environments.particle.state import (
-    State,
-    ParticleState
-)
+from jax_md.dataclasses import dataclass as md_dataclass
+from vivarium.environments.base_env import BaseEntityState, BaseState, BaseParticleState
 
 from vivarium.environments.braitenberg.point_particle.init import init_entities
+
+@md_dataclass
+class EntityState(BaseEntityState):
+    friction: jnp.array
+    diameter: jnp.array
+
+
+@md_dataclass
+class ParticleState(BaseParticleState):
+    idx: jnp.array
+    mu_k: jnp.array
+    sigma_k: jnp.array
+    w_k: jnp.array
+    mu_g: jnp.array
+    sigma_g: jnp.array
+    c_rep: jnp.array
+    color: jnp.array
+
+
+@md_dataclass
+class State(BaseState):
+    max_particles: jnp.int32
+    neighbor_radius: jnp.float32
+    dt: jnp.float32
+    collision_alpha: jnp.float32
+    collision_eps: jnp.float32
+    entities: EntityState
+    objects: ParticleState
+
 
 # Constants
 SEED = 0
@@ -30,12 +55,13 @@ LENIA_PARAMS = {
     'w_k': 0.022,
     'mu_g': 0.6,
     'sigma_g': 0.15,
-    'c_rep': 1.0
+    'c_rep': 0.0  # 1.0  (done through the vivarium collision force)
 }
 
 def init_particles(
     entity_idx_offset=0,
     max_particles=MAX_PARTICLES,
+    color=None,
     key=random.PRNGKey(SEED),
     **kwargs):
     for param, defaut_val in LENIA_PARAMS.items():
@@ -49,11 +75,13 @@ def init_particles(
         elif isinstance(val, (np.ndarray, jnp.ndarray)):
             kwargs[param] = val
 
+    if color is None:
+         color = jnp.full((max_particles, 3), 0.5)
 
     return ParticleState(
         ent_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + max_particles)), 
-        # entity_type=jnp.full((max_particles,), entity_type),
         idx=jnp.array(range(max_particles)),
+        color=color,
         **kwargs
     )
 
@@ -65,12 +93,10 @@ def init_state(
     neighbor_radius=NEIGHBOR_RADIUS,
     collision_alpha=COLLISION_ALPHA,
     collision_eps=COLLISION_EPS,
-    n_dims=N_DIMS,
     seed=SEED,
     diameter=DIAMETER,
     mass=MASS,
     friction=FRICTION,
-    existing_particles=None,
     **kwargs
 ) -> State:
 
