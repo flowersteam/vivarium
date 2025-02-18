@@ -1,26 +1,23 @@
-import logging as lg
-
-from functools import partial
-from typing import Tuple
-
 import jax.numpy as jnp
 
-from jax import vmap, jit
+from jax import vmap
 from jax import random, ops
 
-from jax_md import space, rigid_body, partition, quantity
+from jax_md import space, rigid_body
 
-from vivarium.environments.base_env import BaseEnv
-from vivarium.environments.utils import normal, distance, relative_position
+from vivarium.environments.base_env import BaseEnv, NeighborManager
+from vivarium.environments.utils import normal, relative_position
+
 from vivarium.environments.physics_engine import (
-    collision_force_fn,
-    friction_force_fn,
-    sum_force_fns,
-    dynamics_fn,
+    reset_force_state_fn,
+    collision_state_fn,
+    friction_state_fn,
+    init_state_fn,
+    step_state_fn
 )
 from vivarium.environments.braitenberg.simple.init import init_state
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.simple.classes import EntityType, State
+from vivarium.environments.braitenberg.simple.classes import EntityType
 
 
 ### Define the constants and the classes of the environment to store its state ###
@@ -188,129 +185,84 @@ def motor_command(wheel_activation, base_length, wheel_diameter):
 motor_command = vmap(motor_command, (0, 0, 0))
 
 
-# --- 3 Functions to compute the different forces in the environment ---#
-# TODO : Refactor the code in order to simply the definition of a total force fn incorporating different forces
-def braintenberg_force_fn(displacement):
-    """Return the force function of the environment
+def motor_force(state, mask):
+    """Returns the motor force function of the environment
 
-    :param displacement: displacement function to compute distances between entities
-    :return: force function
+    :param state: state
+    :param mask: mask on entities (e.g. existing ones)
+    :return: motor force
     """
+    agent_idx = state.agents.ent_idx
 
-    def motor_force(state, neighbor, exists_mask):
-        """Returns the motor force function of the environment
+    n = normal(state.entities.unified_orientation[agent_idx])
 
-        :param state: state
-        :param exists_mask: mask on existing entities
-        :return: motor force function
-        """
-        agent_idx = state.agents.ent_idx
+    fwd, rot = motor_command(state.agents.motor,
+                             state.entities.diameter[agent_idx],
+                             state.agents.wheel_diameter)
 
-        body = rigid_body.RigidBody(
-            center=state.entities.unified_position[agent_idx],
-            orientation=state.entities.unified_orientation[agent_idx],
+    cur_vel = (
+        state.entities.unified_momentum[agent_idx]
+        / state.entities.unified_mass[agent_idx]
+    )
+
+    cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
+
+    fwd_delta = fwd - cur_fwd_vel
+
+    fwd_force = (
+        n
+        * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
+        * jnp.tile(state.agents.speed_mul, (SPACE_NDIMS, 1)).T
+    )
+
+
+    center = (
+        jnp.zeros_like(state.entities.unified_position).at[agent_idx].set(fwd_force)
+    )
+
+    # TODO CMF: if I get rid of RigidBody, do I also get rid of mass.orientation?
+    if state.entities.is_rigid_body():
+        cur_rot_vel = (
+            state.entities.momentum.orientation[agent_idx]
+            / state.entities.mass.orientation[agent_idx]
         )
+        rot_delta = rot - cur_rot_vel
+        rot_force = rot_delta * state.agents.theta_mul
+    else:
+        rot_force = state.dt * rot
 
-        n = normal(body.orientation)
+    orientation = (
+        jnp.zeros_like(state.entities.unified_orientation)
+        .at[agent_idx]
+        .set(rot_force)
+    )
 
-        fwd, rot = motor_command(
-            state.agents.motor,
-            state.entities.diameter[agent_idx],
-            state.agents.wheel_diameter,
-        )
+    orientation = jnp.where(mask, orientation, 0.0)
+    mask = jnp.stack([mask] * SPACE_NDIMS, axis=1)
+    center = jnp.where(mask, center, 0.0)
+
+    return center, orientation
+
+
+def sum_force_to_entities(entities, center, orientation=0.):
+    if not entities.is_rigid_body():
+        return entities.set(force=center + entities.force, orientation=orientation + entities.orientation)
+    else:
+        center += entities.force.center
+        orientation += entities.force.orientation         
+        return entities.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
-        # TODO CMF: is this really needed? The max speed is for state.agents.motor, whereas fwd is the body forward speed
-        # `a_max` arg is deprecated in recent versions of jax, replaced by `max`
-        # fwd = jnp.clip(fwd, a_max=state.agents.max_speed)
 
-        cur_vel = (
-            state.entities.unified_momentum[agent_idx]
-            / state.entities.unified_mass[agent_idx]
-        )
-        cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
-
-        fwd_delta = fwd - cur_fwd_vel
-
-        fwd_force = (
-            n
-            * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
-            * jnp.tile(state.agents.speed_mul, (SPACE_NDIMS, 1)).T
-        )
-
-
-        center = (
-            jnp.zeros_like(state.entities.unified_position).at[agent_idx].set(fwd_force)
-        )
-
-        # TODO CMF: if I get rid of RigidBody, do I also get rid of mass.orientation?
-        if state.entities.is_rigid_body():
-            cur_rot_vel = (
-                state.entities.momentum.orientation[agent_idx]
-                / state.entities.mass.orientation[agent_idx]
-            )
-            rot_delta = rot - cur_rot_vel
-            rot_force = rot_delta * state.agents.theta_mul
-            orientation = (
-                jnp.zeros_like(state.entities.unified_orientation)
-                .at[agent_idx]
-                .set(rot_force)
-            )
-            orientation = jnp.where(exists_mask, orientation, 0.0)
-
-        # apply mask to make non existing agents stand still
-        
-        # Because position has SPACE_NDMS dims, need to stack the mask to give it the same shape as center
-        exists_mask = jnp.stack([exists_mask] * SPACE_NDIMS, axis=1)
-        center = jnp.where(exists_mask, center, 0.0)
-
-        if not state.entities.is_rigid_body():
-            return center
-        return rigid_body.RigidBody(center=center, orientation=orientation)
-
-    return motor_force
-
-
-# --- 4 Define the environment class with its different functions (step ...) ---#
-class BraitenbergEnv(BaseEnv):
-    def __init__(self, state, seed=42):
-        self.seed = seed
-        self.init_key = random.PRNGKey(seed)
-        self.displacement, self.shift = space.periodic(state.box_size)
-        self.init_fn, self.apply_physics = dynamics_fn(
-            self.displacement, self.shift,
-            sum_force_fns(self.displacement,
-                          [collision_force_fn,
-                           friction_force_fn,
-                           braintenberg_force_fn])
-        )
-        self.neighbor_fn = partition.neighbor_list(
-            self.displacement,
-            state.box_size,
-            r_cutoff=state.neighbor_radius,
-            dr_threshold=10.0,
-            capacity_multiplier=1.5,
-            format=partition.Sparse,
-        )
-
-        self.neighbors, self.agents_neighs_idx = self.allocate_neighbors(state)
-
-    def distance(self, point1, point2):
-        return distance(self.displacement, point1, point2)
-
-    @partial(jit, static_argnums=(0,))
-    def _step(
-        self, state: State, neighbors: jnp.array, agents_neighs_idx: jnp.array
-    ) -> Tuple[State, jnp.array]:
-        # 1 : Compute agents proximeter
-        exists_mask = jnp.where(state.entities.exists == 1, 1, 0)
+def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
+    def state_fn(state, neighbors):
+        exists_mask = mask_fn(state)
         prox, proximity_dist_map, proximity_dist_theta = compute_prox(
             state,
             agents_neighs_idx,
             target_exists_mask=exists_mask,
-            displacement=self.displacement,
+            displacement=displacement,
         )
 
-        # 2 : Compute motor activations according to new proximeter values
         motor = compute_motor(
             prox, state.agents.params, state.agents.behavior, state.agents.motor
         )
@@ -321,43 +273,33 @@ class BraitenbergEnv(BaseEnv):
             motor=motor,
         )
 
-        # 3 : Update the state with new agents proximeter and motor values
         state = state.set(agents=agents)
 
-        # 4 : Move the entities by applying forces on them (collision, friction and motor forces for agents)
-        entities = self.apply_physics(state, neighbors)
-        state = state.set(time=state.time + 1, entities=entities)
+        center, orientation = motor_force(state, exists_mask)
 
-        # 5 : Update neighbors
-        neighbors = neighbors.update(state.entities.position.center)
-        return state, neighbors
+        return state.set(entities=sum_force_to_entities(state.entities, center, orientation))
+    return state_fn
 
-    def step(self, state: State) -> State:
-        if state.entities.momentum is None:
-            state = self.init_fn(state, self.init_key)
-        current_state = state
-        state, neighbors = self._step(
-            current_state, self.neighbors, self.agents_neighs_idx
-        )
-        if self.neighbors.did_buffer_overflow:
-            # reallocate neighbors and run the simulation from current_state
-            lg.warning(
-                f"NEIGHBORS BUFFER OVERFLOW at step {state.time}: rebuilding neighbors"
-            )
-            neighbors, self.agents_neighs_idx = self.allocate_neighbors(state)
-            assert not neighbors.did_buffer_overflow
 
-        self.neighbors = neighbors
-        return state
+class BraitenbergEnv(BaseEnv):
+    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42):
+        
+        displacement, shift = space_fn(state.box_size)
 
-    def allocate_neighbors(self, state, position=None):
-        neighbors = super().allocate_neighbors(state, position)
-
-        # Also update the neighbor idx of agents (not the cleanest to attribute it to with self here)
-        ag_idx = state.entities.entity_type[neighbors.idx[0]] == EntityType.AGENT.value
-        agents_neighs_idx = neighbors.idx[:, ag_idx]
-
-        return neighbors, agents_neighs_idx
+        exists_mask_fn = lambda state: state.entities.exists == 1
+        key = random.PRNGKey(seed)
+        key, new_key = random.split(key)
+        init_fn = init_state_fn(key)
+        neighbor_manager = NeighborManager(displacement, state)
+        ag_idx = state.entities.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
+        agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
+        state_fns = [reset_force_state_fn(),
+                     braitenberg_state_fn(displacement, exists_mask_fn, 
+                                          agents_neighs_idx),
+                     collision_state_fn(displacement, exists_mask_fn),
+                     friction_state_fn(exists_mask_fn),
+                     step_state_fn(shift, exists_mask_fn, new_key)]
+        super().__init__(state, init_fn, state_fns, neighbor_manager)
 
 
 if __name__ == "__main__":
@@ -365,4 +307,4 @@ if __name__ == "__main__":
     env = BraitenbergEnv(state)
     for _ in range(10):
         state = env.step(state)
-        print(state)
+

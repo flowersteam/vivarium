@@ -12,7 +12,7 @@ def test_simple_env_running():
     env = BraitenbergEnv(state=state)
 
     for _ in range(NUM_STEPS):
-        state = env.step(state=state)
+        state = env.step(state=state, num_scan_steps=3)
 
     assert env
     assert state
