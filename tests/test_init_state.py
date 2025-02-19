@@ -1,7 +1,7 @@
 from omegaconf import OmegaConf
 from hydra import initialize, compose
 
-from vivarium.environments.braitenberg.selective_sensing.init import init_state
+from vivarium.environments.braitenberg.selective_sensing import init_state
 
 
 def test_init_default_state():

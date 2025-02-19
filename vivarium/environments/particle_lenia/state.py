@@ -4,7 +4,10 @@ import numpy as np
 from jax_md.dataclasses import dataclass as md_dataclass
 from vivarium.environments.base_env import BaseEntityState, BaseState, BaseParticleState
 
-from vivarium.environments.braitenberg.point_particle.init import init_entities
+from vivarium.environments.utils import rigid_body_to_point_particle
+from vivarium.environments.braitenberg import selective_sensing
+
+_, init_entities = rigid_body_to_point_particle(selective_sensing)
 
 @md_dataclass
 class EntityState(BaseEntityState):
@@ -85,7 +88,6 @@ def init_particles(
         **kwargs
     )
 
-
 def init_state(
     box_size=BOX_SIZE,
     dt=DT,
@@ -131,5 +133,3 @@ def init_state(
                  neighbor_radius=neighbor_radius, dt=dt, 
                  collision_alpha=collision_alpha, collision_eps=collision_eps,
                  entities=entities, objects=particles)
-
-
