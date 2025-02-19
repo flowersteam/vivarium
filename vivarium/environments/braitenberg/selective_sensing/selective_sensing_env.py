@@ -1,36 +1,33 @@
 import logging as lg
 
-from functools import partial
-from typing import Tuple
-
 import jax
 import jax.numpy as jnp
 
 from jax import vmap, jit
 from jax import random, lax
-from jax_md import space, partition
+from jax_md import space
 
-from vivarium.environments.utils import distance
-from vivarium.environments.base_env import BaseEnv
+from vivarium.environments.base_env import BaseEnv, NeighborManager
 from vivarium.environments.physics_engine import (
-    collision_force_fn,
-    friction_force_fn,
-    sum_force_fns,
-    dynamics_fn,
+    reset_force_state_fn,
+    collision_state_fn,
+    friction_state_fn,
+    init_state_fn,
+    step_state_fn
 )
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.selective_sensing.classes import (
+from vivarium.environments.braitenberg.selective_sensing import (
     State,
-    Neighbors,
     EntityType,
+    init_state
 )
-from vivarium.environments.braitenberg.selective_sensing.init import init_state
 
 from vivarium.environments.braitenberg.simple.simple_env import (
     proximity_map,
     sensor_fn,
     linear_behavior,
-    braintenberg_force_fn,
+    motor_force,
+    sum_force_to_entities
 )
 
 
@@ -341,86 +338,23 @@ compute_all_agents_proxs_motors = vmap(
     compute_agent_proxs_motors, in_axes=(None, 0, 0, 0, 0, 0, None, None, None)
 )
 
-
-# TODO : Fix the non occlusion error in the step
-class SelectiveSensorsEnv(BaseEnv):
-    def __init__(self, state, occlusion=True, seed=42):
-        """Init the selective sensors braitenberg env
-
-        :param state: simulation state already complete
-        :param occlusion: wether to use sensors with occlusion or not, defaults to True
-        :param seed: random seed, defaults to 42
-        """
-        self.seed = seed
-        self.occlusion = occlusion
-        self.compute_all_agents_proxs_motors = self.choose_agent_prox_motor_function()
-        self.init_key = random.PRNGKey(seed)
-        self.displacement, self.shift = space.periodic(state.box_size)
-        self.init_fn, self.apply_physics = dynamics_fn(
-            self.displacement, self.shift,
-            sum_force_fns(self.displacement,
-                          [collision_force_fn,
-                           friction_force_fn,
-                           braintenberg_force_fn])
-        )
-        # Do a warning at the moment if neighbor radius is < box_size
-        if state.neighbor_radius < state.box_size:
-            lg.warn(
-                "Neighbor radius < Box size, this might cause problems for neighbors arrays and proximity maps updates"
-            )
-        self.neighbor_fn = partition.neighbor_list(
-            self.displacement,
-            state.box_size,
-            r_cutoff=state.neighbor_radius,
-            dr_threshold=10.0,
-            capacity_multiplier=1.5,
-            format=partition.Sparse,
-        )
-        self.neighbors_storage = self.allocate_neighbors(state)
-
-    def distance(self, point1, point2):
-        """Returns the distance between two points
-
-        :param point1: point1 coordinates
-        :param point2: point1 coordinates
-        :return: distance between two points
-        """
-        return distance(self.displacement, point1, point2)
-
-    # At the moment doesn't work because the _step function isn't recompiled
-    def choose_agent_prox_motor_function(self):
-        """Returns the function to compute the proximeters and the motors with or without occlusion
-
-        :return: compute_all_agents_proxs_motors function
-        """
-        if self.occlusion:
-            prox_motor_function = compute_all_agents_proxs_motors_occl
-        else:
-            prox_motor_function = compute_all_agents_proxs_motors
-        return prox_motor_function
-
-    @partial(jit, static_argnums=(0,))
-    def _step_env(
-        self, state: State, neighbors_storage: Neighbors
-    ) -> Tuple[State, Neighbors]:
-        """Do one jitted step in the environment and return the updated state, as well as updated neighbors array
-
-        :param state: current state
-        :param neighbors_storage: class storing all neighbors information
-        :return: new state, neighbors storage wih updated neighbors
-        """
+def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_dense, occlusion=True):
+    
+    assert occlusion, "Non occlusion not working yet"
+    prox_motor_function = compute_all_agents_proxs_motors_occl if occlusion else compute_all_agents_proxs_motors
+     
+    def state_fn(state, neighbors):
 
         # Retrieve different neighbors format
-        neighbors = neighbors_storage.neighbors
-        agents_neighs_idx = neighbors_storage.agents_neighs_idx
-        ag_idx_dense = neighbors_storage.agents_idx_dense
         senders, receivers = agents_neighs_idx
-        ag_idx_dense_senders, ag_idx_dense_receivers = ag_idx_dense
+        ag_idx_dense_senders, ag_idx_dense_receivers = agents_idx_dense
+
+        exists_mask = mask_fn(state)
 
         # Compute raw proxs for all agents first
         dist, relative_theta, proximity_dist_map, proximity_dist_theta = (
             get_relative_displacement(
-                state, agents_neighs_idx, displacement_fn=self.displacement
+                state, agents_neighs_idx, displacement_fn=displacement
             )
         )
 
@@ -435,7 +369,7 @@ class SelectiveSensorsEnv(BaseEnv):
 
         # Compute real agents proximeters and motors
         agent_proxs, prox_sensed_ent_tuple, mean_agent_motors = (
-            self.compute_all_agents_proxs_motors(
+            prox_motor_function(
                 state,
                 state.agents.ent_idx,
                 state.agents.params,
@@ -462,96 +396,27 @@ class SelectiveSensorsEnv(BaseEnv):
 
         # Update the entities and the state
         state = state.set(agents=agents)
-        entities = self.apply_physics(state, neighbors)
-        state = state.set(time=state.time + 1, entities=entities)
 
-        # Update the neighbors storage
-        neighbors = neighbors.update(state.entities.unified_position)
-        neighbors_storage = Neighbors(
-            neighbors=neighbors,
-            agents_neighs_idx=agents_neighs_idx,
-            agents_idx_dense=ag_idx_dense,
-        )
+        center, orientation = motor_force(state, exists_mask)
 
-        return state, neighbors_storage
+        return state.set(entities=sum_force_to_entities(state.entities, center, orientation))
+    
+    return state_fn
+    
 
-    @partial(jax.jit, static_argnums=(0, 3))
-    def _steps(self, state, neighbor_storage, num_updates):
-        lg.debug("Compile _steps function in SelectiveSensing environment")
+# TODO : Fix the non occlusion error in the step
+class SelectiveSensorsEnv(BaseEnv):
+    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42):
+        
+        displacement, shift = space_fn(state.box_size)
 
-        """Update the current state by doing a _step_env update num_updates times (this results in faster simulations) 
-
-        :param state: _description_
-        :param neighbor_storage: _description_
-        :param num_updates: _description_
-        """
-
-        def step_fn(carry, _):
-            """Apply a step function to return new state and neighbors storage in a jax.lax.scan update
-
-            :param carry: tuple of (state, neighbors storage)
-            :param _: dummy xs for jax.lax.scan
-            :return: tuple of (carry, carry) with carry=(new_state, new_neighbors _sotrage)
-            """
-            state, neighbors_storage = carry
-            new_state, new_neighbors_storage = self._step_env(state, neighbors_storage)
-            carry = (new_state, new_neighbors_storage)
-            return carry, carry
-
-        (state, neighbor_storage), _ = jax.lax.scan(
-            step_fn, (state, neighbor_storage), xs=None, length=num_updates
-        )
-
-        return state, neighbor_storage
-
-    def step(self, state: State, num_updates: int = 4) -> State:
-        """Do num_updates jitted steps in the environment and return the updated state. This function also handles the neighbors mechanism and hence isn't jitted
-
-        :param state: current state
-        :param num_updates: number of jitted_steps
-        :return: next state
-        """
-        # Because momentum is initialized to None, need to initialize it with init_fn from jax_md
-        if state.entities.momentum is None:
-            state = self.init_fn(state, self.init_key)
-            state, neighbors_storage = self._step_env(state, self.neighbors_storage)
-
-        # Save the first state
-        current_state = state
-
-        state, neighbors_storage = self._steps(
-            current_state, self.neighbors_storage, num_updates
-        )
-
-        # Check if neighbors buffer overflowed
-        if neighbors_storage.neighbors.did_buffer_overflow:
-            # reallocate neighbors and run the simulation from current_state if it is the case
-            lg.warning(
-                f"NEIGHBORS BUFFER OVERFLOW at step {state.time}: rebuilding neighbors"
-            )
-            self.neighbors_storage = self.allocate_neighbors(state)
-            # Because there was an error, we need to re-run this simulation loop from the copy of the current_state we created (and check wether it worked or not after)
-            state, neighbors_storage = self._steps(
-                current_state, self.neighbors_storage, num_updates
-            )
-            assert not neighbors_storage.neighbors.did_buffer_overflow
-
-        return state
-
-    def allocate_neighbors(self, state, position=None):
-        """Allocate the neighbors according to the state
-
-        :param state: state
-        :param position: position of entities in the state, defaults to None
-        :return: Neighbors object with neighbors (sparse representation), idx of agent's neighbors, neighbors (dense representation)
-        """
-        # get the sparse representation of neighbors (shape=(n_neighbors_pairs, 2))
-        position = state.entities.unified_position if position is None else position
-        neighbors = self.neighbor_fn.allocate(position)
-
-        # Also update the neighbor idx of agents
-        ag_idx = state.entities.entity_type[neighbors.idx[0]] == EntityType.AGENT.value
-        agents_neighs_idx = neighbors.idx[:, ag_idx]
+        exists_mask_fn = lambda state: state.entities.exists == 1
+        key = random.PRNGKey(seed)
+        key, new_key = random.split(key)
+        init_fn = init_state_fn(key)
+        neighbor_manager = NeighborManager(displacement, state)
+        ag_idx = state.entities.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
+        agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
 
         # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
         agents_idx_dense_senders = jnp.array(
@@ -566,17 +431,19 @@ class SelectiveSensorsEnv(BaseEnv):
         agents_idx_dense_receivers = agents_neighs_idx[1, :][agents_idx_dense_senders]
         agents_idx_dense = agents_idx_dense_senders, agents_idx_dense_receivers
 
-        neighbor_storage = Neighbors(
-            neighbors=neighbors,
-            agents_neighs_idx=agents_neighs_idx,
-            agents_idx_dense=agents_idx_dense,
-        )
-        return neighbor_storage
+        state_fns = [reset_force_state_fn(),
+                     braitenberg_state_fn(displacement, exists_mask_fn, 
+                                          agents_neighs_idx, 
+                                          agents_idx_dense, occlusion=occlusion),
+                     collision_state_fn(displacement, exists_mask_fn),
+                     friction_state_fn(exists_mask_fn),
+                     step_state_fn(shift, exists_mask_fn, new_key)]
+        super().__init__(state, init_fn, state_fns, neighbor_manager)
 
 
 if __name__ == "__main__":
     state = init_state()
     env = SelectiveSensorsEnv(state)
 
-    env.step(state, num_updates=5)
-    env.step(state, num_updates=6)
+    env.step(state, num_scan_steps=5)
+    env.step(state, num_scan_steps=6)

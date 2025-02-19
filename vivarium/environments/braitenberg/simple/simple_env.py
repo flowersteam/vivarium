@@ -15,9 +15,9 @@ from vivarium.environments.physics_engine import (
     init_state_fn,
     step_state_fn
 )
-from vivarium.environments.braitenberg.simple.init import init_state
+from vivarium.environments.braitenberg.simple import init_state
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.simple.classes import EntityType
+from vivarium.environments.braitenberg.simple.state import EntityType
 
 
 ### Define the constants and the classes of the environment to store its state ###
@@ -78,17 +78,18 @@ def compute_prox(state, agents_neighs_idx, target_exists_mask, displacement):
     target_exists_mask[i] is True (resp. False) if entity of index i in state.entities exists (resp. don't exist).
     :return:
     """
-    body = state.entities.position
+    center = state.entities.position_center
+    orientation = state.entities.position_orientation
     mask = target_exists_mask[agents_neighs_idx[1, :]]
     senders, receivers = agents_neighs_idx
-    Ra = body.center[senders]
-    Rb = body.center[receivers]
+    Ra = center[senders]
+    Rb = center[receivers]
     dR = -space.map_bond(displacement)(
         Ra, Rb
     )  # Looks like it should be opposite, but don't understand why
 
     # Create distance and angle maps between entities
-    dist, theta = proximity_map(dR, body.orientation[senders])
+    dist, theta = proximity_map(dR, orientation[senders])
     proximity_map_dist = jnp.zeros(
         (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
     )
@@ -215,7 +216,6 @@ def motor_force(state, mask):
         * jnp.tile(state.agents.speed_mul, (SPACE_NDIMS, 1)).T
     )
 
-
     center = (
         jnp.zeros_like(state.entities.unified_position).at[agent_idx].set(fwd_force)
     )
@@ -252,6 +252,7 @@ def sum_force_to_entities(entities, center, orientation=0.):
         orientation += entities.force.orientation         
         return entities.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
+
 
 def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
     def state_fn(state, neighbors):
@@ -307,4 +308,3 @@ if __name__ == "__main__":
     env = BraitenbergEnv(state)
     for _ in range(10):
         state = env.step(state)
-
