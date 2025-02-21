@@ -8,6 +8,8 @@ import matplotlib.colors as colors
 
 from vivarium.environments.utils import normal
 
+import matplotlib.animation as animation
+
 
 def _string_to_rgb(color_str):
     return jnp.array(list(colors.to_rgb(color_str)))
@@ -93,10 +95,8 @@ def render(state):
 
     plt.show()
 
-import matplotlib.animation as animation
-
 # Function to render a state history
-def render_history(state_history, pause=0.001, skip_frames=1, arrow_length=3, filename=None):
+def render_history(state_history, fps=10, skip_frames=1, arrow_length=3, filename=None):
     box_size = state_history[0].box_size
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_xlim(0, box_size)
@@ -115,17 +115,18 @@ def render_history(state_history, pause=0.001, skip_frames=1, arrow_length=3, fi
             plot_particles(ax, state_history[t], 'objects')
 
         ax.set_title(f"Timestep: {t}")
-        ax.set_xlabel("X Position")
-        ax.set_ylabel("Y Position")
+        # ax.set_xlabel("X Position")
+        # ax.set_ylabel("Y Position")
+        ax.axis('off')
 
     if filename:
         ani = animation.FuncAnimation(fig, update, frames=range(0, len(state_history), skip_frames))
-        ani.save(filename, writer='ffmpeg', fps=1/pause)
+        ani.save(filename, writer='ffmpeg', fps=fps)
     else:
         for t in range(0, len(state_history), skip_frames):
             update(t)
             display(fig)
             clear_output(wait=True)
-            time.sleep(pause)
+            time.sleep(1/fps)
 
     plt.close(fig)
