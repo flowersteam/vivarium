@@ -1,0 +1,53 @@
+box_size: 35.0
+collision_alpha: 2.0
+collision_eps: 1.0
+friction: 1.0
+
+# Entity data definitions
+entities_data:
+  # Define the different subtypes 
+  EntitySubTypes:
+    - PREYS
+    # - PREDS
+    - PARTICLES
+
+  # Define the different entities
+  Entities:
+  
+    PREYS:
+      type: AGENT
+      num: 16
+      color: blue
+      diameter: 2.0
+      # prox_dist_max: 20.0
+      # prox_cos_min: -0.80
+      selective_behaviors:
+        aggr:
+          beh: FEAR
+          sensed: 
+            - PARTICLES
+        avoid:
+          beh: FEAR
+          sensed: 
+            - PREYS
+
+    # PREDS:
+    #   type: AGENT
+    #   num: 5
+    #   color: red
+    #   diameter: 4.0
+    #   prox_dist_max: 50.0
+    #   prox_cos_min: 0.80
+    #   selective_behaviors:
+    #     aggr:
+    #       beh: AGGRESSION
+    #       sensed: 
+    #         - PREYS
+    #         - PARTICLES
+
+    PARTICLES:
+      type: OBJECT
+      num: 12
+      color: purple
+      diameter: 0.2
+      mass: 1.

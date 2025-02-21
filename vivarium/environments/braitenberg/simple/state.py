@@ -1,17 +1,67 @@
-import jax.numpy as jnp
+from enum import Enum
+
 import numpy as np
-
+import jax.numpy as jnp
 from jax import random
-from jax_md.rigid_body import RigidBody
 
+from jax_md.rigid_body import RigidBody
+from jax_md.dataclasses import dataclass as md_dataclass
+
+from vivarium.environments.base_env import BaseState, BaseEntityState
 from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
-from vivarium.environments.braitenberg.simple.classes import (
-    EntityType,
-    State,
-    AgentState,
-    ObjectState,
-    EntityState,
-)
+
+
+class EntityType(Enum):
+    AGENT = 0
+    OBJECT = 1
+
+
+# Already incorporates position, momentum, force, mass and velocity
+@md_dataclass
+class EntityState(BaseEntityState):
+    diameter: jnp.array
+    friction: jnp.array
+
+
+@md_dataclass
+class ParticleState:
+    ent_idx: jnp.array
+    color: jnp.array
+
+
+@md_dataclass
+class AgentState(ParticleState):
+    prox: jnp.array
+    motor: jnp.array
+    proximity_map_dist: jnp.array
+    proximity_map_theta: jnp.array
+    behavior: jnp.array
+    params: jnp.array
+    wheel_diameter: jnp.array
+    speed_mul: jnp.array
+    max_speed: jnp.array
+    theta_mul: jnp.array
+    proxs_dist_max: jnp.array
+    proxs_cos_min: jnp.array
+
+
+@md_dataclass
+class ObjectState(ParticleState):
+    pass
+
+
+@md_dataclass
+class State(BaseState):
+    max_agents: jnp.int32
+    max_objects: jnp.int32
+    neighbor_radius: jnp.float32
+    dt: jnp.float32
+    collision_alpha: jnp.float32
+    collision_eps: jnp.float32
+    entities: EntityState
+    agents: AgentState
+    objects: ObjectState
+
 
 # Constants
 SEED = 0
@@ -86,6 +136,7 @@ def init_state(
 
     agents = init_agents(
         max_agents=max_agents,
+        max_objects=max_objects,
         behavior=behavior,
         wheel_diameter=wheel_diameter,
         speed_mul=speed_mul,
@@ -163,6 +214,9 @@ def init_entities(
         force=RigidBody(
             center=jnp.zeros((n_entities, 2)), orientation=jnp.zeros(n_entities)
         ),
+        previous_force=RigidBody(
+            center=jnp.zeros((n_entities, 2)), orientation=jnp.zeros(n_entities)
+        ),
         mass=RigidBody(
             center=jnp.full((n_entities, 1), mass_center),
             orientation=jnp.full((n_entities), mass_orientation),
@@ -177,6 +231,7 @@ def init_entities(
 
 def init_agents(
     max_agents=MAX_AGENTS,
+    max_objects=MAX_OBJECTS,
     behavior=BEHAVIOR,
     wheel_diameter=WHEEL_DIAMETER,
     speed_mul=SPEED_MUL,
@@ -203,8 +258,8 @@ def init_agents(
         theta_mul=jnp.full((max_agents), theta_mul),
         proxs_dist_max=jnp.full((max_agents), prox_dist_max),
         proxs_cos_min=jnp.full((max_agents), prox_cos_min),
-        proximity_map_dist=jnp.zeros((max_agents, 1)),
-        proximity_map_theta=jnp.zeros((max_agents, 1)),
+        proximity_map_dist=jnp.zeros((max_agents, max_agents + max_objects)),
+        proximity_map_theta=jnp.zeros((max_agents, max_agents + max_objects)),
         color=jnp.tile(agents_color, (max_agents, 1)),
     )
 
