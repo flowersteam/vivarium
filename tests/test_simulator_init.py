@@ -1,8 +1,9 @@
-from vivarium.simulator.simulator import Simulator
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
+from vivarium.environments.braitenberg.selective_sensing import (
     init_state,
     SelectiveSensorsEnv,
 )
+
+from vivarium.simulator.simulator import Simulator
 
 
 def test_init_simulator_no_args():

@@ -12,5 +12,7 @@ def test_simulator_run():
     state = init_state()
     env = SelectiveSensorsEnv(state=state)
     simulator = Simulator(env_state=state, env=env)
+    for _ in range(NUM_STEPS):
+        simulator.step()
 
     assert simulator
