@@ -78,30 +78,30 @@ def create_property(field_name, rigid_body_field):
     @property
     def prop(self):
         if self._is_rigid_body:
-            return getattr(getattr(self._state.entities, field_name), rigid_body_field)[self._ent_idx]
+            return getattr(getattr(self._state.entity_state, field_name), rigid_body_field)[self._ent_idx]
         else:
             if rigid_body_field == 'orientation':
                 if field_name == 'position':
-                    return self._state.entities.orientation[self._ent_idx]
+                    return self._state.entity_state.orientation[self._ent_idx]
                 else:
                     return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
             elif rigid_body_field == 'center':
-                return getattr(self._state.entities, field_name)[self._ent_idx]
+                return getattr(self._state.entity_state, field_name)[self._ent_idx]
             else:
                 return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
 
     @prop.setter
     def prop(self, value):
         if self._is_rigid_body:
-            getattr(getattr(self._change_recorder.entities, field_name), rigid_body_field)[self._ent_idx] = value
+            getattr(getattr(self._change_recorder.entity_state, field_name), rigid_body_field)[self._ent_idx] = value
         else:
             if rigid_body_field == 'orientation':
                 if field_name == 'position':
-                    self._change_recorder.entities.orientation[self._ent_idx] = value
+                    self._change_recorder.entity_state.orientation[self._ent_idx] = value
                 else:
                     return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
             elif rigid_body_field == 'center':
-                getattr(self._change_recorder.entities, field_name)[self._ent_idx] = value
+                getattr(self._change_recorder.entity_state, field_name)[self._ent_idx] = value
             else:
                 raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
     return prop
@@ -121,9 +121,9 @@ class EntityWrapper:
     def __init__(self, state, ent_idx, entity_type):
         self._state = state
         self._ent_idx = ent_idx
-        self._is_rigid_body = self._state.entities.is_rigid_body()
+        self._is_rigid_body = self._state.entity_state.is_rigid_body()
         self._change_recorder = ChangeRecorder()
-        self._entity_type = entity_type.name.lower() + 's'
+        self._entity_type = entity_type.name.lower() + '_state'
         self._entity_fields = ['ent_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
                                'position', 'momentum', 'force', 'mass',
@@ -134,8 +134,8 @@ class EntityWrapper:
 
     def __getattr__(self, attr):
         if attr in self._entity_fields:
-            return getattr(self._state.entities, attr)[self._ent_idx]
-        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entities.entity_idx[self._ent_idx]]
+            return getattr(self._state.entity_state, attr)[self._ent_idx]
+        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_idx[self._ent_idx]]
 
     def __setattr__(self, attr, value):
         if attr.startswith('_'):
@@ -147,9 +147,9 @@ class EntityWrapper:
                 p = create_property(field_name, rigid_body_field)
                 p.fset(self, value)
             else:
-                getattr(self._change_recorder.entities, attr)[self._ent_idx] = value
+                getattr(self._change_recorder.entity_state, attr)[self._ent_idx] = value
         else:
-            getattr(getattr(self._change_recorder, self._entity_type), attr)[self._state.entities.entity_idx[self._ent_idx]] = value
+            getattr(getattr(self._change_recorder, self._entity_type), attr)[self._state.entity_state.entity_idx[self._ent_idx]] = value
 
     def update_state(self, state):
         changes = self._change_recorder.fetch_changes()
@@ -162,7 +162,7 @@ class EntityList:
     def __init__(self, state, entity_type):
         self._state = state
         self._entity_type = entity_type.name.lower() + 's'
-        self._entity_list = [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entities.entity_type) if type == entity_type.value]
+        self._entity_list = [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type.value]
     
     def __getitem__(self, idx):
         return self._entity_list[idx]

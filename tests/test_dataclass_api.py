@@ -27,8 +27,8 @@ def get_point_particle_state():
 
 def generate_changes(wheel_diameter_idx, wheel_diameter_value, exists_idx, exists_value, friction_idx, friction_value):
     return {
-        'agents': {'wheel_diameter': [{'__idx': wheel_diameter_idx, '__value': wheel_diameter_value}]},
-        'entities': {
+        'agent_state': {'wheel_diameter': [{'__idx': wheel_diameter_idx, '__value': wheel_diameter_value}]},
+        'entity_state': {
             'exists': [{'__idx': exists_idx, '__value': exists_value}],
             'friction': [{'__idx': friction_idx, '__value': friction_value},
                          {'__idx': slice(friction_idx, friction_idx + 2), '__value': friction_value + 1}]
@@ -37,10 +37,10 @@ def generate_changes(wheel_diameter_idx, wheel_diameter_value, exists_idx, exist
 
 def generate_expected(wheel_diameter_idx, wheel_diameter_value, exists_idx, exists_value, friction_idx, friction_value):
     return {
-        'agents': {'wheel_diameter': lambda state: state.agents.wheel_diameter.at[wheel_diameter_idx].set(wheel_diameter_value)},
-        'entities': {
-            'exists': lambda state: state.entities.exists.at[exists_idx].set(exists_value),
-            'friction': lambda state: state.entities.friction.at[friction_idx].set(friction_value).at[friction_idx:friction_idx+2].set(friction_value + 1)
+        'agent_state': {'wheel_diameter': lambda state: state.agent_state.wheel_diameter.at[wheel_diameter_idx].set(wheel_diameter_value)},
+        'entity_state': {
+            'exists': lambda state: state.entity_state.exists.at[exists_idx].set(exists_value),
+            'friction': lambda state: state.entity_state.friction.at[friction_idx].set(friction_value).at[friction_idx:friction_idx+2].set(friction_value + 1)
         }
     }
 
@@ -104,13 +104,13 @@ def test_entity_wrapper(idx, position_center, position_orientation, color, init_
 
     state = entity.update_state(state)
 
-    previous_entity_state = previous_state.agents if entity_type == EntityType.AGENT else previous_state.objects
-    entity_state = state.agents if entity_type == EntityType.AGENT else state.objects
+    previous_entity_state = previous_state.agent_state if entity_type == EntityType.AGENT else previous_state.object_state
+    entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
 
-    assert (not (jnp.equal(previous_state.entities.position_center[idx], jnp.array(position_center))).all())
-    assert (jnp.equal(state.entities.position_center[idx], jnp.array(position_center))).all()
-    assert (jnp.equal(state.entities.position_center, previous_state.entities.position_center.at[idx].set(position_center))).all()
-    assert (jnp.equal(state.entities.position_orientation, previous_state.entities.position_orientation.at[idx].set(position_orientation))).all()
+    assert (not (jnp.equal(previous_state.entity_state.position_center[idx], jnp.array(position_center))).all())
+    assert (jnp.equal(state.entity_state.position_center[idx], jnp.array(position_center))).all()
+    assert (jnp.equal(state.entity_state.position_center, previous_state.entity_state.position_center.at[idx].set(position_center))).all()
+    assert (jnp.equal(state.entity_state.position_orientation, previous_state.entity_state.position_orientation.at[idx].set(position_orientation))).all()
     assert (jnp.equal(entity_state.color, previous_entity_state.color.at[idx].set(color))).all()
 
 
@@ -128,8 +128,8 @@ def test_entity_list(idx, position_center, color, entity_type, state_fn):
 
     state = objects.update_state(state)
 
-    entity_state = state.agents if entity_type == EntityType.AGENT else state.objects
-    expected_position = state.entities.position_center.at[entity_state.ent_idx[idx]].set(position_center)
+    entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
+    expected_position = state.entity_state.position_center.at[entity_state.ent_idx[idx]].set(position_center)
 
     for i, o in enumerate(objects):
         if i > len(color) - 1:
@@ -137,8 +137,8 @@ def test_entity_list(idx, position_center, color, entity_type, state_fn):
         o.color = color[i]
     
     state = objects.update_state(state)
-    entity_state = state.agents if entity_type == EntityType.AGENT else state.objects
+    entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
 
-    assert (jnp.equal(state.entities.position_center, expected_position)).all()
+    assert (jnp.equal(state.entity_state.position_center, expected_position)).all()
     for i, c in enumerate(color):
         assert (jnp.equal(entity_state.color[i], jnp.array(c))).all()

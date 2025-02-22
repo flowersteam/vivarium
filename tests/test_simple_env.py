@@ -22,7 +22,7 @@ def test_simple_env_rigid_body_running():
 
     assert env
     assert state
-    assert state.entities.is_rigid_body()
+    assert state.entity_state.is_rigid_body()
 
 
 def test_simple_env_point_particle_running():
@@ -35,4 +35,4 @@ def test_simple_env_point_particle_running():
 
     assert env
     assert state
-    assert not state.entities.is_rigid_body()
+    assert not state.entity_state.is_rigid_body()

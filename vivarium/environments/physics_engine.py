@@ -15,7 +15,7 @@ def friction_state_fn(mask_fn):
     def state_fn(state, neighbor):
         mask = mask_fn(state)
         # Issue : We need to sum the forces, here we just set them (so previous force functions in the env actually not used)
-        return state.set(entities=state.entities.set(force=friction_force(state, neighbor, mask)))
+        return state.set(entity_state=state.entity_state.set(force=friction_force(state, neighbor, mask)))
     return state_fn
 
 
@@ -26,7 +26,7 @@ def to_rigid_body(position):
 def handle_rigid_body(force_fn):
     def wrapped_force_fn(state, neighbor, exists_mask):
         force = force_fn(state, neighbor, exists_mask)
-        return to_rigid_body(force) if state.entities.is_rigid_body() and not isinstance(force,rigid_body.RigidBody) else force
+        return to_rigid_body(force) if state.entity_state.is_rigid_body() and not isinstance(force,rigid_body.RigidBody) else force
     return wrapped_force_fn
 
 
@@ -106,10 +106,10 @@ def collision_force_fn(displacement):
         :return: collision force function
         """
         return coll_force_fn(
-            state.entities.unified_position,
+            state.entity_state.unified_position,
             neighbor=neighbor,
             exists_mask=exists_mask,
-            diameter=state.entities.diameter,
+            diameter=state.entity_state.diameter,
             epsilon=state.collision_eps,
             alpha=state.collision_alpha,
         )
@@ -122,13 +122,13 @@ def collision_state_fn(displacement, mask_fn):
     def state_fn(state, neighbor):
         mask = mask_fn(state)
         force = coll_fn(state, neighbor, mask)
-        if state.entities.is_rigid_body():
-            force = force.set(center=state.entities.force.center + force.center,
-                              orientation=state.entities.force.orientation + force.orientation)
+        if state.entity_state.is_rigid_body():
+            force = force.set(center=state.entity_state.force.center + force.center,
+                              orientation=state.entity_state.force.orientation + force.orientation)
         else:
-            force = state.entities.force + force
-        entities=state.entities.set(force=force)
-        return state.set(entities=entities)
+            force = state.entity_state.force + force
+        entity_state=state.entity_state.set(force=force)
+        return state.set(entity_state=entity_state)
     return state_fn
 
 
@@ -141,11 +141,11 @@ def friction_force(state, neighbor, exists_mask):
     :param exists_mask: mask to specify which particles exist
     :return: friction force on the system
     """
-    cur_vel = state.entities.unified_momentum / state.entities.unified_mass
+    cur_vel = state.entity_state.unified_momentum / state.entity_state.unified_mass
     # stack the mask to give it the same shape as cur_vel (that has 2 rows for forward and angular velocities)
     mask = jnp.stack([exists_mask] * 2, axis=1)
     cur_vel = jnp.where(mask, cur_vel, 0.0)
-    return -jnp.tile(state.entities.friction, (SPACE_NDIMS, 1)).T * cur_vel
+    return -jnp.tile(state.entity_state.friction, (SPACE_NDIMS, 1)).T * cur_vel
     
 
 def friction_force_fn(displacement):
@@ -156,13 +156,13 @@ def friction_state_fn(mask_fn):
     def state_fn(state, neighbor):
         mask = mask_fn(state)
         force = friction_force(state, neighbor, mask)
-        if state.entities.is_rigid_body():
-            force = force.set(center=state.entities.force.center + force.center,
-                              orientation=state.entities.force.orientation + force.orientation)
+        if state.entity_state.is_rigid_body():
+            force = force.set(center=state.entity_state.force.center + force.center,
+                              orientation=state.entity_state.force.orientation + force.orientation)
         else:
-            force = state.entities.force + force
-        entities=state.entities.set(force=force)
-        return state.set(entities=entities)
+            force = state.entity_state.force + force
+        entity_state=state.entity_state.set(force=force)
+        return state.set(entity_state=entity_state)
     return state_fn
 
 
@@ -209,23 +209,23 @@ def mask_momentum(entity_state, exists_mask):
 
 def reset_force_state_fn():
     def fn(state, neighbor):
-        if state.entities.is_rigid_body():
-            zeros = to_rigid_body(jnp.zeros_like(state.entities.force.center))
+        if state.entity_state.is_rigid_body():
+            zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
         else:
-            zeros = jnp.zeros_like(state.entities.force)
-        return state.set(entities=state.entities.set(force=zeros))
+            zeros = jnp.zeros_like(state.entity_state.force)
+        return state.set(entity_state=state.entity_state.set(force=zeros))
     return fn
 
 
 def init_state_fn(key, kT=0.0):
     key_cpy = key
     def fn(state):
-        assert state.entities.momentum is None
+        assert state.entity_state.momentum is None
         key, new_key = jax.random.split(key_cpy)
-        assert not jnp.any(state.entities.unified_force) 
-        if state.entities.is_rigid_body():
-            assert not jnp.any(state.entities.force.orientation)
-        return state.set(entities=simulate.initialize_momenta(state.entities, new_key, kT))
+        assert not jnp.any(state.entity_state.unified_force) 
+        if state.entity_state.is_rigid_body():
+            assert not jnp.any(state.entity_state.force.orientation)
+        return state.set(entity_state=simulate.initialize_momenta(state.entity_state, new_key, kT))
         
     return fn
 
@@ -238,16 +238,16 @@ def step_state_fn(shift, mask_fn, key, kT=0.0):
         dt_2 = state.dt / 2.0
 
         # Compute changes on entities
-        new_force = state.entities.force
-        entities=state.entities.set(force=state.entities.previous_force)
-        entities = simulate.momentum_step(entities, dt_2)
+        new_force = state.entity_state.force
+        entity_state=state.entity_state.set(force=state.entity_state.previous_force)
+        entity_state = simulate.momentum_step(entity_state, dt_2)
         # TODO : why do we used dt and not dt/2 in the line below ?
-        entities = simulate.position_step(
-            entities, shift, dt_2, neighbor=neighbor
+        entity_state = simulate.position_step(
+            entity_state, shift, dt_2, neighbor=neighbor
         )
-        entities = entities.set(force=new_force)
-        entities = entities.set(previous_force=new_force)
-        entities = simulate.momentum_step(entities, dt_2)
-        entities = mask_momentum(entities, mask)
-        return state.set(entities=entities)
+        entity_state = entity_state.set(force=new_force)
+        entity_state = entity_state.set(previous_force=new_force)
+        entity_state = simulate.momentum_step(entity_state, dt_2)
+        entity_state = mask_momentum(entity_state, mask)
+        return state.set(entity_state=entity_state)
     return state_fn

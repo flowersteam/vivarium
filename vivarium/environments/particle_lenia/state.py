@@ -34,8 +34,8 @@ class State(BaseState):
     dt: jnp.float32
     collision_alpha: jnp.float32
     collision_eps: jnp.float32
-    entities: EntityState
-    objects: ParticleState
+    entity_state: EntityState
+    object_state: ParticleState
 
 
 # Constants
@@ -107,7 +107,7 @@ def init_state(
 
     ent_sub_types = {'AGENTS': (0, 0), 'PARTICLES': (1, max_particles)}
 
-    entities = init_entities(
+    entity_state = init_entities(
         max_agents=0,
         max_objects=max_particles,
         ent_sub_types=ent_sub_types,  # e.g. {'PREYS': (0, 5), 'PREDS': (1, 5), 'RESOURCES': (2, 5), 'POISON': (3, 5)}
@@ -132,4 +132,4 @@ def init_state(
     return State(time=0, box_size=box_size, max_particles=max_particles, 
                  neighbor_radius=neighbor_radius, dt=dt, 
                  collision_alpha=collision_alpha, collision_eps=collision_eps,
-                 entities=entities, objects=particles)
+                 entity_state=entity_state, object_state=particles)

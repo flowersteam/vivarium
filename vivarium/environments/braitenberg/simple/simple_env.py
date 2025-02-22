@@ -78,8 +78,8 @@ def compute_prox(state, agents_neighs_idx, target_exists_mask, displacement):
     target_exists_mask[i] is True (resp. False) if entity of index i in state.entities exists (resp. don't exist).
     :return:
     """
-    center = state.entities.position_center
-    orientation = state.entities.position_orientation
+    center = state.entity_state.position_center
+    orientation = state.entity_state.position_orientation
     mask = target_exists_mask[agents_neighs_idx[1, :]]
     senders, receivers = agents_neighs_idx
     Ra = center[senders]
@@ -91,20 +91,20 @@ def compute_prox(state, agents_neighs_idx, target_exists_mask, displacement):
     # Create distance and angle maps between entities
     dist, theta = proximity_map(dR, orientation[senders])
     proximity_map_dist = jnp.zeros(
-        (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
+        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
     )
     proximity_map_dist = proximity_map_dist.at[senders, receivers].set(dist)
     proximity_map_theta = jnp.zeros(
-        (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
+        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
     )
     proximity_map_theta = proximity_map_theta.at[senders, receivers].set(theta)
 
     prox = sensor(
         dist,
         theta,
-        state.agents.proxs_dist_max[senders],
-        state.agents.proxs_cos_min[senders],
-        len(state.agents.ent_idx),
+        state.agent_state.proxs_dist_max[senders],
+        state.agent_state.proxs_cos_min[senders],
+        len(state.agent_state.ent_idx),
         senders,
         mask,
     )
@@ -193,17 +193,17 @@ def motor_force(state, mask):
     :param mask: mask on entities (e.g. existing ones)
     :return: motor force
     """
-    agent_idx = state.agents.ent_idx
+    agent_idx = state.agent_state.ent_idx
 
-    n = normal(state.entities.unified_orientation[agent_idx])
+    n = normal(state.entity_state.unified_orientation[agent_idx])
 
-    fwd, rot = motor_command(state.agents.motor,
-                             state.entities.diameter[agent_idx],
-                             state.agents.wheel_diameter)
+    fwd, rot = motor_command(state.agent_state.motor,
+                             state.entity_state.diameter[agent_idx],
+                             state.agent_state.wheel_diameter)
 
     cur_vel = (
-        state.entities.unified_momentum[agent_idx]
-        / state.entities.unified_mass[agent_idx]
+        state.entity_state.unified_momentum[agent_idx]
+        / state.entity_state.unified_mass[agent_idx]
     )
 
     cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
@@ -213,26 +213,26 @@ def motor_force(state, mask):
     fwd_force = (
         n
         * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
-        * jnp.tile(state.agents.speed_mul, (SPACE_NDIMS, 1)).T
+        * jnp.tile(state.agent_state.speed_mul, (SPACE_NDIMS, 1)).T
     )
 
     center = (
-        jnp.zeros_like(state.entities.unified_position).at[agent_idx].set(fwd_force)
+        jnp.zeros_like(state.entity_state.unified_position).at[agent_idx].set(fwd_force)
     )
 
     # TODO CMF: if I get rid of RigidBody, do I also get rid of mass.orientation?
-    if state.entities.is_rigid_body():
+    if state.entity_state.is_rigid_body():
         cur_rot_vel = (
-            state.entities.momentum.orientation[agent_idx]
-            / state.entities.mass.orientation[agent_idx]
+            state.entity_state.momentum.orientation[agent_idx]
+            / state.entity_state.mass.orientation[agent_idx]
         )
         rot_delta = rot - cur_rot_vel
-        rot_force = rot_delta * state.agents.theta_mul
+        rot_force = rot_delta * state.agent_state.theta_mul
     else:
         rot_force = state.dt * rot
 
     orientation = (
-        jnp.zeros_like(state.entities.unified_orientation)
+        jnp.zeros_like(state.entity_state.unified_orientation)
         .at[agent_idx]
         .set(rot_force)
     )
@@ -244,13 +244,13 @@ def motor_force(state, mask):
     return center, orientation
 
 
-def sum_force_to_entities(entities, center, orientation=0.):
-    if not entities.is_rigid_body():
-        return entities.set(force=center + entities.force, orientation=orientation + entities.orientation)
+def sum_force_to_entities(entity_state, center, orientation=0.):
+    if not entity_state.is_rigid_body():
+        return entity_state.set(force=center + entity_state.force, orientation=orientation + entity_state.orientation)
     else:
-        center += entities.force.center
-        orientation += entities.force.orientation         
-        return entities.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
+        center += entity_state.force.center
+        orientation += entity_state.force.orientation         
+        return entity_state.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
 
 
@@ -265,20 +265,20 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
         )
 
         motor = compute_motor(
-            prox, state.agents.params, state.agents.behavior, state.agents.motor
+            prox, state.agent_state.params, state.agent_state.behavior, state.agent_state.motor
         )
-        agents = state.agents.set(
+        agent_state = state.agent_state.set(
             prox=prox,
             proximity_map_dist=proximity_dist_map,
             proximity_map_theta=proximity_dist_theta,
             motor=motor,
         )
 
-        state = state.set(agents=agents)
+        state = state.set(agent_state=agent_state)
 
         center, orientation = motor_force(state, exists_mask)
 
-        return state.set(entities=sum_force_to_entities(state.entities, center, orientation))
+        return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
     return state_fn
 
 
@@ -287,12 +287,12 @@ class BraitenbergEnv(BaseEnv):
         
         displacement, shift = space_fn(state.box_size)
 
-        exists_mask_fn = lambda state: state.entities.exists == 1
+        exists_mask_fn = lambda state: state.entity_state.exists == 1
         key = random.PRNGKey(seed)
         key, new_key = random.split(key)
         init_fn = init_state_fn(key)
         neighbor_manager = NeighborManager(displacement, state)
-        ag_idx = state.entities.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
+        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
         agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
         state_fns = [reset_force_state_fn(),
                      braitenberg_state_fn(displacement, exists_mask_fn, 

@@ -58,9 +58,9 @@ class State(BaseState):
     dt: jnp.float32
     collision_alpha: jnp.float32
     collision_eps: jnp.float32
-    entities: EntityState
-    agents: AgentState
-    objects: ObjectState
+    entity_state: EntityState
+    agent_state: AgentState
+    object_state: ObjectState
 
 
 # Constants
@@ -118,7 +118,7 @@ def init_state(
     key = random.PRNGKey(seed)
     key, key_agents_pos, key_objects_pos, key_orientations = random.split(key, 4)
 
-    entities = init_entities(
+    entity_state = init_entities(
         max_objects=max_objects,
         max_agents=max_agents,
         n_dims=n_dims,
@@ -134,7 +134,7 @@ def init_state(
         key_orientations=key_orientations,
     )
 
-    agents = init_agents(
+    agent_state = init_agents(
         max_agents=max_agents,
         max_objects=max_objects,
         behavior=behavior,
@@ -147,14 +147,14 @@ def init_state(
         agents_color=agents_color,
     )
 
-    objects = init_objects(
+    object_state = init_objects(
         max_agents=max_agents, max_objects=max_objects, objects_color=objects_color
     )
 
     state = init_complete_state(
-        entities=entities,
-        agents=agents,
-        objects=objects,
+        entity_state=entity_state,
+        agent_state=agent_state,
+        object_state=object_state,
         box_size=box_size,
         max_agents=max_agents,
         max_objects=max_objects,
@@ -277,9 +277,9 @@ def init_objects(
 
 
 def init_complete_state(
-    entities=None,
-    agents=None,
-    objects=None,
+    entity_state=None,
+    agent_state=None,
+    object_state=None,
     box_size=BOX_SIZE,
     max_agents=MAX_AGENTS,
     max_objects=MAX_OBJECTS,
@@ -297,7 +297,7 @@ def init_complete_state(
         collision_alpha=collision_alpha,
         collision_eps=collision_eps,
         dt=dt,
-        entities=entities,
-        agents=agents,
-        objects=objects,
+        entity_state=entity_state,
+        agent_state=agent_state,
+        object_state=object_state,
     )

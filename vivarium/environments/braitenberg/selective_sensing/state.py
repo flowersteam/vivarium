@@ -66,9 +66,9 @@ class State(BaseState):
     collision_alpha: jnp.float32
     collision_eps: jnp.float32
     ent_sub_types: dict
-    entities: EntityState
-    agents: AgentState
-    objects: ObjectState
+    entity_state: EntityState
+    agent_state: AgentState
+    object_state: ObjectState
 
 
 CONFIG = load_default_config()
@@ -433,9 +433,9 @@ def init_complete_state(
         neighbor_radius=neighbor_radius,
         collision_alpha=collision_alpha,
         collision_eps=collision_eps,
-        entities=entities,
-        agents=agents,
-        objects=objects,
+        entity_state=entities,
+        agent_state=agents,
+        object_state=objects,
         ent_sub_types=total_ent_sub_types,
     )
 

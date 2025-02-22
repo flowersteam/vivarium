@@ -74,7 +74,7 @@ def rigid_body_to_point_particle(module):
     def init_state_from_rigid_body(rigid_body_state):
 
         kwargs = {field: convert(rigid_body_state, field) for field in state_fields}
-        kwargs['entities'] = init_entities_from_rigid_body(rigid_body_state.entities)
+        kwargs['entity_state'] = init_entities_from_rigid_body(rigid_body_state.entity_state)
 
         return module.State(**kwargs)
 

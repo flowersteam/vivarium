@@ -66,7 +66,7 @@ class NeighborManager:
         self.allocate(state)
     
     def allocate(self, state):
-        self.neighbors = self.neighbor_fn.allocate(state.entities.unified_position)
+        self.neighbors = self.neighbor_fn.allocate(state.entity_state.unified_position)
     
     def update(self, position):
         self.neighbors = self.neighbors.update(position)
@@ -108,7 +108,7 @@ class BaseEnv:
             state, neighbors = carry
             for fn in self.state_fns:
                 state = fn(state, neighbors) 
-            neighbors = self.neighbors_manager.update(state.entities.unified_position)
+            neighbors = self.neighbors_manager.update(state.entity_state.unified_position)
             state = state.set(time=state.time + 1)
             carry = (state, neighbors)
             return carry, carry
@@ -118,7 +118,7 @@ class BaseEnv:
 
     def step(self, state: BaseState, num_scan_steps=1) -> BaseState:
 
-        if state.entities.momentum is None:
+        if state.entity_state.momentum is None:
             state = self.init_fn(state)
 
         current_state = state

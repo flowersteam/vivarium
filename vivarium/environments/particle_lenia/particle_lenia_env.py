@@ -38,9 +38,9 @@ def lenia_energy_fn(displacement):
     return lenia_energy
 
 
-from_mask_fn = lambda state: jnp.array(range(len(state.entities.entity_idx)))
+from_mask_fn = lambda state: jnp.array(range(len(state.entity_state.entity_idx)))
 
-to_mask_fn = lambda state: state.objects.ent_idx
+to_mask_fn = lambda state: state.object_state.ent_idx
 
 
 def particle_lenia_state_fn(displacement, from_mask_fn=from_mask_fn, to_mask_fn=to_mask_fn):
@@ -50,13 +50,13 @@ def particle_lenia_state_fn(displacement, from_mask_fn=from_mask_fn, to_mask_fn=
         from_mask = from_mask_fn(state)
         to_mask = to_mask_fn(state)
         force = quantity.force(
-            lambda x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep : lenia_energy_fn(displacement)(state.entities.position[from_mask], x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep)
+            lambda x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep : lenia_energy_fn(displacement)(state.entity_state.position[from_mask], x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep)
             )
-        res = vmap(force)(state.entities.position[to_mask], state.objects.mu_k, state.objects.sigma_k, state.objects.w_k, state.objects.mu_g, state.objects.sigma_g, state.objects.c_rep)
-        all = jnp.zeros_like(state.entities.force)
+        res = vmap(force)(state.entity_state.position[to_mask], state.object_state.mu_k, state.object_state.sigma_k, state.object_state.w_k, state.object_state.mu_g, state.object_state.sigma_g, state.object_state.c_rep)
+        all = jnp.zeros_like(state.entity_state.force)
         all = all.at[to_mask].set(res)
         return state.set(
-            entities=state.entities.set(force=all + state.entities.force)
+            entity_state=state.entity_state.set(force=all + state.entity_state.force)
         )
     return state_fn
 
@@ -66,7 +66,7 @@ class ParticleLeniaEnv(BaseEnv):
         
         displacement, shift = space_fn(state.box_size)
 
-        exists_mask_fn = lambda state: state.entities.exists == 1
+        exists_mask_fn = lambda state: state.entity_state.exists == 1
         key = random.PRNGKey(seed)
         key, new_key = random.split(key)
         init_fn = init_state_fn(key)
@@ -92,8 +92,8 @@ if __name__ == "__main__":
     key, new_key = random.split(key)
 
     state = state.set(
-        entities=state.entities.set(
-            position = state.entities.position.at[state.objects.ent_idx].set(
+        entity_state=state.entity_state.set(
+            position = state.entity_state.position.at[state.object_state.ent_idx].set(
                 random.uniform(new_key, (n_particles, 2)) * pos_range + state.box_size / 2 - pos_range / 2  * jnp.ones((n_particles, 2))
                 )
         )
@@ -121,8 +121,8 @@ if __name__ == "__main__":
         return particles, time_text
 
     def update(frame):
-        particles.set_data(state_hist[frame].entities.position[:, 0],
-                           state_hist[frame].entities.position[:, 1])
+        particles.set_data(state_hist[frame].entity_state.position[:, 0],
+                           state_hist[frame].entity_state.position[:, 1])
         time_text.set_text(f'Time step: {frame}')
         return particles, time_text
 

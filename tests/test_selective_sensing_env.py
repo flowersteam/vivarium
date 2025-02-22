@@ -21,7 +21,7 @@ def test_env_running_rigid_body():
 
     assert env
     assert state
-    assert state.entities.is_rigid_body()
+    assert state.entity_state.is_rigid_body()
 
 def test_env_running_point_particle():
     """Test the stepping mechanism of the env with occlusion (default)"""
@@ -33,7 +33,7 @@ def test_env_running_point_particle():
 
     assert env
     assert state
-    assert not state.entities.is_rigid_body()
+    assert not state.entity_state.is_rigid_body()
 
 # def test_env_running_no_occlusion():
 #     """Test the stepping mechanism of the env without occlusion"""

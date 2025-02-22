@@ -44,8 +44,8 @@ def get_relative_displacement(state, agents_neighs_idx, displacement_fn):
     :return: distance array, angles array, distance map for all agents, angles map for all agents
     """
     # body = state.entities.position
-    position = state.entities.unified_position
-    orientation = state.entities.unified_orientation
+    position = state.entity_state.unified_position
+    orientation = state.entity_state.unified_orientation
     senders, receivers = agents_neighs_idx
     Ra = position[senders]
     Rb = position[receivers]
@@ -55,11 +55,11 @@ def get_relative_displacement(state, agents_neighs_idx, displacement_fn):
 
     dist, theta = proximity_map(dR, orientation[senders])
     proximity_map_dist = jnp.zeros(
-        (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
+        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
     )
     proximity_map_dist = proximity_map_dist.at[senders, receivers].set(dist)
     proximity_map_theta = jnp.zeros(
-        (state.agents.ent_idx.shape[0], state.entities.entity_idx.shape[0])
+        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
     )
     proximity_map_theta = proximity_map_theta.at[senders, receivers].set(theta)
     return dist, theta, proximity_map_dist, proximity_map_theta
@@ -149,7 +149,7 @@ def compute_behavior_motors(
     :param sensed_ent_idx: idx of left and right entities sensed
     :return: right motor values for this behavior
     """
-    left_n_right_types = state.entities.ent_subtype[sensed_ent_idx]
+    left_n_right_types = state.entity_state.ent_subtype[sensed_ent_idx]
     behavior_proxs = mask_proxs_occlusion(agent_proxs, left_n_right_types, sensed_mask)
     motors = compute_motor(behavior_proxs, params, behaviors=behavior, motors=motor)
     return motors
@@ -195,7 +195,7 @@ def compute_occlusion_proxs_motors(
     argmax = jnp.argmax(agent_raw_proxs, axis=0)
     # Get the real entity idx of the left and right sensed entities from dense neighborhoods
     sensed_ent_idx = ag_idx_dense_receivers[agent_idx][argmax]
-    prox_sensed_ent_types = state.entities.ent_subtype[sensed_ent_idx]
+    prox_sensed_ent_types = state.entity_state.ent_subtype[sensed_ent_idx]
 
     # Compute the motor values for all behaviors and do a mean on it
     motor_values = compute_all_behavior_motors(
@@ -358,10 +358,10 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
             )
         )
 
-        dist_max = state.agents.proxs_dist_max[senders]
-        cos_min = state.agents.proxs_cos_min[senders]
+        dist_max = state.agent_state.proxs_dist_max[senders]
+        cos_min = state.agent_state.proxs_cos_min[senders]
         # changed agents_neighs_idx[1, :] to receivers in line below (check if it works)
-        target_exist_mask = state.entities.exists[receivers]
+        target_exist_mask = state.entity_state.exists[receivers]
         # Compute agents raw proximeters (proximeters for all neighbors)
         raw_proxs = sensor_fn(
             dist, relative_theta, dist_max, cos_min, target_exist_mask
@@ -371,11 +371,11 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         agent_proxs, prox_sensed_ent_tuple, mean_agent_motors = (
             prox_motor_function(
                 state,
-                state.agents.ent_idx,
-                state.agents.params,
-                state.agents.sensed,
-                state.agents.behavior,
-                state.agents.motor,
+                state.agent_state.ent_idx,
+                state.agent_state.params,
+                state.agent_state.sensed,
+                state.agent_state.behavior,
+                state.agent_state.motor,
                 raw_proxs,
                 ag_idx_dense_senders,
                 ag_idx_dense_receivers,
@@ -385,7 +385,7 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         prox_sensed_ent_idx, prox_sensed_ent_type = prox_sensed_ent_tuple
 
         # Update agents state
-        agents = state.agents.set(
+        agent_state = state.agent_state.set(
             prox=agent_proxs,
             prox_sensed_ent_type=prox_sensed_ent_type,
             prox_sensed_ent_idx=prox_sensed_ent_idx,
@@ -395,11 +395,11 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         )
 
         # Update the entities and the state
-        state = state.set(agents=agents)
+        state = state.set(agent_state=agent_state)
 
         center, orientation = motor_force(state, exists_mask)
 
-        return state.set(entities=sum_force_to_entities(state.entities, center, orientation))
+        return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
     
     return state_fn
     
@@ -410,12 +410,12 @@ class SelectiveSensorsEnv(BaseEnv):
         
         displacement, shift = space_fn(state.box_size)
 
-        exists_mask_fn = lambda state: state.entities.exists == 1
+        exists_mask_fn = lambda state: state.entity_state.exists == 1
         key = random.PRNGKey(seed)
         key, new_key = random.split(key)
         init_fn = init_state_fn(key)
         neighbor_manager = NeighborManager(displacement, state)
-        ag_idx = state.entities.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
+        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
         agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
 
         # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
