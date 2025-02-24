@@ -1,6 +1,15 @@
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.dataclass_wrapper import EntityList
+from vivarium.controllers.dataclass_wrapper import EntityList, DataclassWrapper
 from vivarium.simulator.simulator_states import EntityType
+
+
+class ClientDataclassWrapper(DataclassWrapper):
+    def __init__(self, client):
+        super().__init__()
+        self._client = client
+
+    def apply(self):
+        self._client.apply_changes([self.fetch_changes()])
 
 
 class SimulatorController:

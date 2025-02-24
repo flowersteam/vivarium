@@ -26,7 +26,6 @@ class SimulatorGRPCClient(SimulatorClient):
         self.name = name
         channel = grpc.insecure_channel("localhost:50051")
         self.stub = simulator_pb2_grpc.SimulatorServerStub(channel)
-        self.streaming_started = False
         self.state = self.get_state()
         self.scene_name = self.get_scene_name()
         self.subtypes_labels = self.get_subtype_labels()

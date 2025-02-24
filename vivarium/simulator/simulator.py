@@ -23,7 +23,7 @@ from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env i
     State as EnvState,
 )
 
-from vivarium.controllers.dataclass_wrapper import update_state_from_change_list
+from vivarium.controllers.dataclass_wrapper import update_state_from_change_list, DataclassWrapper
 
 
 lg = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ class Simulator:
         # First initialize fields in the class because they will be used to define the simulator state below
         self.key = jax.random.PRNGKey(seed)
         self.num_steps_lax = num_steps_lax
-        self.freq = update_freq
+        # self.freq = update_freq
         self.jit_step = jit_step
         self.use_fori_loop = use_fori_loop
         self.ent_sub_types_and_num = (
@@ -131,7 +131,7 @@ class Simulator:
         self.ent_sub_types = self.process_ent_sub_types(self.ent_sub_types_and_num)
 
         # transform the env state (only used in env class) into a simulator state with a simulator state (used only in client server communication)
-        self.state = self.env_to_sim_state(env_state)
+        self.state = self.env_to_sim_state(env_state, freq=update_freq)
 
         # Attributes to start or stop the simulation
         self._is_started = False
@@ -145,6 +145,15 @@ class Simulator:
         # Do a first step to initialize the momentum of the state
         self.step()
         lg.info("Simulator initialized")
+
+    @property
+    def freq(self):
+        return self.state.simulator_state.freq[0]
+    
+    @freq.setter
+    def freq(self, value):
+        self.state = DataclassWrapper().simulator_state.freq[0].set(value).apply(self.state)
+
 
     def load_state(self, state, env):
         """Load a state in the simulator
@@ -438,14 +447,15 @@ class Simulator:
         return {int(idx): label for label, (idx, _) in ent_sub_types_and_num.items()}
 
 
-    def env_to_sim_state(self, env_state):
+    def env_to_sim_state(self, env_state, freq=None):
         """Transform environment state (used in self.env) into a simulator state for the client-server interactoon
 
         :param env_state: env_state
         :return: simulator state
         """
+        freq = freq or self.freq
         return env_to_sim_state(
-            env_state, self.num_steps_lax, self.freq, self.use_fori_loop, self.jit_step
+            env_state, self.num_steps_lax, freq, self.use_fori_loop, self.jit_step
         )
 
     @property

@@ -10,7 +10,7 @@ import numpy as np
 import logging
 
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.controllers.simulator_controller import SimulatorController, ClientDataclassWrapper
 from vivarium.simulator.simulator_states import StateType, EntityType
 from vivarium.controllers.utils import Logger, RoutineHandler, BehaviorHandler
 
@@ -360,7 +360,7 @@ class NotebookController(SimulatorController):
         self._is_running = False
 
         # # set frequency of the simulator to max speed
-        # self.configs[StateType.SIMULATOR][0].freq = -1
+        self.state_wrapper.simulator_state.freq[0].set(-1).apply()
 
         # handle the different subtypes labels objects
         self.subtypes_labels = self.client.get_subtype_labels()
@@ -372,6 +372,10 @@ class NotebookController(SimulatorController):
 
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
+
+    @property
+    def state_wrapper(self):
+        return ClientDataclassWrapper(self.client)
 
     def create_entity_list(self):
         self.entity_lists = {

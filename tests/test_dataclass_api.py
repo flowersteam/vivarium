@@ -103,6 +103,18 @@ def test_change_recorder_simstate():
     assert (state.simulator_state.freq[0] == -1)
 
 
+def test_dataclass_wrapper():
+    state = get_rigid_body_state()
+    idx = 3
+    val = [0.2, 0.3]
+    cur_val = state.agent_state.motor[idx]
+    assert (not jnp.equal(jnp.array(cur_val), jnp.array(val)).all())
+
+    state = DataclassWrapper().agent_state.motor[idx].set(val).apply(state)
+
+    assert (jnp.equal(jnp.array(state.agent_state.motor[idx]), jnp.array(val)).all())
+
+
 @pytest.mark.parametrize("idx, position_center, position_orientation, color, init_state_fn, entity_type", [
     (2, [7, 8], 2.0, [1.0, 0.0, 1.0], get_rigid_body_state, EntityType.AGENT),
     (3, [5, 6], 1.5, [0.5, 0.5, 0.5], get_point_particle_state, EntityType.OBJECT),

@@ -1,3 +1,4 @@
+import numpy as np
 import jax.numpy as jnp
 
 def update_state_from_change_list(state, change_list):
@@ -5,13 +6,17 @@ def update_state_from_change_list(state, change_list):
         state = update_state(state, changes)
     return state
 
+#TODO: Is it possible to jit part of this?
 def update_state(state, changes):
     if isinstance(changes, list):
         for change in changes:
             if change['__idx'] is None:
                 state = change['__value']
             else:
-                state = state.at[change['__idx']].set(change['__value'])
+                if isinstance(state, np.ndarray):
+                    state[change['__idx']] = change['__value']
+                else:
+                    state = state.at[change['__idx']].set(change['__value'])
     else:
         for attr, child in changes.items():
             state = state.set(**{attr: update_state(getattr(state, attr), child)})
@@ -53,7 +58,8 @@ class ChangeRecorder:
         return changes
 
     def __getitem__(self, idx):
-        return ChangeRecorder(name=self._name, idx=idx)
+        self._idx = idx
+        return self
 
     def __setitem__(self, idx, value):
         self._idx = idx
@@ -73,7 +79,7 @@ class ChangeRecorder:
             super().__setattr__(attr, value)
         else:
             getattr(self, attr).store_change(value)
-            #self.store_change(attr, value)
+
 
 def create_property(field_name, rigid_body_field):
     @property
@@ -106,6 +112,50 @@ def create_property(field_name, rigid_body_field):
             else:
                 raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
     return prop
+
+
+class DataclassWrapper:
+    def __init__(self):
+        self._root_change_recorder = ChangeRecorder()
+        self._last_change_recorder = self._root_change_recorder
+        
+    def __getattr__(self, attr):
+        if attr.startswith('_'):
+            return object.__getattribute__(self, attr)
+        self._last_change_recorder = getattr(self._last_change_recorder, attr)
+        return self
+    
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            super().__setattr__(attr, value)
+            return
+        getattr(self._last_change_recorder, attr).store_change(value)
+    
+    def __getitem__(self, idx):
+        self._last_change_recorder = self._last_change_recorder[idx]
+        return self
+    
+    def __setitem__(self, idx, value):
+        self._last_change_recorder[idx] = value
+
+    def set(self, value):
+        self._last_change_recorder.store_change(value)
+        return self
+
+    def update_state(self, state, changes):
+        state = update_state(state, changes)
+        return state
+    
+    def fetch_changes(self):
+        changes = self._root_change_recorder.fetch_changes()
+        self._root_change_recorder = ChangeRecorder()
+        self._last_change_recorder = self._root_change_recorder
+        return changes
+
+    def apply(self, state):
+        changes = self.fetch_changes()
+        state = update_state(state, changes)
+        return state
 
 
 class EntityWrapper:
