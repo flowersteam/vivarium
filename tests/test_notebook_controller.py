@@ -1,3 +1,52 @@
+import jax.numpy as jnp
+from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
+    init_state,
+    SelectiveSensorsEnv,
+)
+from vivarium.simulator.simulator import Simulator
+
+from vivarium.controllers.notebook_controller import NotebookController
+
+NUM_STEPS = 10
+
+
+def test_notebook_controller():
+    """Test default simulator run"""
+    state = init_state()
+    env = SelectiveSensorsEnv(state=state)
+    simulator = Simulator(env_state=state, env=env)
+    controller = NotebookController(simulator)
+    controller.step()
+
+    def beh(agent):
+        left, right = agent.sensors()
+        return right, left
+
+    idx = 0
+    pos = controller.state.entity_state.position_center[idx]
+
+    ag =controller.agents[idx]
+    ag.attach_behavior(beh)
+    controller.execute_routines_and_behaviors()
+
+    assert (jnp.equal(pos, ag.position_center).all())
+
+    # ag.motor = [1., 0.7]
+    for _ in range(NUM_STEPS):
+        pos = controller.state.entity_state.position_center[idx]
+        controller.step()
+        assert (not jnp.equal(pos, ag.position_center).all())
+
+    # assert (not jnp.equal(controller.state.entity_state.position_center[idx], pos).all())
+
+    # for _ in range(NUM_STEPS):
+    #     simulator.step()
+
+    # assert simulator
+
+
+
+
 # import time
 
 # from vivarium.controllers.notebook_controller import NotebookController

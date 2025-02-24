@@ -14,6 +14,8 @@ from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.simulator.simulator_states import StateType, EntityType
 from vivarium.controllers.utils import Logger, RoutineHandler, BehaviorHandler
 
+from vivarium.controllers.dataclass_wrapper import EntityWrapper, EntityList
+
 lg = logging.getLogger(__name__)
 
 if logging.root.handlers:
@@ -25,44 +27,29 @@ else:
 class Entity:
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, config):
-        self.config = config
-        self.routine_handler = RoutineHandler()
-        self.user_events = {}
+    def __init__(self, entity_wrapper):
+        object.__setattr__(self, '_entity_wrapper', entity_wrapper)
+        object.__setattr__(self, 'etype', self._entity_wrapper._entity_type)
+        object.__setattr__(self, 'routine_handler', RoutineHandler())
 
     def __getattr__(self, item):
-        """Get the attribute of the entity
-
-        :param item: item
-        :return: attribute
-        """
-        if item in self.config.param_names():
-            return getattr(self.config, item)
-        else:
-            try:
-                return super().__getattr__(item)
-            except AttributeError as e:
-                print(f"{self.__class__.__name__} has no attribute {item}")
-                raise
-
-    # TODO : Add a check to ensure that the attribute's value is authorized (according to params bounds)
+        if item in self.__dict__:
+            return self.__dict__[item]
+        return getattr(self._entity_wrapper, item)
+    
     def __setattr__(self, item, val):
-        """Set the attribute of the entity
-
-        :param item: field to set
-        :param val: value to set
-        :return: attribute
-        """
-        if item != "config" and item in self.config.param_names():
-            self.user_events[item] = val  # ensures the event is set during the run loop
+        if item in self.__dict__:
+            super().__setattr__(item, val)
         else:
-            return super().__setattr__(item, val)
-
-    def set_events(self):
-        """Set the user events of the entity (events that are set during the run loop from the user)"""
-        for k, v in self.user_events.items():
-            setattr(self.config, k, v)
-        self.user_events = {}
+            setattr(self._entity_wrapper, item, val)
+    
+    @property
+    def state(self):
+        return self._entity_wrapper._state
+    
+    @state.setter
+    def state(self, state):
+        self._entity_wrapper._state = state
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
@@ -123,23 +110,22 @@ class Agent(Entity):
     :param Entity: Entity
     """
 
-    def __init__(self, config):
-        super().__init__(config)
-        self.etype = EntityType.AGENT
-        self.behavior_handler = BehaviorHandler()
-        self.logger = Logger()
-        self.eating_range = 10
-        self.diet = []
-        self.ate = False
-        self.time_since_feeding = np.inf
-        self.simulation_entities = None
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'behavior_handler', BehaviorHandler())
+        object.__setattr__(self, 'logger', Logger())
+        object.__setattr__(self, 'eating_range', 10)
+        object.__setattr__(self, 'diet', [])
+        object.__setattr__(self, 'ate', False)
+        object.__setattr__(self, 'time_since_feeding', np.inf)
+        object.__setattr__(self, 'simulation_entities', None)
         self.set_manual()
 
     def set_manual(self):
         """Set the agent's behavior to manual"""
-        self.behavior = np.full(
+        object.__setattr__(self, 'behavior', np.full(
             shape=self.behavior.shape, fill_value=Behaviors.MANUAL.value
-        )
+        ))
         self.stop_motors()
 
     def sensors(self, sensed_entities=None):
@@ -148,7 +134,7 @@ class Agent(Entity):
         :param sensed_entities: sensed_entities of the sensors under the form of strings, defaults to None
         :return: sensors values
         """
-        left, right = self.config.left_prox, self.config.right_prox
+        left, right = self.prox
         if sensed_entities is not None:
             # transform the strings of sensed entities into ints (this fn can surely be optimized)
             assert all(
@@ -262,12 +248,11 @@ class Agent(Entity):
         """
         self.behavior_handler.behave(self, time)
         # increment time since last meal for all alive agents
-        self.time_since_feeding += 1
+        object.__setattr__(self, 'time_since_feeding', self.time_since_feeding + 1)
 
     def stop_motors(self):
         """Stop the motors of the agent"""
-        self.left_motor = 0
-        self.right_motor = 0
+        self.motor = [0, 0]
 
     def has_eaten(self):
         """Check if the agent has eaten
@@ -355,13 +340,10 @@ class Object(Entity):
 
     :param Entity: Entity
     """
-
-    def __init__(self, config):
-        super().__init__(config)
-        self.etype = EntityType.OBJECT
+    pass
 
 
-# mappy the entity type to their corresponding class
+# map the entity type to their corresponding class
 etype_to_class = {EntityType.AGENT: Agent, EntityType.OBJECT: Object}
 
 
@@ -371,28 +353,17 @@ class NotebookController(SimulatorController):
     :param SimulatorController: SimulatorController
     """
 
-    def __init__(self, **params):
-        super().__init__(**params)
-        self.all_entities = []
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.time = 0
 
-        # add agents and objects to the global entities list
-        for etype in list(EntityType):
-            setattr(
-                self,
-                f"{etype.name.lower()}s",
-                [etype_to_class[etype](c) for c in self.configs[etype.to_state_type()]],
-            )
-            self.all_entities.extend(getattr(self, f"{etype.name.lower()}s"))
-
-        # set flags
-        self.from_stream = True
         self._is_running = False
 
-        # set frequency of the simulator to max speed
-        self.configs[StateType.SIMULATOR][0].freq = -1
+        # # set frequency of the simulator to max speed
+        # self.configs[StateType.SIMULATOR][0].freq = -1
 
         # handle the different subtypes labels objects
+        self.subtypes_labels = self.client.get_subtype_labels()
         self._subtype_idx_to_label = self.subtypes_labels
         self._subtype_label_to_idx = {
             v: k for k, v in self._subtype_idx_to_label.items()
@@ -402,26 +373,20 @@ class NotebookController(SimulatorController):
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
 
-        # automatically update attributes of all entities
-        self.set_all_user_events()
-        self.update_agents_attributes()
-        self.update_entities_attributes()
+    def create_entity_list(self):
+        self.entity_lists = {
+            etype: EntityList(
+                state=self.state, entity_type=etype,
+                entity_wrapper_list=[
+                    etype_to_class[etype](EntityWrapper(self.state, idx, etype)) 
+                    for idx, type in enumerate(self.state.entity_state.entity_type) if type == etype.value]
+            )
+            for etype in EntityType
+        }
 
     def is_running(self):
         """Check if the simulator is running"""
         return self._is_running
-
-    def update_agents_attributes(self):
-        """Give all agents the list of all entities in the simulation (usefull for advanced cases like eating)"""
-        for agent in self.agents:
-            agent.simulation_entities = self.all_entities
-            agent._subtype_label_to_idx = self._subtype_label_to_idx
-            agent.valid_subtypes = self.valid_subtypes
-
-    def update_entities_attributes(self):
-        """Temporary fn to give their subtype labels to all entities"""
-        for ent in self.all_entities:
-            ent.subtype_label = self._subtype_idx_to_label[ent.subtype]
 
     # TODO : Clean mechanism to clean entity apparition (at seems like the entity is moving from a position to another), maybe add a time.sleep() --> LOW PRIORITY
     def spawn_entity(self, entity_idx, position=None):
@@ -560,28 +525,29 @@ class NotebookController(SimulatorController):
         # Add a local time for the run function independant from the controller time
         run_time = 0
         while run_time < num_steps and self._is_running:
-            with self.batch_set_state():
-                # execute routines of the controller
-                self.controller_routine_step(self.time, catch_errors=catch_errors)
+            # with self.batch_set_state():
 
-                # execute routines of the existing entities
-                for entity in self.all_entities:
-                    entity.set_events()
-                    if not entity.exists:
-                        continue
-                    entity.routine_step(self.time, catch_errors=catch_errors)
-                    # execute behaviors of agents
-                    if entity.etype == EntityType.AGENT:
-                        entity.behave(self.time)
+            self.execute_routines_and_behaviors(catch_errors=catch_errors)
 
-            # update the attributes of all entities and do a step on server side
-            self.state = self.client.step()
-            self.pull_configs()
+            self.step()
+
             self.time += 1
             run_time += 1
 
         # finally stop the simulation
         self.stop()
+
+    def execute_routines_and_behaviors(self, catch_errors=True):
+        # execute routines of the controller
+        self.controller_routine_step(self.time, catch_errors=catch_errors)
+
+        # execute routines of the existing entities
+        for etype, elist in self.entity_lists.items():
+            # TODO : Add a check to ensure that the entity exists
+            for entity in elist:
+                entity.routine_step(self.time, catch_errors=catch_errors)
+                if entity.etype == EntityType.AGENT:
+                    entity.behave(self.time)
 
     def stop(self):
         """Pause the simulation"""
