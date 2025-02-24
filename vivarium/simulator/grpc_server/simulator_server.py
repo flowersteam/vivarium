@@ -11,10 +11,11 @@ import simulator_pb2_grpc
 
 from numproto.numproto import proto_to_ndarray
 
-from vivarium.simulator.grpc_server.converters import state_to_proto
+from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_changes
 from vivarium.simulator.grpc_server.converters import nve_state_to_proto
 from vivarium.simulator.grpc_server.converters import agent_state_to_proto
 from vivarium.simulator.grpc_server.converters import object_state_to_proto
+
 
 lg = logging.getLogger(__name__)
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
@@ -43,9 +44,20 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         self._simulation_time = 0
         self._lock = Lock()
 
+    def SetChanges(self, request, context):
+        changes = proto_to_changes(request)
+        with self._lock:
+            self.simulator.apply_changes(changes)
+        return Empty()
+    
+    def SetChangesAndStep(self, request, context):
+        self.SetChanges(request, context)
+        return self.Step(None, None)
+    
     def GetState(self, request, context):
         state = self.simulator.state
-        return state_to_proto(state)
+        p = state_to_proto(state)
+        return p
 
     def GetNVEState(self, request, context):
         entity_state = self.simulator.state.entity_state
@@ -64,7 +76,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         return simulator_pb2.Scene(scene_name=scene_name)
 
     def GetSubtypesLabels(self, request, context):
-        subtype_labels_dict = self.simulator.ent_sub_types
+        subtype_labels_dict = self.simulator.get_subtype_labels()
         return simulator_pb2.SubtypesLabels(data=subtype_labels_dict)
 
     def Start(self, request, context):

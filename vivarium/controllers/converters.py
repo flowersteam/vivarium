@@ -251,25 +251,25 @@ simulator_common_fields = [
 # Define conversions between agents configs and state dictionary
 agent_configs_to_state_dict = {
     "x_position": StateFieldInfo(
-        ("entity_state", "position", "center"), 0, identity_s_to_c, identity_c_to_s
+        ("entity_state", "position_center"), 0, identity_s_to_c, identity_c_to_s
     ),
     "y_position": StateFieldInfo(
-        ("entity_state", "position", "center"), 1, identity_s_to_c, identity_c_to_s
+        ("entity_state", "position_center"), 1, identity_s_to_c, identity_c_to_s
     ),
     "orientation": StateFieldInfo(
-        ("entity_state", "position", "orientation"),
+        ("entity_state", "position_orientation"),
         None,
         identity_s_to_c,
         identity_c_to_s,
     ),
     "mass_center": StateFieldInfo(
-        ("entity_state", "mass", "center"),
+        ("entity_state", "mass_center"),
         np.array([0]),
         mass_center_s_to_c,
         mass_center_c_to_s,
     ),
     "mass_orientation": StateFieldInfo(
-        ("entity_state", "mass", "orientation"), None, identity_s_to_c, identity_c_to_s
+        ("entity_state", "mass_orientation"), None, identity_s_to_c, identity_c_to_s
     ),
     "diameter": StateFieldInfo(
         ("entity_state", "diameter"), None, identity_s_to_c, identity_c_to_s
@@ -421,25 +421,25 @@ agent_configs_to_state_dict.update(
 # Define conversions between objects configs and state dictionary
 object_configs_to_state_dict = {
     "x_position": StateFieldInfo(
-        ("entity_state", "position", "center"), 0, identity_s_to_c, identity_c_to_s
+        ("entity_state", "position_center"), 0, identity_s_to_c, identity_c_to_s
     ),
     "y_position": StateFieldInfo(
-        ("entity_state", "position", "center"), 1, identity_s_to_c, identity_c_to_s
+        ("entity_state", "position_center"), 1, identity_s_to_c, identity_c_to_s
     ),
     "orientation": StateFieldInfo(
-        ("entity_state", "position", "orientation"),
+        ("entity_state", "position_orientation"),
         None,
         identity_s_to_c,
         identity_c_to_s,
     ),
     "mass_center": StateFieldInfo(
-        ("entity_state", "mass", "center"),
+        ("entity_state", "mass_center"),
         np.array([0]),
         mass_center_s_to_c,
         mass_center_c_to_s,
     ),
     "mass_orientation": StateFieldInfo(
-        ("entity_state", "mass", "orientation"), None, identity_s_to_c, identity_c_to_s
+        ("entity_state", "mass_orientation"), None, identity_s_to_c, identity_c_to_s
     ),
     "diameter": StateFieldInfo(
         ("entity_state", "diameter"), None, identity_s_to_c, identity_c_to_s

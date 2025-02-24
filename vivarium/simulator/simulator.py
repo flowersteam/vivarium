@@ -23,7 +23,78 @@ from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env i
     State as EnvState,
 )
 
+from vivarium.controllers.dataclass_wrapper import update_state_from_change_list
+
+
 lg = logging.getLogger(__name__)
+
+
+@jax.jit
+def env_to_sim_state(
+    env_state, num_steps_lax, freq, use_fori_loop, jit_step
+):
+    """Jitted function that transform environment state (used in self.env) into a simulator state for the client-server interaction
+
+    :param env_state: env_state
+    :param num_steps_lax: num_steps_lax
+    :param freq: freq
+    :param use_fori_loop: use_fori_loop
+    :param jit_step: jit_step
+    :return: simulator state
+    """
+    simulator_state = SimulatorState(
+        # why 0 and not 2 ? Like in state types
+        idx=jnp.array([0]),
+        time=jnp.array([env_state.time]),
+        box_size=jnp.array([env_state.box_size]),
+        max_agents=jnp.array([env_state.max_agents]),
+        max_objects=jnp.array([env_state.max_objects]),
+        dt=jnp.array([env_state.dt]),
+        neighbor_radius=jnp.array([env_state.neighbor_radius]),
+        collision_alpha=jnp.array([env_state.collision_alpha]),
+        collision_eps=jnp.array([env_state.collision_eps]),
+        num_steps_lax=jnp.array([num_steps_lax]),
+        freq=jnp.array([freq]),
+        # convert bool to either 1 or 0
+        use_fori_loop=jnp.array([1 * use_fori_loop]),
+        to_jit=jnp.array([1 * jit_step]),
+    )
+
+    sim_state = SimState(
+        agent_state=env_state.agent_state,
+        entity_state=env_state.entity_state,
+        object_state=env_state.object_state,
+        simulator_state=simulator_state,
+    )
+
+    return sim_state
+
+
+@jax.jit
+def sim_to_env_state(sim_state, ent_sub_types_and_num):
+    """Transform the simulator state used for client server connection into env state (used in self.env)
+
+    :param sim_state: simulator state
+    :return: environment state
+    """
+    sim = sim_state.simulator_state
+
+    env_state = EnvState(
+        time=sim.time[0],
+        ent_sub_types=ent_sub_types_and_num,
+        box_size=sim.box_size[0],
+        max_agents=sim.max_agents[0],
+        max_objects=sim.max_objects[0],
+        dt=sim.dt[0],
+        neighbor_radius=sim.neighbor_radius[0],
+        collision_alpha=sim.collision_alpha[0],
+        collision_eps=sim.collision_eps[0],
+        entity_state=sim_state.entity_state,
+        agent_state=sim_state.agent_state,
+        object_state=sim_state.object_state,
+    )
+
+    return env_state
 
 
 class Simulator:
@@ -42,9 +113,9 @@ class Simulator:
         assert isinstance(
             self.env, SelectiveSensorsEnv
         ), "You have to use an environment with selective sensors within the simulator"
-        assert (
-            self.env.occlusion
-        ), "You have to use an environment with occlusion sensors within the simulator"
+        # assert (
+        #     self.env.occlusion
+        # ), "You have to use an environment with occlusion sensors within the simulator"
 
         self.scene_name = scene_name
 
@@ -105,7 +176,7 @@ class Simulator:
 
         self.load_state(state, env)
 
-    def _step(self, state, num_updates):
+    def _step(self, state, num_scan_steps):
         """Do num_updates jitted steps in the simulation. This is done by converting state into environment state, and convert it back to simulation state during return
 
         :param state: current simulation state
@@ -114,7 +185,7 @@ class Simulator:
         """
         # convert the sim_state into env state to call env.step()
         new_env_state = self.env.step(
-            state=self.sim_to_env_state(state), num_updates=num_updates
+            state=self.env_state, num_scan_steps=num_scan_steps
         )
 
         # record the env state because it is the one we can plot and use without client-server interaction
@@ -124,8 +195,10 @@ class Simulator:
         # return the next sim state (convert new env state)
         return self.env_to_sim_state(new_env_state)
 
-    def step(self):
+    def step(self, changes=[]):
         """Do a step in the simulation by calling _step"""
+        if len(changes) > 0:
+            self.apply_changes(changes)
         self.state = self._step(self.state, self.num_steps_lax)
         return self.state
 
@@ -297,6 +370,12 @@ class Simulator:
                 "Impossible to change 'box size', 'dt', 'neighbor radius' during the simulation"
             )
 
+    def apply_changes(self, changes):
+        self.state = update_state_from_change_list(self.state, changes)
+
+    def get_subtype_labels(self):
+        return self.ent_sub_types
+
     def start(self):
         """Start the simulation"""
         self.run(threaded=True)
@@ -358,45 +437,6 @@ class Simulator:
         """
         return {int(idx): label for label, (idx, _) in ent_sub_types_and_num.items()}
 
-    @partial(jax.jit, static_argnums=(0,))
-    def _env_to_sim_state(
-        self, env_state, num_steps_lax, freq, use_fori_loop, jit_step
-    ):
-        """Jitted function that transform environment state (used in self.env) into a simulator state for the client-server interaction
-
-        :param env_state: env_state
-        :param num_steps_lax: num_steps_lax
-        :param freq: freq
-        :param use_fori_loop: use_fori_loop
-        :param jit_step: jit_step
-        :return: simulator state
-        """
-        simulator_state = SimulatorState(
-            # why 0 and not 2 ? Like in state types
-            idx=jnp.array([0]),
-            time=jnp.array([env_state.time]),
-            box_size=jnp.array([env_state.box_size]),
-            max_agents=jnp.array([env_state.max_agents]),
-            max_objects=jnp.array([env_state.max_objects]),
-            dt=jnp.array([env_state.dt]),
-            neighbor_radius=jnp.array([env_state.neighbor_radius]),
-            collision_alpha=jnp.array([env_state.collision_alpha]),
-            collision_eps=jnp.array([env_state.collision_eps]),
-            num_steps_lax=jnp.array([num_steps_lax]),
-            freq=jnp.array([freq]),
-            # convert bool to either 1 or 0
-            use_fori_loop=jnp.array([1 * use_fori_loop]),
-            to_jit=jnp.array([1 * jit_step]),
-        )
-
-        sim_state = SimState(
-            agent_state=env_state.agents,
-            entity_state=env_state.entities,
-            object_state=env_state.objects,
-            simulator_state=simulator_state,
-        )
-
-        return sim_state
 
     def env_to_sim_state(self, env_state):
         """Transform environment state (used in self.env) into a simulator state for the client-server interactoon
@@ -404,36 +444,10 @@ class Simulator:
         :param env_state: env_state
         :return: simulator state
         """
-        return self._env_to_sim_state(
+        return env_to_sim_state(
             env_state, self.num_steps_lax, self.freq, self.use_fori_loop, self.jit_step
         )
 
-    @partial(jax.jit, static_argnums=(0,))
-    def sim_to_env_state(self, sim_state):
-        """Transform the simulator state used for client server connection into env state (used in self.env)
-
-        :param sim_state: simulator state
-        :return: environment state
-        """
-        sim = sim_state.simulator_state
-
-        env_state = EnvState(
-            time=sim.time[0],
-            ent_sub_types=self.ent_sub_types_and_num,
-            box_size=sim.box_size[0],
-            max_agents=sim.max_agents[0],
-            max_objects=sim.max_objects[0],
-            dt=sim.dt[0],
-            neighbor_radius=sim.neighbor_radius[0],
-            collision_alpha=sim.collision_alpha[0],
-            collision_eps=sim.collision_eps[0],
-            entities=sim_state.entity_state,
-            agents=sim_state.agent_state,
-            objects=sim_state.object_state,
-        )
-
-        return env_state
-
     @property
     def env_state(self):
-        return self.sim_to_env_state(self.state)
+        return sim_to_env_state(self.state, self.ent_sub_types_and_num)

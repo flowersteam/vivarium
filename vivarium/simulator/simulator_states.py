@@ -30,6 +30,10 @@ class StateType(Enum):
 # No need to define position, momentum, force, and mass (i.e already in jax_md.simulate.NVEState)
 @dataclass
 class EntityState(simulate.NVEState):
+    position: rigid_body.RigidBody  # Need to specify the type for protobuf deserialization (also below)
+    momentum: rigid_body.RigidBody
+    force: rigid_body.RigidBody
+    mass: rigid_body.RigidBody
     entity_type: util.Array
     ent_subtype: util.Array
     entity_idx: util.Array  # idx in XState (e.g. AgentState)
@@ -40,7 +44,28 @@ class EntityState(simulate.NVEState):
     @property
     def velocity(self) -> util.Array:
         return self.momentum / self.mass
+    
+    def is_rigid_body(self):
+        return hasattr(self.position, 'center')
 
+    def __getattr__(self, name):
+        prefix, suffix = name.split('_', 1)
+        if prefix == "unified":
+            if suffix == 'orientation':
+                if isinstance(self.position, rigid_body.RigidBody):
+                    return self.position.orientation
+                return self.orientation
+            if isinstance(getattr(self, suffix), rigid_body.RigidBody):
+                return getattr(self, suffix).center
+            return getattr(self, suffix)
+        if suffix in ['center', 'orientation']:
+            if isinstance(self.position, rigid_body.RigidBody):
+                return getattr(getattr(self, prefix), suffix)
+            if suffix == 'center':
+                return getattr(self, prefix)
+            else:  # Necessarily 'orientation'
+                return self.orientation if prefix == 'position' else jnp.zeros_like(self.orientation)
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 # TODO : ent idx and color already in Particle state in env side
 
@@ -117,6 +142,18 @@ class SimState:
     entity_state: EntityState
     agent_state: AgentState
     object_state: ObjectState
+
+    @property
+    def entities(self):
+        return self.entity_state
+    
+    @property
+    def agents(self):
+        return self.agent_state
+    
+    @property
+    def objects(self):
+        return self.object_state
 
     def field(self, stype_or_nested_fields):
         if isinstance(stype_or_nested_fields, StateType) or isinstance(

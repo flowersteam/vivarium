@@ -9,6 +9,8 @@ from vivarium.environments.braitenberg.selective_sensing import (
 from vivarium.utils.scene_configs import load_scene_config
 import pytest
 
+from vivarium.simulator.simulator import env_to_sim_state
+
 from vivarium.environments.braitenberg import selective_sensing
 from vivarium.environments.utils import rigid_body_to_point_particle
 
@@ -86,6 +88,21 @@ def test_change_recorder(changes_and_expected, state_fn):
             assert (jnp.equal(getattr(getattr(state, entity), attr), expected_fn(state))).all()
 
 
+def test_change_recorder_simstate():
+    env_state = get_rigid_body_state()
+    state = env_to_sim_state(env_state, num_steps_lax=2, freq=60, use_fori_loop=False, jit_step=False)
+
+    assert (state.simulator_state.freq[0] == 60)
+
+    change_recorder = ChangeRecorder()
+    change_recorder.simulator_state.freq[0] = -1
+    changes = change_recorder.fetch_changes()
+
+    state = update_state(state, changes)
+
+    assert (state.simulator_state.freq[0] == -1)
+
+
 @pytest.mark.parametrize("idx, position_center, position_orientation, color, init_state_fn, entity_type", [
     (2, [7, 8], 2.0, [1.0, 0.0, 1.0], get_rigid_body_state, EntityType.AGENT),
     (3, [5, 6], 1.5, [0.5, 0.5, 0.5], get_point_particle_state, EntityType.OBJECT),
@@ -102,7 +119,7 @@ def test_entity_wrapper(idx, position_center, position_orientation, color, init_
 
     previous_state = state
 
-    state = entity.update_state(state)
+    state = entity.apply_to_state(state)
 
     previous_entity_state = previous_state.agent_state if entity_type == EntityType.AGENT else previous_state.object_state
     entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
@@ -126,7 +143,7 @@ def test_entity_list(idx, position_center, color, entity_type, state_fn):
     obj = objects[idx]
     obj.position_center = position_center
 
-    state = objects.update_state(state)
+    state = objects.apply_to_state(state)
 
     entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
     expected_position = state.entity_state.position_center.at[entity_state.ent_idx[idx]].set(position_center)
@@ -136,7 +153,7 @@ def test_entity_list(idx, position_center, color, entity_type, state_fn):
             break
         o.color = color[i]
     
-    state = objects.update_state(state)
+    state = objects.apply_to_state(state)
     entity_state = state.agent_state if entity_type == EntityType.AGENT else state.object_state
 
     assert (jnp.equal(state.entity_state.position_center, expected_position)).all()

@@ -37,7 +37,7 @@ class ChangeRecorder:
                 value = value.item()
         self.__idx = value
 
-    def store_change(self, attr, value):
+    def store_change(self, value):
         self._changes.append({'__idx': self._idx, '__value': value})
 
     def fetch_changes(self):
@@ -57,7 +57,7 @@ class ChangeRecorder:
 
     def __setitem__(self, idx, value):
         self._idx = idx
-        self.store_change(self._name, value)
+        self.store_change(value)
 
     def __getattr__(self, attr):
         if attr.startswith('_'):
@@ -72,7 +72,8 @@ class ChangeRecorder:
         if attr.startswith('_'):
             super().__setattr__(attr, value)
         else:
-            self.store_change(attr, value)
+            getattr(self, attr).store_change(value)
+            #self.store_change(attr, value)
 
 def create_property(field_name, rigid_body_field):
     @property
@@ -123,7 +124,8 @@ class EntityWrapper:
         self._ent_idx = ent_idx
         self._is_rigid_body = self._state.entity_state.is_rigid_body()
         self._change_recorder = ChangeRecorder()
-        self._entity_type = entity_type.name.lower() + '_state'
+        self._entity_type = entity_type
+        self._entity_type_attr = entity_type.name.lower() + '_state'
         self._entity_fields = ['ent_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
                                'position', 'momentum', 'force', 'mass',
@@ -135,7 +137,7 @@ class EntityWrapper:
     def __getattr__(self, attr):
         if attr in self._entity_fields:
             return getattr(self._state.entity_state, attr)[self._ent_idx]
-        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_idx[self._ent_idx]]
+        return getattr(getattr(self._state, self._entity_type_attr), attr)[self._state.entity_state.entity_idx[self._ent_idx]]
 
     def __setattr__(self, attr, value):
         if attr.startswith('_'):
@@ -149,21 +151,24 @@ class EntityWrapper:
             else:
                 getattr(self._change_recorder.entity_state, attr)[self._ent_idx] = value
         else:
-            getattr(getattr(self._change_recorder, self._entity_type), attr)[self._state.entity_state.entity_idx[self._ent_idx]] = value
+            getattr(getattr(self._change_recorder, self._entity_type_attr), attr)[self._state.entity_state.entity_idx[self._ent_idx]] = value
 
-    def update_state(self, state):
+    def apply_to_state(self, state):
         changes = self._change_recorder.fetch_changes()
         self._state = update_state(state, changes)
         self._change_recorder = ChangeRecorder()
         return self._state
+    
+    def set_state(self, state):
+        self._state = state
 
 
 class EntityList:
-    def __init__(self, state, entity_type):
+    def __init__(self, state, entity_type, entity_wrapper_list=None):
         self._state = state
         self._entity_type = entity_type.name.lower() + 's'
-        self._entity_list = [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type.value]
-    
+        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type.value]
+
     def __getitem__(self, idx):
         return self._entity_list[idx]
     
@@ -176,7 +181,19 @@ class EntityList:
     def __len__(self):
         return len(self._entity_list)
 
-    def update_state(self, state):
+    def apply_to_state(self, state):
         for entity in self._entity_list:
-            state = entity.update_state(state)
+            state = entity.apply_to_state(state)
         return state
+    
+    def set_state(self, state):
+        for entity in self._entity_list:
+            entity.set_state(state)
+
+    def fetch_changes(self):
+        changes = []
+        for e in self._entity_list:
+            c = e._change_recorder.fetch_changes()
+            if c:
+                changes.append(c)
+        return changes

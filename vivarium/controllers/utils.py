@@ -268,14 +268,14 @@ class BehaviorHandler(object):
                     motor_values = total_motor_values / total_weights
             # else keep the current motor values
             else:
-                motor_values = [agent.left_motor, agent.right_motor]
+                motor_values = agent.motor
         except Exception as e:
             lg.error(
                 f"Error while computing motor values in behavior of agent {agent.idx}: {e}"
             )
             motor_values = np.zeros(2)
 
-        agent.left_motor, agent.right_motor = motor_values
+        agent.motor = motor_values
 
     def print_behaviors(self, full_infos=False):
         """Print the behaviors and active behaviors of the agent"""

@@ -1,3 +1,5 @@
+import numpy as np
+import jax.numpy as jnp
 from jax_md.rigid_body import RigidBody
 
 import simulator_pb2
@@ -8,26 +10,146 @@ from vivarium.simulator.grpc_server.numproto.numproto import (
 )
 from vivarium.simulator.simulator_states import (
     SimulatorState,
-    EntityState,
+    # EntityState,
     AgentState,
     ObjectState,
+    SimState
 )
+from vivarium.environments.braitenberg.selective_sensing.state import EntityState
+
 from vivarium.simulator.simulator_states import SimState as State
 
 
-def proto_to_state(state):
+from jax_md.dataclasses import fields
+
+
+def changes_to_proto(changes):
+    if isinstance(changes, list) and '__idx' in changes[0]:
+        proto_changes = simulator_pb2.Changes()
+        for change in changes:
+            proto_change = simulator_pb2.Change()
+            for k, v in change.items():
+                idx_or_value = simulator_pb2.IdxOrValue()
+                if k == '__idx':
+                    idx_or_value.idx = v
+                elif k == '__value':
+                    idx_or_value.value.CopyFrom(ndarray_to_proto(v))
+                else:
+                    raise ValueError(f"Unknown key {k}")
+                proto_change.field[k].CopyFrom(idx_or_value)
+            proto_changes.changes.append(proto_change)
+        return proto_changes
+    elif isinstance(changes, dict):
+        proto_state_change = simulator_pb2.StateChange()
+        for attr, child in changes.items():
+            x = changes_to_proto(child)
+            if isinstance(x, simulator_pb2.Changes):
+                nested = simulator_pb2.StateChange()
+                nested.changes.CopyFrom(x)
+                proto_state_change.child[attr].CopyFrom(nested)
+            else:
+                proto_state_change.child[attr].CopyFrom(changes_to_proto(child))
+        return proto_state_change
+    else:
+        proto_state_change_list = simulator_pb2.StateChangeList()
+        for change in changes:
+            proto_state_change_list.state_changes.append(changes_to_proto(change))
+        return proto_state_change_list
+    
+def proto_to_changes(proto_changes):
+    if isinstance(proto_changes, simulator_pb2.StateChangeList):
+        changes = []
+        for proto_state_change in proto_changes.state_changes:
+            change = proto_to_changes(proto_state_change)
+            changes.append(change)
+        return changes
+    elif isinstance(proto_changes, simulator_pb2.StateChange):
+        if proto_changes.HasField('changes'):
+            return proto_to_changes(proto_changes.changes)
+        else:
+            changes = {}
+            for attr, child in proto_changes.child.items():
+                changes[attr] = proto_to_changes(child)
+            return changes
+    elif isinstance(proto_changes, simulator_pb2.Changes):
+        changes = []
+        for proto_change in proto_changes.changes:
+            changes.append(proto_to_changes(proto_change))
+        return changes
+    elif isinstance(proto_changes, simulator_pb2.Change):
+        change = {}
+        for k, v in proto_changes.field.items():
+            idx_or_value = v
+            if k == '__idx':
+                change['__idx'] = idx_or_value.idx
+            elif k == '__value':
+                change['__value'] = proto_to_ndarray(idx_or_value.value)
+            else:
+                raise ValueError(f"Unknown key {k}")
+        return change
+
+
+
+    if proto_changes.HasField('changes'):
+        for proto_change in proto_changes.changes:
+            change = {}
+            for k in ['idx', 'value']:
+                idx_or_value = getattr(proto_change, k)
+                if k == 'idx':
+                    change[k] = idx_or_value.idx
+                elif k == 'value':
+                    change[k] = proto_to_ndarray(idx_or_value.value)
+                else:
+                    raise ValueError(f"Unknown key {k}")
+            changes.append(change)
+    else:
+        for proto_state_change in proto_changes.state_changes:
+            change = {}
+            for attr, child in proto_state_change.child.items():
+                change[attr] = proto_to_changes(child)
+            changes.append(change)
+    return changes
+
+
+def proto_to_state(state, dataclass_type):
     """Convert a protobuf state to a State object.
 
     :param state: simulation state in protobuf format
     :return: State object
     """
-    return State(
-        simulator_state=proto_to_simulator_state(state.simulator_state),
-        entity_state=proto_to_nve_state(state.entity_state),
-        agent_state=proto_to_agent_state(state.agent_state),
-        object_state=proto_to_object_state(state.object_state),
-    )
 
+    if dataclass_type in [np.ndarray, jnp.ndarray]:
+        return proto_to_ndarray(state.array_data)
+    elif 'center' in state.nested_fields and 'orientation' in state.nested_fields:
+        return RigidBody(
+            center=proto_to_ndarray(state.nested_fields['center'].array_data).astype(float),
+            orientation=proto_to_ndarray(state.nested_fields['orientation'].array_data).astype(float),
+        )
+    else:
+        kwargs = {}
+        for field in fields(dataclass_type):
+            kwargs[field.name] = proto_to_state(state.nested_fields[field.name], field.type)
+
+        return dataclass_type(**kwargs)
+
+
+
+def state_to_proto(state):
+    """Convert a State object to a protobuf state.
+
+    :param state: simulation state
+    :return: protobuf state
+    """
+
+    message = simulator_pb2.Dataclass()
+
+    if isinstance(state, (np.ndarray, jnp.ndarray)):
+        message.array_data.CopyFrom(ndarray_to_proto(state))
+    else:
+        for field in fields(state):
+            value = getattr(state, field.name)
+            message.nested_fields[field.name].CopyFrom(state_to_proto(value))
+    return message
 
 # Added time, sensed, params and entity subtypes
 def proto_to_simulator_state(simulator_state):
@@ -73,6 +195,10 @@ def proto_to_nve_state(entity_state):
             ),
         ),
         force=RigidBody(
+            center=proto_to_ndarray(entity_state.force.center).astype(float),
+            orientation=proto_to_ndarray(entity_state.force.orientation).astype(float),
+        ),
+        previous_force=RigidBody(
             center=proto_to_ndarray(entity_state.force.center).astype(float),
             orientation=proto_to_ndarray(entity_state.force.orientation).astype(float),
         ),
@@ -136,19 +262,27 @@ def proto_to_object_state(object_state):
     )
 
 
-def state_to_proto(state):
-    """Convert a State object to a protobuf state.
+# def state_to_proto(state):
+#     """Convert a State object to a protobuf state.
 
-    :param state: simulation state
-    :return: protobuf state
-    """
-    return simulator_pb2.State(
-        simulator_state=simulator_state_to_proto(state.simulator_state),
-        entity_state=nve_state_to_proto(state.entity_state),
-        agent_state=agent_state_to_proto(state.agent_state),
-        object_state=object_state_to_proto(state.object_state),
-    )
+#     :param state: simulation state
+#     :return: protobuf state
+#     """
+#     return simulator_pb2.State(
+#         simulator_state=simulator_state_to_proto(state.simulator_state),
+#         entity_state=nve_state_to_proto(state.entity_state),
+#         agent_state=agent_state_to_proto(state.agent_state),
+#         object_state=object_state_to_proto(state.object_state),
+#     )
 
+
+
+    # return simulator_pb2.State(
+    #     simulator_state=simulator_state_to_proto(state.simulator_state),
+    #     entity_state=nve_state_to_proto(state.entity_state),
+    #     agent_state=agent_state_to_proto(state.agent_state),
+    #     object_state=object_state_to_proto(state.object_state),
+    # )
 
 def simulator_state_to_proto(simulator_state):
     """Convert a SimulatorState object to a protobuf simulator state.
@@ -181,20 +315,20 @@ def nve_state_to_proto(entity_state):
     """
     return simulator_pb2.EntityState(
         position=simulator_pb2.RigidBody(
-            center=ndarray_to_proto(entity_state.position.center),
-            orientation=ndarray_to_proto(entity_state.position.orientation),
+            center=ndarray_to_proto(entity_state.position_center),
+            orientation=ndarray_to_proto(entity_state.position_orientation),
         ),
         momentum=simulator_pb2.RigidBody(
-            center=ndarray_to_proto(entity_state.momentum.center),
-            orientation=ndarray_to_proto(entity_state.momentum.orientation),
+            center=ndarray_to_proto(entity_state.momentum_center),
+            orientation=ndarray_to_proto(entity_state.momentum_orientation),
         ),
         force=simulator_pb2.RigidBody(
-            center=ndarray_to_proto(entity_state.force.center),
-            orientation=ndarray_to_proto(entity_state.force.orientation),
+            center=ndarray_to_proto(entity_state.force_center),
+            orientation=ndarray_to_proto(entity_state.force_orientation),
         ),
         mass=simulator_pb2.RigidBody(
-            center=ndarray_to_proto(entity_state.mass.center),
-            orientation=ndarray_to_proto(entity_state.mass.orientation),
+            center=ndarray_to_proto(entity_state.mass_center),
+            orientation=ndarray_to_proto(entity_state.mass_orientation),
         ),
         entity_type=ndarray_to_proto(entity_state.entity_type),
         ent_subtype=ndarray_to_proto(entity_state.ent_subtype),

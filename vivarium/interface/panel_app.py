@@ -162,9 +162,9 @@ class EntityManager:
 
 class AgentManager(EntityManager):
     def get_cds_data(self, state):
-        pos = state.position(self.etype).center
+        pos = state.position_center(self.etype)
         x, y = pos[:, 0], pos[:, 1]
-        thetas = state.position(self.etype).orientation
+        thetas = state.position_orientation(self.etype)
         radii = state.diameter(self.etype) / 2.0
         colors = state.agent_state.color
         motors = state.agent_state.motor
@@ -329,9 +329,9 @@ class AgentManager(EntityManager):
 
 class ObjectManager(EntityManager):
     def get_cds_data(self, state):
-        pos = state.position(self.etype).center
+        pos = state.position_center(self.etype)
         x, y = pos[:, 0], pos[:, 1]
-        thetas = state.position(self.etype).orientation
+        thetas = state.position_orientation(self.etype)
         d = state.diameter(self.etype)
         colors = state.object_state.color
 

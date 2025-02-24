@@ -26,16 +26,18 @@ package simulator;
 // Interface exported by the server.
 service SimulatorServer {
   // Do a step in the simulation
-  rpc Step(google.protobuf.Empty) returns (State) {}
+  rpc Step(google.protobuf.Empty) returns (Dataclass) {}
+  rpc SetChangesAndStep(StateChangeList) returns (Dataclass) {}
   
   // Get one of the states of the simulation
-  rpc GetState(google.protobuf.Empty) returns (State) {}
+  rpc GetState(google.protobuf.Empty) returns (Dataclass) {}
   rpc GetNVEState(google.protobuf.Empty) returns (EntityState) {}
   rpc GetAgentState(google.protobuf.Empty) returns (AgentState) {}
   rpc GetObjectState(google.protobuf.Empty) returns (ObjectState) {}
 
   // set the state of the simulation
-  rpc SetState(StateChange) returns (google.protobuf.Empty) {}
+  // rpc SetState(StateChange) returns (google.protobuf.Empty) {}
+  rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
 
   // send the labels of subtypes and scene name
   rpc GetSceneName(Scene) returns (Scene) {}
@@ -45,6 +47,35 @@ service SimulatorServer {
   rpc IsStarted(google.protobuf.Empty) returns (IsStartedState) {}
   rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+message Dataclass {
+  NDArray array_data = 1;  // For numpy arrays
+  map<string, Dataclass> nested_fields = 2;  // For nested dataclasses
+}
+
+message IdxOrValue {
+  oneof idx_or_value {
+    int32 idx = 1;
+    NDArray value = 2;
+  }
+}
+
+message Change {
+  map<string, IdxOrValue> field = 1;
+}
+
+message Changes {
+  repeated Change changes = 1;
+}
+
+message StateChange {
+  Changes changes = 1;
+  map<string, StateChange> child = 2;
+}
+
+message StateChangeList {
+  repeated StateChange state_changes = 1;
 }
 
 message AgentIdx {
@@ -122,12 +153,12 @@ message State {
   ObjectState object_state = 4;
 }
 
-message StateChange {
-  repeated int32 ent_idx= 1;
-  repeated int32 col_idx= 2;
-  repeated string nested_field = 3;
-  NDArray value = 4;
-}
+// message StateChange {
+//   repeated int32 ent_idx= 1;
+//   repeated int32 col_idx= 2;
+//   repeated string nested_field = 3;
+//   NDArray value = 4;
+// }
 
 message AddAgentInput {
   int32 max_agents = 1;

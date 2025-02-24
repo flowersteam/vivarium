@@ -12,7 +12,7 @@ from vivarium.controllers.config import (
     config_to_stype,
     Config,
 )
-from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.controllers.old_simulator_controller import SimulatorController
 from vivarium.simulator.simulator_states import EntityType, StateType
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 
