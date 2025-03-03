@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 
+
 def update_state_from_change_list(state, change_list):
     for changes in change_list:
         state = update_state(state, changes)
@@ -21,6 +22,7 @@ def update_state(state, changes):
         for attr, child in changes.items():
             state = state.set(**{attr: update_state(getattr(state, attr), child)})
     return state
+
 
 class ChangeRecorder:
     def __init__(self, name=None, idx=None):   
@@ -116,19 +118,26 @@ def create_property(field_name, rigid_body_field):
 
 class DataclassWrapper:
     def __init__(self):
-        self._root_change_recorder = ChangeRecorder()
-        self._last_change_recorder = self._root_change_recorder
+        object.__setattr__(self, '_root_change_recorder', ChangeRecorder())
+        object.__setattr__(self, '_last_change_recorder', self._root_change_recorder)
+        # self._root_change_recorder = ChangeRecorder()
+        # self._last_change_recorder = self._root_change_recorder
         
     def __getattr__(self, attr):
-        if attr.startswith('_'):
-            return object.__getattribute__(self, attr)
+        if attr in self.__dict__:
+            return self.__dict__[attr]
+        # if attr.startswith('_'):
+        #     return object.__getattribute__(self, attr)
         self._last_change_recorder = getattr(self._last_change_recorder, attr)
         return self
     
     def __setattr__(self, attr, value):
-        if attr.startswith('_'):
-            super().__setattr__(attr, value)
+        if attr in self.__dict__:
+            self.__dict__[attr] = value
             return
+        # if attr.startswith('_'):
+        #     super().__setattr__(attr, value)
+        #     return
         getattr(self._last_change_recorder, attr).store_change(value)
     
     def __getitem__(self, idx):
@@ -230,6 +239,12 @@ class EntityList:
     
     def __len__(self):
         return len(self._entity_list)
+    
+    def __repr__(self):
+        return repr(self._entity_list)
+
+    # def __str__(self):
+    #     return str(self._entity_list)
 
     def apply_to_state(self, state):
         for entity in self._entity_list:
