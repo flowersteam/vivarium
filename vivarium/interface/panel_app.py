@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import panel as pn
 
-from bokeh.plotting import figure
+from bokeh.plotting import figure, curdoc
 from bokeh.models import (
     ColumnDataSource,
     PointDrawTool,
@@ -21,6 +21,7 @@ from vivarium.simulator.simulator_states import EntityType
 
 lg = logging.getLogger(__name__)
 pn.extension()
+pn.config.theme = 'dark'
 
 
 def normal(array):
@@ -32,27 +33,33 @@ def normal(array):
 
 class EntityManager:
     def __init__(
-        self, config, panel_configs, panel_simulator_config, selected, etype, state
+        self, 
+        entities,
+        selected_param_entity,
+        param_simulator_state,
+        selected, etype, state
     ):
-        self.config = config
-        self.panel_configs = panel_configs
-        self.panel_simulator_config = panel_simulator_config
+        self.entities = entities
+        self.selected_param_entity = selected_param_entity
+        self.param_simulator_state = param_simulator_state
         self.selected = selected
         self.etype = etype
         self.cds = ColumnDataSource(data=self.get_cds_data(state))
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
-        self.panel_simulator_config.param.watch(
-            self.hide_all_non_existing, "hide_non_existing", onlychanged=False, 
+        self.param_simulator_state.param.watch(
+            self.hide_all_non_existing, "hide_non_existing", onlychanged=True, 
         )
         selected.param.watch(
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
-        for i, pc in enumerate(self.panel_configs):
-            pc.param.watch(self.update_cds_view, pc.param_names(), onlychanged=True)
-            self.config[i].param.watch(
-                self.hide_non_existing, "exists", onlychanged=False
-            )
+        self.selected_param_entity.param.watch(self.update_cds_view, 
+                                               self.selected_param_entity.panel_parameters, 
+                                               onlychanged=True)
+        self.selected_param_entity.param.watch(self.hide_non_existing, 
+                                               "exists", 
+                                               onlychanged=True)
+        self.apply_visible_filter()
 
     def drag_cb(self, attr, old, new):
         """Callback for the drag & drop of entities
@@ -94,15 +101,15 @@ class EntityManager:
 
         :return: A dictionary of ColumnDataSource views for each visibility attribute
         """
-        # For each attribute in the panel config, create a filter
+        # For each panel attribute (i.e. visibility-related), create a filter
         # that is a logical AND of the visibility and the attribute
         return {
             attr: CDSView(
                 filter=BooleanFilter(
-                    [getattr(pc, attr) and pc.visible for pc in self.panel_configs]
+                    [getattr(pc, attr) and pc.visible for pc in self.entities]
                 )
             )
-            for attr in self.panel_configs[0].param_names()
+            for attr in self.selected_param_entity.panel_parameters
         }
 
     def update_cds_view(self, event):
@@ -111,8 +118,8 @@ class EntityManager:
         :param event: The event containing the changed value
         """
         n = event.name
-        for attr in [n] if n != "visible" else self.panel_configs[0].param_names():
-            f = [getattr(pc, attr) and pc.visible for pc in self.panel_configs]
+        for attr in [n] if n != "visible" else self.selected_param_entity.panel_parameters:
+            f = [getattr(e, attr) and e.visible for e in self.entities]
             self.cds_view[attr].filter = BooleanFilter(f)
 
     def update_selected_plot(self, event):
@@ -122,7 +129,6 @@ class EntityManager:
         """
         self.cds.selected.indices = event.new
 
-    # TODO : understand why non existing entities are not hidden at initialization
     def hide_all_non_existing(self, event):
         """Hides or shows all the entities that do not exist according to the global
         visibility of non-existing entities
@@ -130,9 +136,17 @@ class EntityManager:
         :param event: The event containing the new global "visibility of non-existing
         entities" value
         """
-        for i, pc in enumerate(self.panel_configs):
-            if not self.config[i].exists:
-                pc.visible = not event.new
+        for i, entity in enumerate(self.entities):
+            if not entity.exists:
+                entity.visible = not event.new
+        
+        # CMF added this
+        self.apply_visible_filter()
+
+    def apply_visible_filter(self):
+        f = [e.visible for e in self.entities]
+        for attr in self.selected_param_entity.panel_parameters:
+            self.cds_view[attr].filter = BooleanFilter(f)
 
     def hide_non_existing(self, event):
         """Hides or shows an entity that does not exist depending on the global
@@ -140,10 +154,9 @@ class EntityManager:
 
         :param event: The event containing the new existence value
         """
-        if not self.panel_simulator_config.hide_non_existing:
+        if not self.param_simulator_state.hide_non_existing:
             return
-        idx = self.config.index(event.obj)
-        self.panel_configs[idx].visible = event.new
+        self.selected_param_entity.visible = event.new
 
     def update_selected_simulator(self):
         """Updates the list of selected entities in the Selection list"""
@@ -310,7 +323,7 @@ class AgentManager(EntityManager):
             **src,
         )
         # direction lines plotting
-        fig.multi_line("ox", "oy", color="black", view=self.cds_view["visible"], **src)
+        fig.multi_line("ox", "oy", color="white", view=self.cds_view["visible"], **src)
         # agents body plotting
         return fig.circle(
             "x",
@@ -318,7 +331,8 @@ class AgentManager(EntityManager):
             radius="r",
             fill_color="fc",
             fill_alpha=0.6,
-            line_color=None,
+            line_color="white",
+            line_width=1,
             hover_fill_color="black",
             hover_fill_alpha=0.7,
             hover_line_color=None,
@@ -349,7 +363,8 @@ class ObjectManager(EntityManager):
             angle="angle",
             fill_color="fill_color",
             fill_alpha=0.6,
-            line_color=None,
+            line_color="white",
+            line_width=1,
             hover_fill_color="black",
             hover_fill_alpha=0.7,
             hover_line_color=None,
@@ -359,29 +374,31 @@ class ObjectManager(EntityManager):
 
 
 class WindowManager(Parameterized):
-    controller = PanelController(client=SimulatorGRPCClient())
-    config_types = [k.name for k, v in controller.configs.items() if v]
-    start_toggle = pn.widgets.Toggle(
-        **(
-            {"name": "Stop", "value": True}
-            if controller.is_started()
-            else {"name": "Start", "value": False}
-        ),
-        align="center",
-    )
-    entity_toggle = pn.widgets.ToggleGroup(
-        name="EntityToggle",
-        options=config_types,
-        align="center",
-        value=config_types[1:],
-    )
+
     update_switch = pn.widgets.Switch(name="Update plot", value=True, align="center")
     update_timestep = pn.widgets.IntSlider(
         name="Timestep (ms)", value=1, start=1, end=1000
     )
 
-    def __init__(self, notebook_mode=False, **kwargs):
+    def __init__(self, client=None, notebook_mode=False, **kwargs):
         super().__init__(**kwargs)
+        client = client or SimulatorGRPCClient()
+        self.controller = PanelController(client=client)
+        self.entity_types = [k.name for k, v in self.controller.selected_entities.items()]
+        self.start_toggle = pn.widgets.Toggle(
+            **(
+                {"name": "Stop", "value": True}
+                if self.controller.is_started()
+                else {"name": "Start", "value": False}
+            ),
+            align="center",
+        )
+        self.entity_toggle = pn.widgets.ToggleGroup(
+            name="EntityToggle",
+            options=self.entity_types,
+            align="center",
+            value=self.entity_types,
+        )
         self.notebook_mode = notebook_mode
         self.entity_manager_classes = {
             EntityType.AGENT: AgentManager,
@@ -389,21 +406,20 @@ class WindowManager(Parameterized):
         }
         self.entity_managers = {
             etype: manager_class(
-                config=self.controller.configs[etype.to_state_type()],
-                panel_configs=self.controller.panel_configs[etype.to_state_type()],
-                panel_simulator_config=self.controller.panel_simulator_config,
-                selected=self.controller.selected_entities[etype],
+                entities = self.controller.entity_lists[etype],
+                selected_param_entity=self.controller.selected_entities[etype],
+                param_simulator_state=self.controller.param_simulator_state,
+                selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
             )
             for etype, manager_class in self.entity_manager_classes.items()
-            if len(self.controller.configs[etype.to_state_type()])
         }
 
         self.plot = self.create_plot()
         self.app = self.create_app()
         self.set_callbacks()
-        # self.update_plot_cb()
+        self.update_plot_cb()
 
     def start_toggle_cb(self, event):
         """Callback for the start/stop button
@@ -432,10 +448,10 @@ class WindowManager(Parameterized):
         """Periodic callback for the plot update"""
         for em in self.entity_managers.values():
             em.update_selected_simulator()
+        self.controller.apply_changes()
         state = self.controller.update_state()
-        self.controller.pull_configs()
-        if self.controller.panel_simulator_config.config_update:
-            self.controller.pull_selected_configs()
+        if self.controller.param_simulator_state.config_update:
+            self.controller.pull_selected_entities()
         for em in self.entity_managers.values():
             with em.no_drag_cb():
                 em.update_cds(state)
@@ -455,13 +471,17 @@ class WindowManager(Parameterized):
 
         :return: A bokeh plot
         """
+        curdoc().theme = 'dark_minimal'
+
         p_tools = "crosshair,pan,wheel_zoom,box_zoom,reset,tap,box_select,lasso_select"
         p = figure(tools=p_tools, active_drag="box_select")
-        p.axis.major_label_text_font_size = "24px"
+        # p.axis.major_label_text_font_size = "24px"
+        p.axis.visible = False
+        p.grid.visible = False
         hover = HoverTool(tooltips=None)
         p.add_tools(hover)
-        p.x_range = Range1d(0, self.controller.simulator_config.box_size)
-        p.y_range = Range1d(0, self.controller.simulator_config.box_size)
+        p.x_range = Range1d(0, self.controller.param_simulator_state.box_size)
+        p.y_range = Range1d(0, self.controller.param_simulator_state.box_size)
         draw_tool = PointDrawTool(
             renderers=[self.entity_managers[etype].plot(p) for etype in EntityType],
             add=False,
@@ -478,12 +498,8 @@ class WindowManager(Parameterized):
             *[
                 pn.Column(
                     pn.pane.Markdown("### SIMULATOR", align="center"),
-                    pn.panel(
-                        self.controller.panel_simulator_config,
-                        name="Visualization configuration",
-                    ),
-                    pn.panel(self.controller.simulator_config, name="Configuration"),
-                    visible=False,
+                    pn.panel(self.controller.param_simulator_state, name="Configuration"),
+                    visible=True,
                     sizing_mode="scale_height",
                     scroll=True,
                     name="SIMULATOR",
@@ -492,13 +508,9 @@ class WindowManager(Parameterized):
             + [
                 pn.Column(
                     pn.pane.Markdown(f"### {etype.name}", align="center"),
-                    self.controller.selected_entities[etype],
+                    self.controller.selected[etype],
                     pn.panel(
-                        self.controller.selected_panel_configs[etype],
-                        name="Visualization configuration",
-                    ),
-                    pn.panel(
-                        self.controller.selected_configs[etype],
+                        self.controller.selected_entities[etype],
                         name="State configuration",
                     ),
                     visible=True,
