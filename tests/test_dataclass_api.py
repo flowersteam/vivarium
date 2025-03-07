@@ -17,8 +17,6 @@ from vivarium.environments.utils import rigid_body_to_point_particle
 init_state_point_particle, _ = rigid_body_to_point_particle(selective_sensing)
 
 
-
-
 def get_rigid_body_state():
     config = load_scene_config('prey_predator')
     return init_rigid_body_state(**config)
@@ -90,17 +88,17 @@ def test_change_recorder(changes_and_expected, state_fn):
 
 def test_change_recorder_simstate():
     env_state = get_rigid_body_state()
-    state = env_to_sim_state(env_state, num_steps_lax=2, freq=60, use_fori_loop=False, jit_step=False)
+    state = env_to_sim_state(env_state, num_steps_lax=2, freq=60, use_fori_loop=False, to_jit=False)
 
-    assert (state.simulator_state.freq[0] == 60)
+    assert (state.simulator_state.freq == 60)
 
     change_recorder = ChangeRecorder()
-    change_recorder.simulator_state.freq[0] = -1
+    change_recorder.simulator_state.freq = -1
     changes = change_recorder.fetch_changes()
 
     state = update_state(state, changes)
 
-    assert (state.simulator_state.freq[0] == -1)
+    assert (state.simulator_state.freq == -1)
 
 
 def test_dataclass_wrapper():
@@ -113,6 +111,24 @@ def test_dataclass_wrapper():
     state = DataclassWrapper().agent_state.motor[idx].set(val).apply(state)
 
     assert (jnp.equal(jnp.array(state.agent_state.motor[idx]), jnp.array(val)).all())
+
+
+def test_dataclass_wrapper_with_state():
+    state = get_rigid_body_state()
+
+    dw = DataclassWrapper(state)
+    
+    assert jnp.equal(state.entity_state.position.center, dw.entity_state.position.center).all()
+
+
+    dw.agent_state.motor = 100 * jnp.ones_like(state.agent_state.motor)
+    
+    dw.apply()
+
+    assert jnp.equal(dw.agent_state.motor, 100 * jnp.ones_like(state.agent_state.motor)).all()  
+    
+    
+    assert jnp.equal(state.entity_state.position.center[1, 2], dw.entity_state.position.center[1, 2]).all()
 
 
 @pytest.mark.parametrize("idx, position_center, position_orientation, color, init_state_fn, entity_type", [
