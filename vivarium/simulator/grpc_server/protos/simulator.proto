@@ -1,18 +1,3 @@
-// Copyright 2015 gRPC authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-
 syntax = "proto3";
 
 option java_multiple_files = true;
@@ -29,14 +14,10 @@ service SimulatorServer {
   rpc Step(google.protobuf.Empty) returns (Dataclass) {}
   rpc SetChangesAndStep(StateChangeList) returns (Dataclass) {}
   
-  // Get one of the states of the simulation
+  // Get state of the simulation
   rpc GetState(google.protobuf.Empty) returns (Dataclass) {}
-  rpc GetNVEState(google.protobuf.Empty) returns (EntityState) {}
-  rpc GetAgentState(google.protobuf.Empty) returns (AgentState) {}
-  rpc GetObjectState(google.protobuf.Empty) returns (ObjectState) {}
 
   // set the state of the simulation
-  // rpc SetState(StateChange) returns (google.protobuf.Empty) {}
   rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
 
   // send the labels of subtypes and scene name
@@ -54,15 +35,27 @@ message Dataclass {
   map<string, Dataclass> nested_fields = 2;  // For nested dataclasses
 }
 
-message IdxOrValue {
-  oneof idx_or_value {
-    int32 idx = 1;
-    NDArray value = 2;
+message Slice {
+  optional int32 start = 1;
+  optional int32 stop = 2;
+  optional int32 step = 3;
+}
+
+message Idx {
+  oneof idx {
+    int32 int_idx = 1;
+    Slice slice_idx = 2;
+    bool is_none = 3;
   }
 }
 
+message Indexes {
+  repeated Idx idx = 1;
+}
+
 message Change {
-  map<string, IdxOrValue> field = 1;
+  Indexes idx = 1;
+  NDArray value = 2;
 }
 
 message Changes {
@@ -78,10 +71,6 @@ message StateChangeList {
   repeated StateChange state_changes = 1;
 }
 
-message AgentIdx {
-  repeated int32 idx = 1;
-}
-
 message NDArray {
   bytes ndarray = 1;
 }
@@ -89,80 +78,6 @@ message NDArray {
 message RigidBody {
   NDArray center = 1;
   NDArray orientation = 2;
-}
-
-message SimulatorState {
-  NDArray idx = 1;
-  NDArray box_size = 2;
-  NDArray max_agents = 3;
-  NDArray max_objects = 4;
-  NDArray num_steps_lax = 5;
-  NDArray dt = 6;
-  NDArray freq = 7;
-  NDArray neighbor_radius = 8;
-  NDArray to_jit = 9;
-  NDArray use_fori_loop = 10;
-  NDArray collision_eps = 11;
-  NDArray collision_alpha = 12;
-  NDArray time = 13;
-}
-
-message EntityState {
-  RigidBody position = 1;
-  RigidBody momentum = 2;
-  RigidBody force = 3;
-  RigidBody mass = 4;
-  NDArray diameter = 5;
-  NDArray entity_type = 6;
-  NDArray entity_idx = 7;
-  NDArray friction = 8;
-  NDArray exists = 9;
-  NDArray ent_subtype = 10;
-}
-
-message AgentState {
-  NDArray ent_idx = 1;
-  NDArray prox = 2;
-  NDArray motor = 3;
-  NDArray behavior = 4;
-  NDArray wheel_diameter = 5;
-  NDArray speed_mul = 6;
-  NDArray max_speed = 7;
-  NDArray theta_mul = 8;
-  NDArray proxs_dist_max = 9;
-  NDArray proxs_cos_min = 10;
-  NDArray color = 11;
-  NDArray proximity_map_dist = 12;
-  NDArray proximity_map_theta = 13;
-  NDArray params = 14;
-  NDArray sensed = 15;
-  NDArray prox_sensed_ent_type = 16;
-  NDArray prox_sensed_ent_idx = 17;
-}
-
-message ObjectState {
-  NDArray ent_idx = 1;
-  NDArray custom_field = 2;
-  NDArray color = 3;
-}
-
-message State {
-  SimulatorState simulator_state = 1;
-  EntityState entity_state = 2;
-  AgentState agent_state = 3;
-  ObjectState object_state = 4;
-}
-
-// message StateChange {
-//   repeated int32 ent_idx= 1;
-//   repeated int32 col_idx= 2;
-//   repeated string nested_field = 3;
-//   NDArray value = 4;
-// }
-
-message AddAgentInput {
-  int32 max_agents = 1;
-  string serialized_config =2;
 }
 
 message IsStartedState {

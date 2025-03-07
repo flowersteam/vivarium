@@ -31,21 +31,6 @@ class SimulatorServerStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=simulator__pb2.Dataclass.FromString,
                 )
-        self.GetNVEState = channel.unary_unary(
-                '/simulator.SimulatorServer/GetNVEState',
-                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=simulator__pb2.EntityState.FromString,
-                )
-        self.GetAgentState = channel.unary_unary(
-                '/simulator.SimulatorServer/GetAgentState',
-                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=simulator__pb2.AgentState.FromString,
-                )
-        self.GetObjectState = channel.unary_unary(
-                '/simulator.SimulatorServer/GetObjectState',
-                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=simulator__pb2.ObjectState.FromString,
-                )
         self.SetChanges = channel.unary_unary(
                 '/simulator.SimulatorServer/SetChanges',
                 request_serializer=simulator__pb2.StateChangeList.SerializeToString,
@@ -96,33 +81,14 @@ class SimulatorServerServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetState(self, request, context):
-        """Get one of the states of the simulation
+        """Get state of the simulation
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetNVEState(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetAgentState(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetObjectState(self, request, context):
-        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def SetChanges(self, request, context):
         """set the state of the simulation
-        rpc SetState(StateChange) returns (google.protobuf.Empty) {}
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -177,21 +143,6 @@ def add_SimulatorServerServicer_to_server(servicer, server):
                     servicer.GetState,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=simulator__pb2.Dataclass.SerializeToString,
-            ),
-            'GetNVEState': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetNVEState,
-                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=simulator__pb2.EntityState.SerializeToString,
-            ),
-            'GetAgentState': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetAgentState,
-                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=simulator__pb2.AgentState.SerializeToString,
-            ),
-            'GetObjectState': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetObjectState,
-                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=simulator__pb2.ObjectState.SerializeToString,
             ),
             'SetChanges': grpc.unary_unary_rpc_method_handler(
                     servicer.SetChanges,
@@ -282,57 +233,6 @@ class SimulatorServer(object):
         return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetState',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             simulator__pb2.Dataclass.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetNVEState(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetNVEState',
-            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            simulator__pb2.EntityState.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetAgentState(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetAgentState',
-            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            simulator__pb2.AgentState.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetObjectState(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetObjectState',
-            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            simulator__pb2.ObjectState.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

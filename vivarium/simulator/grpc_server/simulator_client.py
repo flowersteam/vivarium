@@ -5,12 +5,8 @@ from vivarium.simulator.grpc_server import simulator_pb2_grpc
 from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
 from vivarium.simulator.grpc_server.converters import (
     proto_to_state,
-    proto_to_nve_state,
-    proto_to_agent_state,
-    proto_to_object_state,
     changes_to_proto
 )
-
 from vivarium.simulator.simulator_states import SimState
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
@@ -42,25 +38,6 @@ class SimulatorGRPCClient(SimulatorClient):
         """Stop the simulator."""
         self.stub.Stop(Empty())
 
-    def get_change_time(self):
-        """Get the change time of the simulator."""
-        return self.stub.GetChangeTime(Empty()).time
-
-    # def set_state(self, nested_field, ent_idx, column_idx, value):
-    #     """Set the state of the simulator.
-
-    #     :param nested_field: nested field to set
-    #     :param ent_idx: entity index to set
-    #     :param column_idx: column index to set
-    #     :param value: value to set
-    #     """
-        # state_change = simulator_pb2.StateChange(
-        #     nested_field=nested_field,
-        #     ent_idx=ent_idx,
-        #     col_idx=column_idx,
-        #     value=ndarray_to_proto(value),
-        # )
-        # self.stub.SetState(state_change)
 
     def get_state(self):
         """Get the state of the simulator.
@@ -69,30 +46,6 @@ class SimulatorGRPCClient(SimulatorClient):
         """
         state = self.stub.GetState(Empty())
         return proto_to_state(state, SimState)
-
-    def get_nve_state(self):
-        """Get the NVE state of the simulator.
-
-        :return: simulation Entity state
-        """
-        entity_state = self.stub.GetNVEState(Empty())
-        return proto_to_nve_state(entity_state)
-
-    def get_agent_state(self):
-        """Get the agent state of the simulator.
-
-        :return: simulation Agent state
-        """
-        agent_state = self.stub.GetAgentState(Empty())
-        return proto_to_agent_state(agent_state)
-
-    def get_object_state(self):
-        """Get the object state of the simulator.
-
-        :return: simulation Object state
-        """
-        object_state = self.stub.GetObjectState(Empty())
-        return proto_to_object_state(object_state)
 
     def get_scene_name(self):
         """Get the scene name of the simulator.
@@ -118,7 +71,7 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         if len(changes) > 0:
-            self.state= proto_to_state(self.stub.SetChangesAndStep(changes_to_proto(changes)), SimState)
+            self.state = proto_to_state(self.stub.SetChangesAndStep(changes_to_proto(changes)), SimState)
         else:
             self.state = proto_to_state(self.stub.Step(Empty()), SimState)
         return self.state
