@@ -1,65 +1,225 @@
-import time
-import threading
 import param
 import logging
-import numpy as np
-from contextlib import contextmanager
+import jax.numpy as jnp
 
-from vivarium.controllers import converters
-from vivarium.controllers.config import (
-    AgentConfig,
-    ObjectConfig,
-    config_to_stype,
-    Config,
+from vivarium.controllers.simulator_controller import (
+    SimulatorController, EntityType, ControllerEntity, create_entity_lists
 )
-from vivarium.controllers.old_simulator_controller import SimulatorController
-from vivarium.simulator.simulator_states import EntityType, StateType
-from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+
+from vivarium.controllers.dataclass_wrapper import SimulatorStateWrapper
+from vivarium.utils.converters import rgb_array_to_string, string_to_rgb_array
+
 
 lg = logging.getLogger(__name__)
 
 
-class PanelConfig(Config):
-    """Base class for panel configurations"""
+class PanelSimulatorStateWrapper(SimulatorStateWrapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'hide_non_existing', True)
+        object.__setattr__(self, 'config_update', False)
+        object.__setattr__(self, 'panel_parameters', ['hide_non_existing', 'config_update'])
 
+    def __getattr__(self, attr):
+        if attr in self.panel_parameters:
+            return object.__getattr__(self, attr)
+        return super().__getattr__(attr)
+
+    def __setattr__(self, attr, val):
+        if attr in self.panel_parameters:
+            object.__setattr__(self, attr, val)
+        else:
+            super().__setattr__(attr, val)
+
+
+class PanelControllerEntity(ControllerEntity):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'visible', bool(self.exists))
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return object.__getattr__(self, attr)
+        return super().__getattr__(attr)
+    
+    def __setattr__(self, attr, val):
+        if attr in self.__dict__:
+            object.__setattr__(self, attr, val)
+        else:
+            super().__setattr__(attr, val)
+
+
+class PanelControllerAgent(PanelControllerEntity):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'visible_wheels', True)
+        object.__setattr__(self, 'visible_proxs', True)
+
+
+class PanelControllerObject(PanelControllerEntity):
     pass
 
 
-class PanelEntityConfig(PanelConfig):
-    """Base class for panel configurations of entities"""
+class ParameterizedData(param.Parameterized):
+    update_from_server = param.Event()
 
-    visible = param.Boolean(True)
+    def __init__(self, data, parameter_mapping={}, panel_parameters=[], **params):
+        super().__init__(**params)
+        self.data = data
+        self.parameter_mapping = parameter_mapping
+        self.panel_parameters = panel_parameters
+        self.update_parameter_list(panel_parameters)
+        self.param_to_jax = {p: self.parameter_mapping[p] if p in self.parameter_mapping else ParameterMapping(p) for p in self.parameters}
+        self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
+        self.param.watch(self.update_to, self.parameters, onlychanged=True)
+        self.param.watch(self.udpate_panel_parameter, self.panel_parameters, onlychanged=True)
+        self.update_from_server = True
+
+    @param.depends('update_from_server', watch = True)
+    def update_from(self):
+        for p, mapping in self.param_to_jax.items():
+            setattr(self, p, mapping.jax_to_param_fn(getattr(self.data, mapping.jax_name)))
+
+    def update_to(self, event):
+        mapping = self.param_to_jax[event.name]
+        setattr(self.data,
+                mapping.param_name, mapping.param_to_jax_fn(event.new))
+
+    def udpate_panel_parameter(self, event):
+        setattr(self.data, event.name, event.new)
+
+    def update_parameter_list(self, panel_parameters):
+        parameters = self.to_dict(exclude=['name', 'update_from_server'] + panel_parameters)
+        self.parameters =list(parameters.keys())
+
+    def to_dict(self, params=None, exclude=['name']):
+        """Return a dictionary with the configuration parameters
+
+        :param params: params, defaults to None
+        :return: dictionary with the configuration parameters
+        """
+        d = self.param.values()
+        for e in exclude:
+            del d[e]
+        if params is not None:
+            return {p: d[p] for p in params}
+        else:
+            return d
+
+    def param_names(self, exclude=['name']):
+        """Return the names of the configuration parameters
+
+        :return: list of parameter names
+        """
+        return list(self.to_dict(exclude=exclude).keys())
+
+    def json(self):
+        """Return a JSON representation of the configuration
+
+        :return: JSON representation of the configuration
+        """
+        return self.param.serialize_parameters(subset=self.param_names())
 
 
-class PanelAgentConfig(PanelEntityConfig):
-    """Base class for panel configurations of agents"""
-
-    visible_wheels = param.Boolean(True)
-    visible_proxs = param.Boolean(True)
-
-
-class PanelObjectConfig(PanelEntityConfig):
-    """Base class for panel configurations of objects"""
-
-    pass
+class ParameterMapping:
+    def __init__(self, jax_name, param_name=None, jax_to_param_fn=None, param_to_jax_fn=None):
+        self.jax_name = jax_name
+        self.param_name = param_name if param_name is not None else jax_name
+        self.jax_to_param_fn = jax_to_param_fn if jax_to_param_fn is not None else lambda x: x
+        self.param_to_jax_fn = param_to_jax_fn if param_to_jax_fn is not None else lambda x: x
 
 
-class PanelSimulatorConfig(Config):
-    """Base class for panel configurations of the simulator"""
-
+class ParamSimulatorState(ParameterizedData):
+    time = param.Integer()
+    box_size = param.Number()
+    num_steps_lax = param.Integer()
+    dt = param.Number()
+    freq = param.Number()
+    neighbor_radius = param.Number()
+    use_fori_loop = param.Boolean()
+    collision_alpha = param.Number()
+    collision_eps = param.Number()
     hide_non_existing = param.Boolean(True)
     config_update = param.Boolean(False)
 
+    def __init__(self, simulator_state_wrapper, **params):
+        parameter_mapping = {}
+        for attr in ['time', 'box_size', 'num_steps_lax', 'dt', 'freq', 'neighbor_radius', 'collision_alpha', 'collision_eps']:
+            parameter_mapping[attr] = ParameterMapping(attr,
+                                                       jax_to_param_fn=lambda x: x.item(),
+                                                       param_to_jax_fn=lambda x: jnp.array(x)
+                                                       )
+        parameter_mapping['use_fori_loop'] = ParameterMapping(
+            'use_fori_loop',
+            jax_to_param_fn=lambda x: bool(x.item()),
+            param_to_jax_fn=lambda x: jnp.array(int(x))
+        )
 
-# Mapping between config classes and their corresponding state types
-panel_config_to_stype = {
-    PanelSimulatorConfig: StateType.SIMULATOR,
-    PanelAgentConfig: StateType.AGENT,
-    PanelObjectConfig: StateType.OBJECT,
+        super().__init__(simulator_state_wrapper, 
+                         parameter_mapping=parameter_mapping, 
+                         panel_parameters=['hide_non_existing', 'config_update'],
+                         **params)
+
+
+entity_parameter_mapping = {
+    'orientation': ParameterMapping('position_orientation'),
+    'mass': ParameterMapping(
+        'mass_center',
+        jax_to_param_fn=lambda x: x[0].item(),
+        param_to_jax_fn=lambda x: jnp.array([x])
+    ),
+    'color': ParameterMapping(
+        'color',
+        jax_to_param_fn=rgb_array_to_string,
+        param_to_jax_fn=string_to_rgb_array
+    ),
+    'exists': ParameterMapping(
+        'exists',
+        jax_to_param_fn=lambda x: bool(x.item()),
+        param_to_jax_fn=lambda x: jnp.array(int(x))
+    ),
 }
 
-stype_to_panel_config = {
-    stype: config_class for config_class, stype in panel_config_to_stype.items()
+class ParamEntity(ParameterizedData):
+    x_position = param.Number()
+    y_position = param.Number()
+    orientation = param.Number()
+    mass = param.Number()
+    diameter = param.Number()
+    friction = param.Number()
+    exists = param.Boolean()
+    color = param.Color()
+    visible = param.Boolean(True)
+
+    def __init__(self, entity, panel_parameters=[], **params):
+        super().__init__(entity, 
+                         parameter_mapping=entity_parameter_mapping,
+                         panel_parameters=panel_parameters + ['visible'],
+                         **params)
+
+
+class Agent(ParamEntity):
+    # behavior = param.String()
+    left_motor = param.Number()
+    right_motor = param.Number()
+    left_prox = param.Number()
+    right_prox = param.Number()
+    wheel_diameter = param.Number()
+    proxs_dist_max = param.Number()
+    proxs_cos_min = param.Number()
+    visible_wheels = param.Boolean(True)
+    visible_proxs = param.Boolean(True)
+
+    def __init__(self, entity, **params):
+        super().__init__(entity, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
+
+class Object(ParamEntity):
+    pass
+
+
+etype_to_class = {
+    EntityType.AGENT: PanelControllerAgent,
+    EntityType.OBJECT: PanelControllerObject,
 }
 
 
@@ -67,9 +227,6 @@ class Selected(param.Parameterized):
     """Class to store the selected entities in the interface"""
 
     selection = param.ListSelector([0], objects=[0])
-
-    def selection_nve_idx(self, ent_idx):
-        return ent_idx[np.array(self.selection)].tolist()
 
     def __len__(self):
         return len(self.selection)
@@ -79,138 +236,47 @@ class PanelController(SimulatorController):
     """Controller for the panel interface"""
 
     def __init__(self, **params):
-        self._selected_configs_watchers = None
-        self._selected_panel_configs_watchers = None
-        self.selected_entities = {
+        super().__init__(**params)
+        self.selected = {
             EntityType.AGENT: Selected(),
             EntityType.OBJECT: Selected(),
         }
-        self.selected_configs = {
-            EntityType.AGENT: AgentConfig(),
-            EntityType.OBJECT: ObjectConfig(),
+        self.selected_entities = {
+            EntityType.AGENT: Agent(self.agents[0]),
+            EntityType.OBJECT: Object(self.objects[0]),
         }
-        super().__init__(**params)
-        self.panel_configs = {
-            stype: [stype_to_panel_config[stype]() for _ in range(len(configs))]
-            for stype, configs in self.configs.items()
-        }
-        self.selected_panel_configs = {
-            EntityType.AGENT: PanelAgentConfig(),
-            EntityType.OBJECT: PanelObjectConfig(),
-        }
-        self.panel_simulator_config = PanelSimulatorConfig()
-        self.pull_selected_panel_configs()
+        self.param_simulator_state = ParamSimulatorState(self.simulator_state)
 
-        self.update_entity_list()
-        for selected in self.selected_entities.values():
+        self.update_selected()
+        for selected in self.selected.values():
             selected.param.watch(
-                self.pull_selected_configs,
+                self.pull_selected_entities,
                 ["selection"],
                 onlychanged=True,
                 precedence=1,
             )
-            selected.param.watch(
-                self.pull_selected_panel_configs, ["selection"], onlychanged=True
-            )
 
-    def watch_selected_configs(self):
-        """Watch the selected configurations"""
-        watchers = {
-            etype: config.param.watch(
-                self.push_selected_to_config_list,
-                config.param_names(),
-                onlychanged=True,
-            )
-            for etype, config in self.selected_configs.items()
-        }
-        return watchers
+    def create_entity_lists(self):
+        self.entity_lists = create_entity_lists(self.state, etype_to_class)
 
-    def watch_selected_panel_configs(self):
-        """Watch the selected panel configurations"""
-        watchers = {
-            etype: config.param.watch(
-                self.push_selected_to_config_list,
-                config.param_names(),
-                onlychanged=True,
-            )
-            for etype, config in self.selected_panel_configs.items()
-        }
-        return watchers
+    def create_simulator_state(self):
+        self.simulator_state = PanelSimulatorStateWrapper(self.state)
 
-    @contextmanager
-    def dont_push_selected_configs(self):
-        """Context manager to avoid pushing the selected configurations"""
-        if self._selected_configs_watchers is not None:
-            for etype, config in self.selected_configs.items():
-                config.param.unwatch(self._selected_configs_watchers[etype])
-        try:
-            yield
-        finally:
-            self._selected_configs_watchers = self.watch_selected_configs()
-
-    @contextmanager
-    def dont_push_selected_panel_configs(self):
-        """Context manager to avoid pushing the selected panel configurations"""
-        if self._selected_panel_configs_watchers is not None:
-            for etype, config in self.selected_panel_configs.items():
-                config.param.unwatch(self._selected_panel_configs_watchers[etype])
-        try:
-            yield
-        finally:
-            self._selected_panel_configs_watchers = self.watch_selected_panel_configs()
-
-    def update_entity_list(self, *events):
+    def update_selected(self, *events):
         """Update the entity list"""
         state = self.state
-        for etype, selected in self.selected_entities.items():
+        for etype, selected in self.selected.items():
             selected.param.selection.objects = state.entity_idx(etype).tolist()
 
-    def pull_selected_configs(self, *events):
+    def pull_selected_entities(self, *events):
         """Pull the selected configurations"""
-        state = self.state
-        config_dict = {
-            etype.to_state_type(): [config]
-            for etype, config in self.selected_configs.items()
-        }
-        with self.dont_push_selected_configs():
-            # Todo: check if for loop below is still required
-            for etype, selected in self.selected_entities.items():
-                config_dict[etype.to_state_type()][0].idx = int(
-                    state.ent_idx(etype.to_state_type(), selected.selection[0])
-                )
-            converters.set_configs_from_state(state, config_dict)
-        return state
-
-    def pull_selected_panel_configs(self, *events):
-        """Pull the selected panel configurations"""
-        with self.dont_push_selected_panel_configs():
-            for etype, panel_config in self.selected_panel_configs.items():
-                panel_config.param.update(
-                    **self.panel_configs[etype.to_state_type()][
-                        self.selected_entities[etype].selection[0]
-                    ].to_dict()
-                )
+        for etype, selected in self.selected.items():
+            self.selected_entities[etype].data = self.entity_lists[etype][selected.selection[0]]
+            self.selected_entities[etype].update_from_server = True
 
     def pull_all_data(self):
         """Pull all the data from the simulator"""
-        self.pull_selected_configs()
-        self.pull_configs({StateType.SIMULATOR: self.configs[StateType.SIMULATOR]})
+        self.update_state()
+        self.update_entity_lists()
+        self.pull_selected_entities()
 
-    def push_selected_to_config_list(self, *events):
-        """Push the selected configurations to the configuration list"""
-        lg.info("Push_selected_to_config_list %d", len(events))
-        for e in events:
-            if isinstance(e.obj, PanelConfig):
-                stype = panel_config_to_stype[type(e.obj)]
-            else:
-                stype = config_to_stype[type(e.obj)]
-            selected_entities = self.selected_entities[stype.to_entity_type()].selection
-            for idx in selected_entities:
-                if isinstance(e.obj, PanelConfig):
-                    setattr(self.panel_configs[stype][idx], e.name, e.new)
-                else:
-                    setattr(self.configs[stype][idx], e.name, e.new)
-
-
-if __name__ == "__main__":
-    simulator = PanelController(client=SimulatorGRPCClient())
