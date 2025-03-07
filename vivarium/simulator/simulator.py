@@ -31,7 +31,7 @@ lg = logging.getLogger(__name__)
 
 @jax.jit
 def env_to_sim_state(
-    env_state, num_steps_lax, freq, use_fori_loop, jit_step
+    env_state, num_steps_lax, freq, use_fori_loop, to_jit
 ):
     """Jitted function that transform environment state (used in self.env) into a simulator state for the client-server interaction
 
@@ -44,20 +44,20 @@ def env_to_sim_state(
     """
     simulator_state = SimulatorState(
         # why 0 and not 2 ? Like in state types
-        idx=jnp.array([0]),
-        time=jnp.array([env_state.time]),
-        box_size=jnp.array([env_state.box_size]),
-        max_agents=jnp.array([env_state.max_agents]),
-        max_objects=jnp.array([env_state.max_objects]),
-        dt=jnp.array([env_state.dt]),
-        neighbor_radius=jnp.array([env_state.neighbor_radius]),
-        collision_alpha=jnp.array([env_state.collision_alpha]),
-        collision_eps=jnp.array([env_state.collision_eps]),
-        num_steps_lax=jnp.array([num_steps_lax]),
-        freq=jnp.array([freq]),
+        idx=jnp.array(0),
+        time=jnp.array(env_state.time),
+        box_size=jnp.array(env_state.box_size),
+        max_agents=jnp.array(env_state.max_agents),
+        max_objects=jnp.array(env_state.max_objects),
+        dt=jnp.array(env_state.dt),
+        neighbor_radius=jnp.array(env_state.neighbor_radius),
+        collision_alpha=jnp.array(env_state.collision_alpha),
+        collision_eps=jnp.array(env_state.collision_eps),
+        num_steps_lax=jnp.array(num_steps_lax),
+        freq=jnp.array(freq),
         # convert bool to either 1 or 0
-        use_fori_loop=jnp.array([1 * use_fori_loop]),
-        to_jit=jnp.array([1 * jit_step]),
+        use_fori_loop=jnp.array(1 * use_fori_loop),
+        to_jit=jnp.array(1 * to_jit),
     )
 
     sim_state = SimState(
@@ -80,15 +80,15 @@ def sim_to_env_state(sim_state, ent_sub_types_and_num):
     sim = sim_state.simulator_state
 
     env_state = EnvState(
-        time=sim.time[0],
+        time=sim.time,
         ent_sub_types=ent_sub_types_and_num,
-        box_size=sim.box_size[0],
-        max_agents=sim.max_agents[0],
-        max_objects=sim.max_objects[0],
-        dt=sim.dt[0],
-        neighbor_radius=sim.neighbor_radius[0],
-        collision_alpha=sim.collision_alpha[0],
-        collision_eps=sim.collision_eps[0],
+        box_size=sim.box_size,
+        max_agents=sim.max_agents,
+        max_objects=sim.max_objects,
+        dt=sim.dt,
+        neighbor_radius=sim.neighbor_radius,
+        collision_alpha=sim.collision_alpha,
+        collision_eps=sim.collision_eps,
         entity_state=sim_state.entity_state,
         agent_state=sim_state.agent_state,
         object_state=sim_state.object_state,
@@ -97,7 +97,21 @@ def sim_to_env_state(sim_state, ent_sub_types_and_num):
     return env_state
 
 
+def create_property(field_name):
+    @property
+    def prop(self):
+        return getattr(self.state.simulator_state, field_name)
+
+    @prop.setter
+    def prop(self, value):
+        self.state = getattr(DataclassWrapper().simulator_state, field_name).set(value).apply(self.state)
+    return prop
+
 class Simulator:
+    freq = create_property('freq')
+    num_steps_lax = create_property('num_steps_lax')
+    use_fori_loop = create_property('use_fori_loop')
+    to_jit = create_property('to_jit')
     def __init__(
         self,
         env,
@@ -105,7 +119,7 @@ class Simulator:
         scene_name="scene",
         num_steps_lax=4,
         update_freq=-1,
-        jit_step=True,
+        to_jit=True,
         use_fori_loop=True,
         seed=0,
     ):
@@ -121,19 +135,15 @@ class Simulator:
 
         # First initialize fields in the class because they will be used to define the simulator state below
         self.key = jax.random.PRNGKey(seed)
-        self.num_steps_lax = num_steps_lax
-        # self.freq = update_freq
-        self.jit_step = jit_step
-        self.use_fori_loop = use_fori_loop
+
         self.ent_sub_types_and_num = (
             env_state.ent_sub_types
         )  # information about entities sub types in a dictionary
         self.ent_sub_types = self.process_ent_sub_types(self.ent_sub_types_and_num)
 
         # transform the env state (only used in env class) into a simulator state with a simulator state (used only in client server communication)
-        self.state = self.env_to_sim_state(env_state, freq=update_freq)
+        self.state = self.env_to_sim_state(env_state, num_steps_lax=num_steps_lax, freq=update_freq, to_jit=to_jit, use_fori_loop=use_fori_loop)
 
-        # Attributes to start or stop the simulation
         self._is_started = False
         self._to_stop = False
 
@@ -145,15 +155,6 @@ class Simulator:
         # Do a first step to initialize the momentum of the state
         self.step()
         lg.info("Simulator initialized")
-
-    @property
-    def freq(self):
-        return self.state.simulator_state.freq[0]
-    
-    @freq.setter
-    def freq(self, value):
-        self.state = DataclassWrapper().simulator_state.freq[0].set(value).apply(self.state)
-
 
     def load_state(self, state, env):
         """Load a state in the simulator
@@ -447,15 +448,18 @@ class Simulator:
         return {int(idx): label for label, (idx, _) in ent_sub_types_and_num.items()}
 
 
-    def env_to_sim_state(self, env_state, freq=None):
+    def env_to_sim_state(self, env_state, num_steps_lax=None, freq=None, use_fori_loop=None, to_jit=None):
         """Transform environment state (used in self.env) into a simulator state for the client-server interactoon
 
         :param env_state: env_state
         :return: simulator state
         """
         freq = freq or self.freq
+        num_steps_lax = num_steps_lax or self.num_steps_lax
+        use_fori_loop = use_fori_loop or self.use_fori_loop
+        to_jit = to_jit or self.to_jit
         return env_to_sim_state(
-            env_state, self.num_steps_lax, freq, self.use_fori_loop, self.jit_step
+            env_state, num_steps_lax, freq, use_fori_loop, to_jit
         )
 
     @property
