@@ -11,10 +11,6 @@ from vivarium.environments.utils import normal
 import matplotlib.animation as animation
 
 
-def _string_to_rgb(color_str):
-    return jnp.array(list(colors.to_rgb(color_str)))
-
-
 def plot_particles(ax, state, type, size_scale=30):
     entities = getattr(state, type)
     idx = entities.ent_idx

@@ -2,8 +2,6 @@ from enum import Enum
 from collections import defaultdict
 
 import numpy as np
-import matplotlib.colors as mcolors
-
 import jax.numpy as jnp
 from jax import random
 
@@ -14,6 +12,7 @@ from jax_md.rigid_body import RigidBody
 from vivarium.environments.base_env import BaseState, BaseEntityState, BaseParticleState
 from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
 from vivarium.utils.scene_configs import load_default_config
+from vivarium.utils.converters import string_to_rgb_array
 
 
 class EntityType(Enum):
@@ -72,11 +71,6 @@ class State(BaseState):
 
 
 CONFIG = load_default_config()
-
-
-# Helper function to transform a color string into rgb with matplotlib colors
-def _string_to_rgb_array(color_str):
-    return jnp.array(list(mcolors.to_rgb(color_str)))
 
 
 # Helper functions to define behaviors of agents in selecting sensing case
@@ -449,7 +443,7 @@ def process_entity(data, box_size):
     """
     n = data["num"]
     color_str = data["color"]
-    color = _string_to_rgb_array(color_str)
+    color = string_to_rgb_array(color_str)
     positions = get_positions(data.get("positions"), n, box_size)
     exists = get_exists(data.get("existing"), n)
     diameter = data.get(
