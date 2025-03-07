@@ -10,11 +10,12 @@ import numpy as np
 import logging
 
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.controllers.simulator_controller import SimulatorController, ClientDataclassWrapper
+from vivarium.controllers.simulator_controller import (
+    SimulatorController, ControllerEntity, create_entity_lists
+)
 from vivarium.simulator.simulator_states import StateType, EntityType
 from vivarium.controllers.utils import Logger, RoutineHandler, BehaviorHandler
 
-from vivarium.controllers.dataclass_wrapper import EntityWrapper, EntityList
 
 lg = logging.getLogger(__name__)
 
@@ -23,33 +24,15 @@ if logging.root.handlers:
 else:
     lg.setLevel(logging.WARNING)
 
+class InternalData:
+    pass
 
-class Entity:
+class NotebookControllerEntity(ControllerEntity):
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, entity_wrapper):
-        object.__setattr__(self, '_entity_wrapper', entity_wrapper)
-        object.__setattr__(self, 'etype', self._entity_wrapper._entity_type)
+    def __init__(self, state, ent_idx, entity_type):
+        super().__init__(state, ent_idx, entity_type)
         object.__setattr__(self, 'routine_handler', RoutineHandler())
-
-    def __getattr__(self, item):
-        if item in self.__dict__:
-            return self.__dict__[item]
-        return getattr(self._entity_wrapper, item)
-    
-    def __setattr__(self, item, val):
-        if item in self.__dict__:
-            super().__setattr__(item, val)
-        else:
-            setattr(self._entity_wrapper, item, val)
-    
-    @property
-    def state(self):
-        return self._entity_wrapper._state
-    
-    @state.setter
-    def state(self, state):
-        self._entity_wrapper._state = state
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
@@ -77,6 +60,7 @@ class Entity:
         self.routine_handler.routine_step(self, time, catch_errors)
 
     def print_infos(self):
+        # TODO: to fix according to recent refactoring
         """Print the entity's infos
 
         :return: entity's infos
@@ -104,7 +88,7 @@ class Entity:
         self.routine_handler.print_routines()
 
 
-class Agent(Entity):
+class Agent(NotebookControllerEntity):
     """Agent class that represents an agent in the simulation
 
     :param Entity: Entity
@@ -335,7 +319,7 @@ class Agent(Entity):
         return print("\n".join(info_lines))
 
 
-class Object(Entity):
+class Object(NotebookControllerEntity):
     """Object class that represents an object in the simulation
 
     :param Entity: Entity
@@ -360,7 +344,8 @@ class NotebookController(SimulatorController):
         self._is_running = False
 
         # # set frequency of the simulator to max speed
-        self.state_wrapper.simulator_state.freq[0].set(-1).apply()
+        self.simulator_state.freq = -1
+        self.apply_changes()
 
         # handle the different subtypes labels objects
         self.subtypes_labels = self.client.get_subtype_labels()
@@ -373,20 +358,8 @@ class NotebookController(SimulatorController):
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
 
-    @property
-    def state_wrapper(self):
-        return ClientDataclassWrapper(self.client)
-
-    def create_entity_list(self):
-        self.entity_lists = {
-            etype: EntityList(
-                state=self.state, entity_type=etype,
-                entity_wrapper_list=[
-                    etype_to_class[etype](EntityWrapper(self.state, idx, etype)) 
-                    for idx, type in enumerate(self.state.entity_state.entity_type) if type == etype.value]
-            )
-            for etype in EntityType
-        }
+    def create_entity_lists(self):
+        self.entity_lists = create_entity_lists(self.state, etype_to_class)
 
     def is_running(self):
         """Check if the simulator is running"""
@@ -550,7 +523,7 @@ class NotebookController(SimulatorController):
             # TODO : Add a check to ensure that the entity exists
             for entity in elist:
                 entity.routine_step(self.time, catch_errors=catch_errors)
-                if entity.etype == EntityType.AGENT:
+                if entity._entity_type == EntityType.AGENT:
                     entity.behave(self.time)
 
     def stop(self):
