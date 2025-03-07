@@ -12,9 +12,6 @@ import simulator_pb2_grpc
 from numproto.numproto import proto_to_ndarray
 
 from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_changes
-from vivarium.simulator.grpc_server.converters import nve_state_to_proto
-from vivarium.simulator.grpc_server.converters import agent_state_to_proto
-from vivarium.simulator.grpc_server.converters import object_state_to_proto
 
 
 lg = logging.getLogger(__name__)
@@ -40,8 +37,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def __init__(self, simulator):
         self.simulator = simulator
         self.recorded_change_dict = defaultdict(dict)
-        self._change_time = 0
-        self._simulation_time = 0
         self._lock = Lock()
 
     def SetChanges(self, request, context):
@@ -58,18 +53,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         state = self.simulator.state
         p = state_to_proto(state)
         return p
-
-    def GetNVEState(self, request, context):
-        entity_state = self.simulator.state.entity_state
-        return nve_state_to_proto(entity_state)
-
-    def GetAgentState(self, request, context):
-        agent_state = self.simulator.state.agent_state
-        return agent_state_to_proto(agent_state)
-
-    def GetObjectState(self, request, context):
-        object_state = self.simulator.state.object_state
-        return object_state_to_proto(object_state)
 
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
