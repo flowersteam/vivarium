@@ -94,7 +94,7 @@ class BaseEnv:
     def init_state(self) -> BaseState:
         raise (NotImplementedError)
 
-    @partial(jit, static_argnums=(0,3))
+    @partial(jit, static_argnums=(0, 3))
     def _step_env(
         self, state, neighbors, num_scan_steps=1
     ):
@@ -123,7 +123,7 @@ class BaseEnv:
 
         current_state = state
         neighbors = self.neighbors_manager.neighbors
-        state, neighbors = self._step_env(current_state, neighbors, num_scan_steps)
+        state, neighbors = self._step_env(current_state, neighbors, int(num_scan_steps))
         self.neighbors_manager.neighbors = neighbors
 
         self.neighbors_manager.reallocate_if_overflow(state)
