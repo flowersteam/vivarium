@@ -18,6 +18,8 @@ def test_notebook_controller():
     controller = NotebookController(simulator)
     controller.step()
 
+    assert controller.state.simulator_state.freq == -1
+
     def beh(agent):
         left, right = agent.sensors()
         return right, left
@@ -31,20 +33,10 @@ def test_notebook_controller():
 
     assert (jnp.equal(pos, ag.position_center).all())
 
-    # ag.motor = [1., 0.7]
     for _ in range(NUM_STEPS):
         pos = controller.state.entity_state.position_center[idx]
         controller.step()
         assert (not jnp.equal(pos, ag.position_center).all())
-
-    # assert (not jnp.equal(controller.state.entity_state.position_center[idx], pos).all())
-
-    # for _ in range(NUM_STEPS):
-    #     simulator.step()
-
-    # assert simulator
-
-
 
 
 # import time
