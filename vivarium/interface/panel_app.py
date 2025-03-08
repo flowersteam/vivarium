@@ -158,6 +158,7 @@ class EntityManager:
             return
         self.selected_param_entity.visible = event.new
 
+
     def update_selected_simulator(self):
         """Updates the list of selected entities in the Selection list"""
         indices = self.cds.selected.indices

@@ -66,6 +66,7 @@ class ParameterizedData(param.Parameterized):
     def __init__(self, data, parameter_mapping={}, panel_parameters=[], **params):
         super().__init__(**params)
         self.data = data
+        self.selection = None
         self.parameter_mapping = parameter_mapping
         self.panel_parameters = panel_parameters
         self.update_parameter_list(panel_parameters)
@@ -73,20 +74,29 @@ class ParameterizedData(param.Parameterized):
         self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
         self.param.watch(self.update_to, self.parameters, onlychanged=True)
         self.param.watch(self.udpate_panel_parameter, self.panel_parameters, onlychanged=True)
-        self.update_from_server = True
 
     @param.depends('update_from_server', watch = True)
     def update_from(self):
+        data = self.data if self.selection is None else self.data[self.selection[0]]
         for p, mapping in self.param_to_jax.items():
-            setattr(self, p, mapping.jax_to_param_fn(getattr(self.data, mapping.jax_name)))
+            setattr(self, p, mapping.jax_to_param_fn(getattr(data, mapping.jax_name)))
 
     def update_to(self, event):
         mapping = self.param_to_jax[event.name]
-        setattr(self.data,
-                mapping.param_name, mapping.param_to_jax_fn(event.new))
+        if self.selection is None:
+            setattr(self.data,
+                    mapping.param_name, mapping.param_to_jax_fn(event.new))
+            return
+        for idx in self.selection:
+            setattr(self.data[idx],
+                    mapping.param_name, mapping.param_to_jax_fn(event.new))
 
     def udpate_panel_parameter(self, event):
-        setattr(self.data, event.name, event.new)
+        if self.selection is None:
+            setattr(self.data, event.name, event.new)
+            return
+        for idx in self.selection:
+            setattr(self.data[idx], event.name, event.new)
 
     def update_parameter_list(self, panel_parameters):
         parameters = self.to_dict(exclude=['name', 'update_from_server'] + panel_parameters)
@@ -191,11 +201,12 @@ class ParamEntity(ParameterizedData):
     color = param.Color()
     visible = param.Boolean(True)
 
-    def __init__(self, entity, panel_parameters=[], **params):
-        super().__init__(entity, 
+    def __init__(self, entities, panel_parameters=[], **params):
+        super().__init__(entities, 
                          parameter_mapping=entity_parameter_mapping,
                          panel_parameters=panel_parameters + ['visible'],
                          **params)
+        self.selection = [0]
 
 
 class Agent(ParamEntity):
@@ -210,8 +221,8 @@ class Agent(ParamEntity):
     visible_wheels = param.Boolean(True)
     visible_proxs = param.Boolean(True)
 
-    def __init__(self, entity, **params):
-        super().__init__(entity, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
+    def __init__(self, entities, **params):
+        super().__init__(entities, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
 
 class Object(ParamEntity):
     pass
@@ -242,10 +253,14 @@ class PanelController(SimulatorController):
             EntityType.OBJECT: Selected(),
         }
         self.selected_entities = {
-            EntityType.AGENT: Agent(self.agents[0]),
-            EntityType.OBJECT: Object(self.objects[0]),
+            EntityType.AGENT: Agent(self.agents),
+            EntityType.OBJECT: Object(self.objects),
         }
         self.param_simulator_state = ParamSimulatorState(self.simulator_state)
+        
+        for s_ent in self.selected_entities.values():
+            s_ent.update_from_server = True
+        self.param_simulator_state.update_from_server = True
 
         self.update_selected()
         for selected in self.selected.values():
@@ -271,7 +286,7 @@ class PanelController(SimulatorController):
     def pull_selected_entities(self, *events):
         """Pull the selected configurations"""
         for etype, selected in self.selected.items():
-            self.selected_entities[etype].data = self.entity_lists[etype][selected.selection[0]]
+            self.selected_entities[etype].selection = selected.selection
             self.selected_entities[etype].update_from_server = True
 
     def pull_all_data(self):

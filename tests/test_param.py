@@ -1,4 +1,3 @@
-import param
 from vivarium.utils.converters import rgb_array_to_string, string_to_rgb_array
 
 import jax.numpy as jnp
@@ -44,10 +43,11 @@ def test_param_entity(idx, init_state_fn, entity_type):
     env = SelectiveSensorsEnv(state=state)
     simulator = Simulator(env_state=state, env=env)
     controller = SimulatorController(simulator)
-    # controller.step()
 
     controller_entities = controller.agents if entity_type == EntityType.AGENT else controller.objects
-    entity = Agent(controller.agents[idx]) if entity_type == EntityType.AGENT else Object(controller.objects[idx])
+    entity = Agent(controller.agents) if entity_type == EntityType.AGENT else Object(controller.objects)
+    entity.selection = [idx]
+    entity.update_from_server = True
 
     assert entity.x_position == controller_entities[idx].position_center[0]
     entity.x_position = 10
@@ -109,6 +109,7 @@ def test_simulator_state_param():
     controller = SimulatorController(simulator)
 
     simulator_param = ParamSimulatorState(controller.simulator_state)
+    simulator_param.update_from_server = True
     assert simulator_param.freq == controller.simulator_state.freq
 
     simulator_param.freq = -10
