@@ -261,15 +261,20 @@ class Agent(ParamEntity):
                 self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=idx), sensed, onlychanged=True)
 
         self.update_parameter_list()
+        for p in self.panel_parameters:
+            if p in self.param_to_jax:
+                del self.param_to_jax[p]
 
     @param.depends('update_from_server', watch=True)
     def update_from(self):
         super().update_from()
+        self.allow_update_to = False
         for i in range(self.selected_entity_data.params.shape[0]):
             setattr(self, behavior_param_name(i), Behaviors(self.selected_entity_data.behavior[i]).name)
             for idx, label in self.subtype_labels.items():
                 sensed = self.selected_entity_data.sensed[i][idx]
                 setattr(self, sensed_param_name(label, i), bool(sensed))
+        self.allow_update_to = True
 
     def update_behavior(self, event, slot_idx, label_idx):
         for ag_idx in self.selection:
