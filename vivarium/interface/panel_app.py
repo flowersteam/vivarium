@@ -19,6 +19,7 @@ from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.panel_controller import PanelController
 from vivarium.simulator.simulator_states import EntityType
 
+
 lg = logging.getLogger(__name__)
 pn.extension()
 pn.config.theme = 'dark'
@@ -54,7 +55,7 @@ class EntityManager:
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
         self.selected_param_entity.param.watch(self.update_cds_view, 
-                                               self.selected_param_entity.panel_parameters, 
+                                               self.selected_param_entity.panel_visibility_parameters, 
                                                onlychanged=True)
         self.selected_param_entity.param.watch(self.hide_non_existing, 
                                                "exists", 
@@ -109,7 +110,7 @@ class EntityManager:
                     [getattr(pc, attr) and pc.visible for pc in self.entities]
                 )
             )
-            for attr in self.selected_param_entity.panel_parameters
+            for attr in self.selected_param_entity.panel_visibility_parameters
         }
 
     def update_cds_view(self, event):
@@ -118,7 +119,7 @@ class EntityManager:
         :param event: The event containing the changed value
         """
         n = event.name
-        for attr in [n] if n != "visible" else self.selected_param_entity.panel_parameters:
+        for attr in [n] if n != "visible" else self.selected_param_entity.panel_visibility_parameters:
             f = [getattr(e, attr) and e.visible for e in self.entities]
             self.cds_view[attr].filter = BooleanFilter(f)
 
@@ -145,7 +146,7 @@ class EntityManager:
 
     def apply_visible_filter(self):
         f = [e.visible for e in self.entities]
-        for attr in self.selected_param_entity.panel_parameters:
+        for attr in self.selected_param_entity.panel_visibility_parameters:
             self.cds_view[attr].filter = BooleanFilter(f)
 
     def hide_non_existing(self, event):
@@ -175,6 +176,7 @@ class EntityManager:
 
 
 class AgentManager(EntityManager):
+
     def get_cds_data(self, state):
         pos = state.position_center(self.etype)
         x, y = pos[:, 0], pos[:, 1]

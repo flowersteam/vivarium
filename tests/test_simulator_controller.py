@@ -31,6 +31,12 @@ def test_simulator_controller():
     ag =controller.agents[idx]
     assert (jnp.equal(pos, ag.position_center).all())
 
+    ag.behavior = [3, 2]
+    controller.apply_changes()
+    controller.update_state()
+
+    assert jnp.equal(jnp.array([3, 2]), controller.state.agent_state.behavior[idx]).all()
+
     for ag in controller.agents:
         ag.behavior = 5
         ag.motor = [0., 0.]

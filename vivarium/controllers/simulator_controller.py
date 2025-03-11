@@ -1,9 +1,11 @@
+import numpy as np
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.dataclass_wrapper import (
     EntityList, EntityWrapper, SimulatorStateWrapper
 )
 from vivarium.simulator.simulator_states import EntityType
 from vivarium.utils.converters import string_to_rgb_array
+from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
 class InternalData:
@@ -48,6 +50,25 @@ class ControllerEntity(EntityWrapper):
             if item == 'color' and isinstance(val, str):
                 val = string_to_rgb_array(val)
             super().__setattr__(item, val)
+
+class ControllerAgent(ControllerEntity):
+
+    def set_behavior(self, slot_idx, behavior, sensed):
+        assert slot_idx < self.behavior.shape[0], 'Behavior index out of bounds'
+        if isinstance(behavior, Behaviors):
+            behavior = behavior.value
+        cur_behaviors = np.array(self.behavior)
+        cur_behaviors[slot_idx] = behavior
+        self.behavior = cur_behaviors
+        cur_sensed = np.array(self.sensed)
+        cur_sensed[slot_idx] = [int(i in sensed) for i in range(len(cur_sensed[slot_idx]))]
+        self.sensed = cur_sensed
+        cur_params = np.array(self.params)
+        cur_params[slot_idx] = behavior_to_params(behavior)
+        self.params = cur_params
+
+class ControllerObject(ControllerEntity):
+    pass
     
 
 def create_entity_lists(state, etype_to_class):
@@ -71,7 +92,9 @@ class SimulatorController:
         self.create_simulator_state()
         
     def create_entity_lists(self):
-        self.entity_lists = create_entity_lists(self.state, {etype: ControllerEntity for etype in EntityType})
+        self.entity_lists = create_entity_lists(self.state, 
+                                                {EntityType.AGENT: ControllerAgent,
+                                                 EntityType.OBJECT: ControllerObject})
 
     def create_simulator_state(self):
         self.simulator_state = SimulatorStateWrapper(self.state)
@@ -130,3 +153,6 @@ class SimulatorController:
         changes = self.fetch_changes()
         if len(changes) > 0:
             self.client.apply_changes(changes)
+
+    def get_subtype_labels(self):
+        return self.client.get_subtype_labels()

@@ -45,7 +45,7 @@ def test_param_entity(idx, init_state_fn, entity_type):
     controller = SimulatorController(simulator)
 
     controller_entities = controller.agents if entity_type == EntityType.AGENT else controller.objects
-    entity = Agent(controller.agents) if entity_type == EntityType.AGENT else Object(controller.objects)
+    entity = Agent(controller.agents, controller.get_subtype_labels()) if entity_type == EntityType.AGENT else Object(controller.objects)
     entity.selection = [idx]
     entity.update_from_server = True
 

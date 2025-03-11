@@ -3,7 +3,7 @@ import logging as lg
 import jax
 import jax.numpy as jnp
 
-from jax import vmap, jit
+from jax import vmap
 from jax import random, lax
 from jax_md import space
 
@@ -406,7 +406,7 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
 
 # TODO : Fix the non occlusion error in the step
 class SelectiveSensorsEnv(BaseEnv):
-    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42):
+    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42, **kwargs):
         
         displacement, shift = space_fn(state.box_size)
 
@@ -438,7 +438,7 @@ class SelectiveSensorsEnv(BaseEnv):
                      collision_state_fn(displacement, exists_mask_fn),
                      friction_state_fn(exists_mask_fn),
                      step_state_fn(shift, exists_mask_fn, new_key)]
-        super().__init__(state, init_fn, state_fns, neighbor_manager)
+        super().__init__(state, init_fn, state_fns, neighbor_manager, **kwargs)
 
 
 if __name__ == "__main__":

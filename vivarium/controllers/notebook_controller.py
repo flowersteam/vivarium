@@ -107,9 +107,9 @@ class Agent(NotebookControllerEntity):
 
     def set_manual(self):
         """Set the agent's behavior to manual"""
-        object.__setattr__(self, 'behavior', np.full(
+        self.behavior = np.full(
             shape=self.behavior.shape, fill_value=Behaviors.MANUAL.value
-        ))
+        )
         self.stop_motors()
 
     def sensors(self, sensed_entities=None):
@@ -348,7 +348,7 @@ class NotebookController(SimulatorController):
         self.apply_changes()
 
         # handle the different subtypes labels objects
-        self.subtypes_labels = self.client.get_subtype_labels()
+        self.subtypes_labels = self.get_subtype_labels()
         self._subtype_idx_to_label = self.subtypes_labels
         self._subtype_label_to_idx = {
             v: k for k, v in self._subtype_idx_to_label.items()

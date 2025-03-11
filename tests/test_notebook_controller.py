@@ -7,6 +7,8 @@ from vivarium.simulator.simulator import Simulator
 
 from vivarium.controllers.notebook_controller import NotebookController
 
+from vivarium.utils.scene_configs import load_scene_config
+
 NUM_STEPS = 10
 
 
@@ -28,6 +30,7 @@ def test_notebook_controller():
     pos = controller.state.entity_state.position_center[idx]
 
     ag =controller.agents[idx]
+
     ag.attach_behavior(beh)
     controller.execute_routines_and_behaviors()
 
@@ -38,6 +41,31 @@ def test_notebook_controller():
         controller.step()
         assert (not jnp.equal(pos, ag.position_center).all())
 
+    ag.behavior = [3, 1]
+    controller.step()
+    assert jnp.equal(jnp.array([3, 1]), controller.state.agent_state.behavior[idx]).all()
+
+
+def test_scene():
+    config = load_scene_config("session_6")
+    state = init_state(**config)
+    env = SelectiveSensorsEnv(state=state, to_jit=False)
+    simulator = Simulator(env_state=state, env=env)
+    controller = NotebookController(simulator)
+    
+    # controller.step()
+
+    idx = 0
+    ag = controller.agents[idx]
+
+    print('change behavior')
+    ag.behavior = [2]
+
+    controller.step()
+
+if __name__ == "__main__":
+    # test_notebook_controller()
+    test_scene()
 
 # import time
 
