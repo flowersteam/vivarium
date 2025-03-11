@@ -1,7 +1,5 @@
 import logging as lg
 
-from functools import partial
-
 from jax import jit, lax
 import jax.numpy as jnp
 from jax_md.rigid_body import RigidBody
@@ -38,8 +36,6 @@ class BaseEntityState(simulate.NVEState):
         if suffix in ['center', 'orientation']:
             if isinstance(self.position, RigidBody):
                 return getattr(getattr(self, prefix), suffix)
-            # return RigidBody(center=getattr(self, prefix), 
-            #                  orientation=self.orientation if prefix == 'position' else jnp.zeros_like(self.orientation))
             if suffix == 'center':
                 return getattr(self, prefix)
             else:  # Necessarily 'orientation'
@@ -85,16 +81,17 @@ class NeighborManager:
 class BaseEnv:
     def __init__(self, state, 
                  init_fn, state_fns, 
-                 neighbors_manager):
+                 neighbors_manager, to_jit=True):
         self.state = state
         self.init_fn = init_fn
         self.state_fns = state_fns
         self.neighbors_manager = neighbors_manager
+        if to_jit:
+            self._step_env = jit(self._step_env, static_argnums=(2,))
 
     def init_state(self) -> BaseState:
         raise (NotImplementedError)
 
-    @partial(jit, static_argnums=(0, 3))
     def _step_env(
         self, state, neighbors, num_scan_steps=1
     ):

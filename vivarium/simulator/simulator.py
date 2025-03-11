@@ -12,7 +12,6 @@ from contextlib import contextmanager
 import jax
 import jax.numpy as jnp
 
-from vivarium.controllers import converters
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.simulator.simulator_states import SimState, SimulatorState
 from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
@@ -351,35 +350,6 @@ class Simulator:
             lg.info("Simulation loaded from %s", saving_path)
             return data
 
-    # TODO : set the params to the correct values when a behavior is modified
-    def set_state(self, nested_field, ent_idx, column_idx, value):
-        """Set the current simulation state
-
-        :param nested_field: simulation field (e.g)
-        :param ent_idx: entity idx to modify
-        :param column_idx: column idx to modify
-        :param value: value to set
-        """
-        lg.debug("\nSet state :")
-        lg.debug(f"{nested_field = }; {ent_idx = }; {column_idx = }; {value = }")
-        row_idx = self.state.row_idx(nested_field[0], jnp.array(ent_idx))
-        col_idx = None if column_idx is None else jnp.array(column_idx)
-        change = converters.rec_set_dataclass(
-            self.state, nested_field, row_idx, col_idx, value
-        )
-        self.state = self.state.set(**change)
-
-        #  Update the class field if it is in the simulator state (e.g num_steps_lax, freq)
-        if nested_field[0] == "simulator_state":
-            self.update_attr(nested_field[1], SimulatorState.get_type(nested_field[1]))
-
-        # Check if there can be problems with nested fields that aren't tuples
-        # TODO : Update the client to ensure those fields can't be modified
-        if nested_field[1] in ("box_size", "neighbor_radius", "dt"):
-            lg.warning(
-                "Impossible to change 'box size', 'dt', 'neighbor radius' during the simulation"
-            )
-
     def apply_changes(self, changes):
         self.state = update_state_from_change_list(self.state, changes)
 
@@ -457,7 +427,7 @@ class Simulator:
         freq = freq or self.freq
         num_steps_lax = num_steps_lax or self.num_steps_lax
         use_fori_loop = use_fori_loop or self.use_fori_loop
-        to_jit = to_jit or self.to_jit
+        to_jit = to_jit if to_jit is not None else self.to_jit
         return env_to_sim_state(
             env_state, num_steps_lax, freq, use_fori_loop, to_jit
         )

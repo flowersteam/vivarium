@@ -98,8 +98,8 @@ def stack_behaviors(behaviors_dict_list):
     sensed_length = behaviors_dict_list[0]["sensed_mask"].shape[1]
 
     params = np.zeros((n_behaviors, 2, 3))  # (2, 3) = params.shape
-    sensed_mask = np.zeros((n_behaviors, sensed_length))
-    behaviors = np.zeros((n_behaviors,))
+    sensed_mask = np.zeros((n_behaviors, sensed_length), dtype=int)
+    behaviors = np.zeros((n_behaviors,), dtype=int)
 
     # iterate in the list of behaviors and update params and mask
     for i in range(n_behaviors):
@@ -129,8 +129,8 @@ def get_agents_params_and_sensed_arr(agents_stacked_behaviors_list):
     behaviors_shape = agents_stacked_behaviors_list[0]["behaviors"].shape
     # Init arrays w right shapes
     params = np.zeros((n_agents, *params_shape))
-    sensed = np.zeros((n_agents, *sensed_shape))
-    behaviors = np.zeros((n_agents, *behaviors_shape))
+    sensed = np.zeros((n_agents, *sensed_shape), dtype=int)
+    behaviors = np.zeros((n_agents, *behaviors_shape), dtype=int)
 
     for i in range(n_agents):
         assert agents_stacked_behaviors_list[i]["params"].shape == params_shape
@@ -541,7 +541,7 @@ def init_state(
             # create a behavior list for all behaviors of the agent
             if 'selective_behaviors' not in data:
                 agent_behaviors = {}
-                agent_behaviors['manual'] = {'beh': 'MANUAL', 'sensed': ent_sub_types}
+                agent_behaviors['beh'] = {'beh': 'MANUAL', 'sensed': ent_sub_types}
             else:
                 agent_behaviors = data['selective_behaviors']
             for beh_name, behavior_data in agent_behaviors.items():
@@ -553,7 +553,7 @@ def init_state(
                         len(
                             ent_sub_types,
                         )
-                    )
+                    ), dtype=int
                 )
                 for sensed_type in behavior_data["sensed"]:
                     try:
