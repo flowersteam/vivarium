@@ -15,11 +15,11 @@ def plot_particles(ax, state, type, size_scale=30):
     entities = getattr(state, type)
     idx = entities.ent_idx
     
-    exists = state.entities.exists[idx]         
+    exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
-    pos = state.entities.unified_position[idx][exists]
+    pos = state.entity_state.position_center[idx][exists]
 
-    diameter = state.entities.diameter[idx][exists][exists]
+    diameter = state.entity_state.diameter[idx][exists][exists]
     x, y = pos[:, 0], pos[:, 1]
     colors_rgba = [
         colors.to_rgba(np.array(c), alpha=1.0) for c in entities.color[exists]
@@ -36,13 +36,13 @@ def plot_particles(ax, state, type, size_scale=30):
 def plot_orientation(ax, state, type, arrow_length):
     entities = getattr(state, type)
     idx = entities.ent_idx
-    exists = state.entities.exists[idx]         
+    exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
 
-    pos = state.entities.unified_position[idx][exists]
+    pos = state.entity_state.position_center[idx][exists]
     x, y = pos[:, 0], pos[:, 1]
 
-    theta = state.entities.unified_orientation[idx][exists][
+    theta = state.entity_state.position_orientation[idx][exists][
         exists
     ]
     n = normal(theta)
@@ -77,12 +77,12 @@ def render(state):
     arrow_length = 3
     # size_scale = 30
 
-    if hasattr(state, 'agents'):
-        plot_particles(plt, state, 'agents')
-        plot_orientation(plt, state, 'agents', arrow_length)
+    if hasattr(state, 'agent_state'):
+        plot_particles(plt, state, 'agent_state')
+        plot_orientation(plt, state, 'agent_state', arrow_length)
 
-    if hasattr(state, 'objects'):
-        plot_particles(plt, state, 'objects')
+    if hasattr(state, 'object_state'):
+        plot_particles(plt, state, 'object_state')
 
     plt.title("State")
     plt.xlabel("X Position")
@@ -103,12 +103,12 @@ def render_history(state_history, fps=10, skip_frames=1, arrow_length=3, filenam
         ax.set_xlim(0, box_size)
         ax.set_ylim(0, box_size)
 
-        if hasattr(state_history[t], 'agents'):
-            plot_particles(ax, state_history[t], 'agents')
-            plot_orientation(ax, state_history[t], 'agents', arrow_length)
+        if hasattr(state_history[t], 'agent_state'):
+            plot_particles(ax, state_history[t], 'agent_state')
+            plot_orientation(ax, state_history[t], 'agent_state', arrow_length)
 
-        if hasattr(state_history[t], 'objects'):
-            plot_particles(ax, state_history[t], 'objects')
+        if hasattr(state_history[t], 'object_state'):
+            plot_particles(ax, state_history[t], 'object_state')
 
         ax.set_title(f"Timestep: {t}")
         # ax.set_xlabel("X Position")
