@@ -7,7 +7,7 @@ from jax import random
 from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.base_env import BaseState, BaseEntityState
+from vivarium.environments.state import BaseState, BaseEntityState
 from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
