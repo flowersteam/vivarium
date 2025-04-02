@@ -53,9 +53,19 @@ message Indexes {
   repeated Idx idx = 1;
 }
 
+message Value {
+  oneof value {
+    NDArray ndarray = 1;
+    bool bool_value = 3;
+    int32 int_value = 4;
+    float float_value = 5;
+    string str_value = 6;
+  }
+}
+
 message Change {
   Indexes idx = 1;
-  NDArray value = 2;
+  Value value = 2;
 }
 
 message Changes {

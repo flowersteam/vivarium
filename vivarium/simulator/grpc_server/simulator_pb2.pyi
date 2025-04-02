@@ -47,13 +47,27 @@ class Indexes(_message.Message):
     idx: _containers.RepeatedCompositeFieldContainer[Idx]
     def __init__(self, idx: _Optional[_Iterable[_Union[Idx, _Mapping]]] = ...) -> None: ...
 
+class Value(_message.Message):
+    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value")
+    NDARRAY_FIELD_NUMBER: _ClassVar[int]
+    BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
+    INT_VALUE_FIELD_NUMBER: _ClassVar[int]
+    FLOAT_VALUE_FIELD_NUMBER: _ClassVar[int]
+    STR_VALUE_FIELD_NUMBER: _ClassVar[int]
+    ndarray: NDArray
+    bool_value: bool
+    int_value: int
+    float_value: float
+    str_value: str
+    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ...) -> None: ...
+
 class Change(_message.Message):
     __slots__ = ("idx", "value")
     IDX_FIELD_NUMBER: _ClassVar[int]
     VALUE_FIELD_NUMBER: _ClassVar[int]
     idx: Indexes
-    value: NDArray
-    def __init__(self, idx: _Optional[_Union[Indexes, _Mapping]] = ..., value: _Optional[_Union[NDArray, _Mapping]] = ...) -> None: ...
+    value: Value
+    def __init__(self, idx: _Optional[_Union[Indexes, _Mapping]] = ..., value: _Optional[_Union[Value, _Mapping]] = ...) -> None: ...
 
 class Changes(_message.Message):
     __slots__ = ("changes",)
