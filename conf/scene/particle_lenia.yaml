@@ -1,0 +1,45 @@
+environment:
+  cls: vivarium.environments.particle_lenia.ParticleLeniaEnv
+  kwargs:
+    box_size: 35.0
+    neighbor_radius: 50.0
+    num_scan_steps: 8
+    to_jit: False
+    seed: 42
+
+simulator:
+  kwargs:
+    update_freq: -1
+
+subtypes:
+  - particle
+state_data:
+  state:
+    cls: vivarium.environments.state.BaseState
+    kwargs:
+      dt: 0.1
+      collision_alpha: 2.0
+      collision_eps: 1.0
+
+  entity_state:
+    cls: vivarium.environments.state.EntityState
+    entity_types:
+      - object_state
+
+  object_state:
+    cls: vivarium.environments.particle_lenia.state.ObjectState
+    kwargs:
+      n_exists: 20
+      mass: 1.
+      diameter: 0.2
+      friction: 1.0
+      subtype_to_n:
+        - [0, 200]
+      position: None
+      orientation: None
+      mu_k: 4.0
+      sigma_k: 1.0
+      w_k: 0.022
+      mu_g: 0.6
+      sigma_g: 0.15
+      c_rep: 0.0 

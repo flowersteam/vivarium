@@ -1,135 +1,24 @@
-from jax import random
+from collections.abc import Iterable
+
 import jax.numpy as jnp
-import numpy as np
+
 from jax_md.dataclasses import dataclass as md_dataclass
-from vivarium.environments.base_env import BaseEntityState, BaseState, BaseParticleState
 
-from vivarium.environments.utils import rigid_body_to_point_particle
-from vivarium.environments.braitenberg import selective_sensing
-
-_, init_entities = rigid_body_to_point_particle(selective_sensing)
-
-@md_dataclass
-class EntityState(BaseEntityState):
-    friction: jnp.array
-    diameter: jnp.array
+from vivarium.environments.state import ParticleState
 
 
 @md_dataclass
-class ParticleState(BaseParticleState):
-    idx: jnp.array
+class ObjectState(ParticleState):
     mu_k: jnp.array
     sigma_k: jnp.array
     w_k: jnp.array
     mu_g: jnp.array
     sigma_g: jnp.array
     c_rep: jnp.array
-    color: jnp.array
-
-
-@md_dataclass
-class State(BaseState):
-    max_particles: jnp.int32
-    neighbor_radius: jnp.float32
-    dt: jnp.float32
-    collision_alpha: jnp.float32
-    collision_eps: jnp.float32
-    entity_state: EntityState
-    object_state: ParticleState
-
-
-# Constants
-SEED = 0
-MAX_PARTICLES = 10
-N_DIMS = 2
-BOX_SIZE = 100
-MASS = 1.0
-DIAMETER = 0.2
-NEIGHBOR_RADIUS = 100.0
-COLLISION_ALPHA = 2.
-COLLISION_EPS = 1.
-DT = 0.1
-FRICTION = 1.
-
-# Lenia parameters
-LENIA_PARAMS = {
-    'mu_k': 4.0,
-    'sigma_k': 1.0,
-    'w_k': 0.022,
-    'mu_g': 0.6,
-    'sigma_g': 0.15,
-    'c_rep': 0.0  # 1.0  (done through the vivarium collision force)
-}
-
-def init_particles(
-    entity_idx_offset=0,
-    max_particles=MAX_PARTICLES,
-    color=None,
-    key=random.PRNGKey(SEED),
-    **kwargs):
-    for param, defaut_val in LENIA_PARAMS.items():
-        val = kwargs[param] if param in kwargs else defaut_val
-        if isinstance(val, float):
-            kwargs[param] = jnp.full((max_particles,), val)
-        elif isinstance(val, tuple) and len(val) == 2:
-            mean, std = val
-            key, key_param = random.split(key)  
-            kwargs[param] = random.normal(key_param, (max_particles,)) * std + mean
-        elif isinstance(val, (np.ndarray, jnp.ndarray)):
-            kwargs[param] = val
-
-    if color is None:
-         color = jnp.full((max_particles, 3), 0.5)
-
-    return ParticleState(
-        ent_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + max_particles)), 
-        idx=jnp.array(range(max_particles)),
-        color=color,
-        **kwargs
-    )
-
-def init_state(
-    box_size=BOX_SIZE,
-    dt=DT,
-    max_particles=MAX_PARTICLES,
-    neighbor_radius=NEIGHBOR_RADIUS,
-    collision_alpha=COLLISION_ALPHA,
-    collision_eps=COLLISION_EPS,
-    seed=SEED,
-    diameter=DIAMETER,
-    mass=MASS,
-    friction=FRICTION,
-    **kwargs
-) -> State:
-
-    key = random.PRNGKey(seed)
-    key, s_key = random.split(key, 2)
-
-    ent_sub_types = {'AGENTS': (0, 0), 'PARTICLES': (1, max_particles)}
-
-    entity_state = init_entities(
-        max_agents=0,
-        max_objects=max_particles,
-        ent_sub_types=ent_sub_types,  # e.g. {'PREYS': (0, 5), 'PREDS': (1, 5), 'RESOURCES': (2, 5), 'POISON': (3, 5)}
-        n_dims=N_DIMS,
-        box_size=box_size,
-        existing_agents=None,
-        existing_objects=None,
-        mass_center=mass,
-        mass_orientation=1.,
-        diameter=diameter,
-        friction=friction,
-        agents_pos=None,
-        objects_pos=None,
-        key=s_key)
-
-    particles = init_particles(
-        entity_idx_offset=0,
-        max_particles=max_particles,
-        **kwargs
-    )
-
-    return State(time=0, box_size=box_size, max_particles=max_particles, 
-                 neighbor_radius=neighbor_radius, dt=dt, 
-                 collision_alpha=collision_alpha, collision_eps=collision_eps,
-                 entity_state=entity_state, object_state=particles)
+    @classmethod
+    def create(cls, entity_idx_offset, params, entity_type_field):
+        for attr, val in params['state_data'][entity_type_field]['kwargs'].items():
+            if attr in [field.name for field in cls.__dataclass_fields__.values()]:
+                if not isinstance(val, Iterable) or len(val) == 1:
+                    params['state_data'][entity_type_field]['kwargs'][attr] = [val] * params['state_data'][entity_type_field]['kwargs']['n_exists']
+        return cls._create(entity_idx_offset, params, entity_type_field)
