@@ -3,8 +3,7 @@ import logging as lg
 import jax
 import jax.numpy as jnp
 
-from jax import vmap
-from jax import random, lax
+from jax import random, lax, vmap
 from jax_md import space
 
 from vivarium.environments.base_env import BaseEnv, NeighborManager
@@ -17,9 +16,8 @@ from vivarium.environments.physics_engine import (
 )
 from vivarium.environments.braitenberg.behaviors import Behaviors
 from vivarium.environments.braitenberg.selective_sensing import (
-    State,
-    EntityType,
-    init_state
+    AgentState,
+    EntityType
 )
 
 from vivarium.environments.braitenberg.simple.simple_env import (
@@ -31,19 +29,16 @@ from vivarium.environments.braitenberg.simple.simple_env import (
 )
 
 
-SPACE_NDIMS = 2
-
-
 # TODO : Should refactor the function to split the returns
-def get_relative_displacement(state, agents_neighs_idx, displacement_fn):
+def get_relative_displacement(state, braitenberg_state, agents_neighs_idx, displacement_fn):
     """Get all infos relative to distance and orientation between all agents and their neighbors
 
     :param state: state
+    :param braitenberg_state: braitenberg agents' state
     :param agents_neighs_idx: idx all agents neighbors
     :param displacement_fn: jax md function enabling to know the distance between points
     :return: distance array, angles array, distance map for all agents, angles map for all agents
     """
-    # body = state.entities.position
     position = state.entity_state.unified_position
     orientation = state.entity_state.unified_orientation
     senders, receivers = agents_neighs_idx
@@ -55,11 +50,11 @@ def get_relative_displacement(state, agents_neighs_idx, displacement_fn):
 
     dist, theta = proximity_map(dR, orientation[senders])
     proximity_map_dist = jnp.zeros(
-        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
+        (braitenberg_state.count(), state.entity_state.count())
     )
     proximity_map_dist = proximity_map_dist.at[senders, receivers].set(dist)
     proximity_map_theta = jnp.zeros(
-        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
+        (braitenberg_state.count(), state.entity_state.count())
     )
     proximity_map_theta = proximity_map_theta.at[senders, receivers].set(theta)
     return dist, theta, proximity_map_dist, proximity_map_theta
@@ -80,29 +75,27 @@ def compute_motor(proxs, params, behaviors, motors):
     motor_values = linear_motor_values * (1 - manual_mask) + motors * manual_mask
     return motor_values
 
+# Functions for selective sensing with occlusion
 
-### 1 : Functions for selective sensing with occlusion
-
-
-def update_mask(mask, left_n_right_types, ent_type):
+def update_mask(mask, left_n_right_types, subtype):
     """Update a mask of
 
     :param mask: mask that will be applied on sensors of agents
     :param left_n_right_types: types of left adn right sensed entities
-    :param ent_type: entity subtype (e.g 1 for predators)
+    :param subtype: entity subtype (e.g 1 for predators)
     :return: mask
     """
-    cur = jnp.where(left_n_right_types == ent_type, 0, 1)
+    cur = jnp.where(left_n_right_types == subtype, 0, 1)
     mask *= cur
     return mask
 
 
-def keep_mask(mask, left_n_right_types, ent_type):
+def keep_mask(mask, left_n_right_types, subtype):
     """Return the mask unchanged
 
     :param mask: mask
     :param left_n_right_types: left_n_right_types
-    :param ent_type: ent_type
+    :param subtype: subtype
     :return: mask
     """
     return mask
@@ -149,13 +142,13 @@ def compute_behavior_motors(
     :param sensed_ent_idx: idx of left and right entities sensed
     :return: right motor values for this behavior
     """
-    left_n_right_types = state.entity_state.ent_subtype[sensed_ent_idx]
+    left_n_right_types = state.entity_state.entity_subtype[sensed_ent_idx]
     behavior_proxs = mask_proxs_occlusion(agent_proxs, left_n_right_types, sensed_mask)
     motors = compute_motor(behavior_proxs, params, behaviors=behavior, motors=motor)
     return motors
 
 
-# See for the vectorizing idx because already in a vmaped function here
+# See for the vectorizing idx because already in a vmapped function here
 compute_all_behavior_motors = vmap(
     compute_behavior_motors, in_axes=(None, 0, 0, 0, None, None, None)
 )
@@ -195,7 +188,7 @@ def compute_occlusion_proxs_motors(
     argmax = jnp.argmax(agent_raw_proxs, axis=0)
     # Get the real entity idx of the left and right sensed entities from dense neighborhoods
     sensed_ent_idx = ag_idx_dense_receivers[agent_idx][argmax]
-    prox_sensed_ent_types = state.entity_state.ent_subtype[sensed_ent_idx]
+    prox_sensed_ent_types = state.entity_state.entity_subtype[sensed_ent_idx]
 
     # Compute the motor values for all behaviors and do a mean on it
     motor_values = compute_all_behavior_motors(
@@ -211,7 +204,7 @@ compute_all_agents_proxs_motors_occl = vmap(
 )
 
 
-### 2 : Functions for selective sensing without occlusion
+# Functions for selective sensing without occlusion
 
 
 def mask_sensors(state, agent_raw_proxs, ent_type_id, ent_neighbors_idx):
@@ -338,7 +331,7 @@ compute_all_agents_proxs_motors = vmap(
     compute_agent_proxs_motors, in_axes=(None, 0, 0, 0, 0, 0, None, None, None)
 )
 
-def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_dense, occlusion=True):
+def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_neighs_idx, agents_idx_dense, occlusion=True):
     
     assert occlusion, "Non occlusion not working yet"
     prox_motor_function = compute_all_agents_proxs_motors_occl if occlusion else compute_all_agents_proxs_motors
@@ -351,15 +344,17 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
 
         exists_mask = mask_fn(state)
 
+        braitenberg_state = getattr(state, braitenberg_state_field)
+
         # Compute raw proxs for all agents first
         dist, relative_theta, proximity_dist_map, proximity_dist_theta = (
             get_relative_displacement(
-                state, agents_neighs_idx, displacement_fn=displacement
+                state, braitenberg_state, agents_neighs_idx, displacement_fn=displacement
             )
         )
 
-        dist_max = state.agent_state.proxs_dist_max[senders]
-        cos_min = state.agent_state.proxs_cos_min[senders]
+        dist_max = braitenberg_state.proxs_dist_max[senders]
+        cos_min = braitenberg_state.proxs_cos_min[senders]
         # changed agents_neighs_idx[1, :] to receivers in line below (check if it works)
         target_exist_mask = state.entity_state.exists[receivers]
         # Compute agents raw proximeters (proximeters for all neighbors)
@@ -371,11 +366,11 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         agent_proxs, prox_sensed_ent_tuple, mean_agent_motors = (
             prox_motor_function(
                 state,
-                state.agent_state.ent_idx,
-                state.agent_state.params,
-                state.agent_state.sensed,
-                state.agent_state.behavior,
-                state.agent_state.motor,
+                braitenberg_state.entity_idx,
+                braitenberg_state.behavior_params,
+                braitenberg_state.sensed,
+                braitenberg_state.behavior,
+                braitenberg_state.motor,
                 raw_proxs,
                 ag_idx_dense_senders,
                 ag_idx_dense_receivers,
@@ -385,7 +380,7 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         prox_sensed_ent_idx, prox_sensed_ent_type = prox_sensed_ent_tuple
 
         # Update agents state
-        agent_state = state.agent_state.set(
+        braitenberg_state = braitenberg_state.set(
             prox=agent_proxs,
             prox_sensed_ent_type=prox_sensed_ent_type,
             prox_sensed_ent_idx=prox_sensed_ent_idx,
@@ -395,9 +390,9 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
         )
 
         # Update the entities and the state
-        state = state.set(agent_state=agent_state)
+        state = state.set(**{braitenberg_state_field: braitenberg_state})
 
-        center, orientation = motor_force(state, exists_mask)
+        center, orientation = motor_force(state, braitenberg_state, exists_mask)
 
         return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
     
@@ -406,23 +401,26 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx, agents_idx_de
 
 # TODO : Fix the non occlusion error in the step
 class SelectiveSensorsEnv(BaseEnv):
-    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42, **kwargs):
+    def __init__(self, state, box_size, neighbor_radius, seed=42, space_fn=space.periodic, occlusion=True, **kwargs):
         
-        displacement, shift = space_fn(state.box_size)
+        braitenberg_attr_name = state.attr_name_from_cls(AgentState)
+        assert braitenberg_attr_name is not None, "No braitenberg agent found in state"
+        
+        displacement, shift = space_fn(box_size)
 
         exists_mask_fn = lambda state: state.entity_state.exists == 1
         key = random.PRNGKey(seed)
         key, new_key = random.split(key)
         init_fn = init_state_fn(key)
-        neighbor_manager = NeighborManager(displacement, state)
-        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
+        neighbor_manager = NeighborManager(displacement, box_size, neighbor_radius, state)
+        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == state.entity_type_to_int(braitenberg_attr_name)
         agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
 
         # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
         agents_idx_dense_senders = jnp.array(
             [
                 jnp.argwhere(jnp.equal(agents_neighs_idx[0, :], idx)).flatten()
-                for idx in jnp.arange(state.max_agents)
+                for idx in jnp.arange(getattr(state, braitenberg_attr_name).count())
             ]
         )
         # Note: jnp.argwhere(jnp.equal(self.agents_neighs_idx[0, :], idx)).flatten() ~ jnp.where(agents_idx[0, :] == idx)
@@ -432,18 +430,10 @@ class SelectiveSensorsEnv(BaseEnv):
         agents_idx_dense = agents_idx_dense_senders, agents_idx_dense_receivers
 
         state_fns = [reset_force_state_fn(),
-                     braitenberg_state_fn(displacement, exists_mask_fn, 
+                     braitenberg_state_fn(braitenberg_attr_name, displacement, exists_mask_fn, 
                                           agents_neighs_idx, 
                                           agents_idx_dense, occlusion=occlusion),
                      collision_state_fn(displacement, exists_mask_fn),
                      friction_state_fn(exists_mask_fn),
                      step_state_fn(shift, exists_mask_fn, new_key)]
         super().__init__(state, init_fn, state_fns, neighbor_manager, **kwargs)
-
-
-if __name__ == "__main__":
-    state = init_state()
-    env = SelectiveSensorsEnv(state)
-
-    env.step(state, num_scan_steps=5)
-    env.step(state, num_scan_steps=6)
