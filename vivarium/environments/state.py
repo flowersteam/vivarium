@@ -161,6 +161,20 @@ class BaseState:
                 return value[self.e_cond(e_type)]
 
         return wrapper
+    
+    def attr_name_from_cls(self, cls):
+        """
+        Get the attribute name of the class from the dataclass fields.
+        Args:
+            cls: The class to search for in the dataclass fields.
+        Returns:
+            str: The attribute name of the class in the dataclass fields.
+        """
+        attr_name = None
+        for field_name, field_value in self.__dataclass_fields__.items():
+            if field_value.type == cls:
+                attr_name = field_name
+        return attr_name
 
 
 def create_state_cls(base_state_cls, entity_types, **kwargs):  
