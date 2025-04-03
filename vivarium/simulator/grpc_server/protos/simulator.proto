@@ -22,7 +22,6 @@ service SimulatorServer {
 
   // send the labels of subtypes and scene name
   rpc GetSceneName(Scene) returns (Scene) {}
-  rpc GetSubtypesLabels(SubtypesLabels) returns (SubtypesLabels) {}
 
   // Handle the connection between the server and the clients
   rpc IsStarted(google.protobuf.Empty) returns (IsStartedState) {}
@@ -92,11 +91,6 @@ message RigidBody {
 
 message IsStartedState {
   bool is_started = 1;
-}
-
-// TODO : Check how I should define this 
-message SubtypesLabels {
-    map<int32, string> data = 1;
 }
 
 message Scene {

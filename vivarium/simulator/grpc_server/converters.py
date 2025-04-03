@@ -1,7 +1,8 @@
 import numpy as np
 import jax.numpy as jnp
-from jax_md.dataclasses import fields
+
 from jax_md.rigid_body import RigidBody
+from jax_md.dataclasses import fields
 
 import simulator_pb2
 
@@ -26,7 +27,6 @@ def idx_to_proto(idx):
 
 def indexes_to_proto(indexes):
     proto_indexes = simulator_pb2.Indexes()
-    # proto_idx = simulator_pb2.Idx()
     if isinstance(indexes, (int, slice, np.int32)):
         proto_indexes.idx.append(idx_to_proto(indexes))
     elif isinstance(indexes, tuple):
@@ -45,7 +45,28 @@ def changes_to_proto(changes):
         for change in changes:
             proto_change = simulator_pb2.Change()
             proto_change.idx.CopyFrom(indexes_to_proto(change['__idx']))
-            proto_change.value.CopyFrom(ndarray_to_proto(change['__value']))
+            if isinstance(change['__value'], (np.ndarray, jnp.ndarray)):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(ndarray=ndarray_to_proto(change['__value']))
+                )
+            elif isinstance(change['__value'], float):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(float_value=change['__value'])
+                )
+            elif isinstance(change['__value'], int):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(int_value=change['__value'])
+                )
+            elif isinstance(change['__value'], bool):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(bool_value=change['__value'])
+                )
+            elif isinstance(change['__value'], str):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(string_value=change['__value'])
+                )
+            else:
+                raise ValueError(f"Unknown value type {type(change['__value'])}")
             proto_changes.changes.append(proto_change)
         return proto_changes
     elif isinstance(changes, dict):
@@ -106,9 +127,19 @@ def proto_to_changes(proto_changes):
             changes.append(proto_to_changes(proto_change))
         return changes
     elif isinstance(proto_changes, simulator_pb2.Change):
+        if proto_changes.value.HasField('ndarray'):
+            value = proto_to_ndarray(proto_changes.value.ndarray)
+        elif proto_changes.value.HasField('float_value'):
+            value = proto_changes.value.float_value
+        elif proto_changes.value.HasField('int_value'):
+            value = proto_changes.value.int_value
+        elif proto_changes.value.HasField('bool_value'):
+            value = proto_changes.value.bool_value
+        elif proto_changes.value.HasField('string_value'):
+            value = proto_changes.value.string_value
         change = {
             '__idx': proto_to_indexes(proto_changes.idx),
-            '__value': proto_to_ndarray(proto_changes.value)
+            '__value': value
         }
         return change
 
@@ -140,7 +171,7 @@ def proto_to_state(state, dataclass_type):
     :return: State object
     """
 
-    if dataclass_type in [np.ndarray, jnp.ndarray]:
+    if dataclass_type in [np.ndarray, jnp.ndarray, jnp.array, jnp.int32, jnp.float32]:
         return proto_to_ndarray(state.array_data)
     elif 'center' in state.nested_fields and 'orientation' in state.nested_fields:
         return RigidBody(

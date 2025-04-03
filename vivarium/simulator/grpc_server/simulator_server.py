@@ -1,13 +1,12 @@
 import logging
-
-from concurrent import futures
 from threading import Lock
-from contextlib import contextmanager
+from concurrent import futures
 from collections import defaultdict
+from contextlib import contextmanager
 
-import grpc
-import simulator_pb2
 import simulator_pb2_grpc
+import simulator_pb2
+import grpc
 
 from numproto.numproto import proto_to_ndarray
 
@@ -26,7 +25,6 @@ def nonblocking(lock):
     finally:
         if locked:
             lock.release()
-
 
 class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     """A gRPC server for the simulator.
@@ -57,10 +55,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
         return simulator_pb2.Scene(scene_name=scene_name)
-
-    def GetSubtypesLabels(self, request, context):
-        subtype_labels_dict = self.simulator.get_subtype_labels()
-        return simulator_pb2.SubtypesLabels(data=subtype_labels_dict)
 
     def Start(self, request, context):
         self.simulator.run(threaded=True)
