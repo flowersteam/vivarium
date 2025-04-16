@@ -2,23 +2,21 @@ import pytest
 
 import jax.numpy as jnp
 
-from vivarium.utils.scene_configs import load_scene_config
+from vivarium.utils.scene_configs import SceneConfiguration
 
-from vivarium.environments.state import (
-    EntityState, 
-    create_state,
-    class_to_string
-    )
+from vivarium.environments.state import EntityState
 
-from vivarium.environments.braitenberg.selective_sensing.state import (
-    AgentState,
-    ObjectState
-    )
+from vivarium.environments.braitenberg.selective_sensing.state import AgentState, ObjectState
 
-config = load_scene_config('braitenberg')
 
-agent = config.state_data.agent_state.kwargs
-object = config.state_data.object_state.kwargs
+scene_config = SceneConfiguration('braitenberg')
+
+state = scene_config.create_state()
+agent_field = state.field_name(AgentState)
+object_field = state.field_name(ObjectState)
+
+agent = scene_config.entity_type_configs[agent_field].kwargs
+object = scene_config.entity_type_configs[object_field].kwargs
 n_agents = agent.n_exists
 n_objects = object.n_exists
 
@@ -31,28 +29,27 @@ expected_values = {
     "proxs_dist_max": agent.proxs_dist_max
 }
 
-def test_class_to_string():
-    assert class_to_string(AgentState) == 'agent_state'
-    assert class_to_string(ObjectState) == 'object_state'
+entity_types_kwargs = {etype: config.kwargs for etype, config in scene_config.entity_type_configs.items()}
 
 
-@pytest.mark.parametrize("entity_type_cls, entity_idx_offset", [
-    (AgentState, 0),
-    (ObjectState, 2),
+@pytest.mark.parametrize("entity_type, entity_idx_offset", [
+    (agent_field, 0),
+    (object_field, 2),
 ])
-def test_create_entity_type_state(entity_type_cls, entity_idx_offset):
-    cls = entity_type_cls
-    state = cls.create(entity_idx_offset, config, class_to_string(cls))
+def test_create_entity_type_state(entity_type, entity_idx_offset):
+    cls = scene_config.entity_type_configs[entity_type].state_cls
+    state = cls.create(entity_idx_offset, entity_types_kwargs, entity_type)
+    n_exists = n_agents if entity_type == agent_field else n_objects
+    assert jnp.equal(state.entity_idx, jnp.array(range(entity_idx_offset, entity_idx_offset + n_exists))).all()
 
-    assert jnp.equal(state.entity_idx, jnp.array(range(entity_idx_offset, entity_idx_offset + config['state_data'][class_to_string(cls)]['kwargs']['n_exists']))).all()
-
-    if entity_type_cls == AgentState:
+    if state.__class__ == AgentState:
         assert jnp.equal(state.proxs_dist_max, jnp.array(expected_values["proxs_dist_max"])).all()
 
 
 def test_create_entity_state():
 
-    entity_state = EntityState.create(config)
+    
+    entity_state = EntityState.create(scene_config.entity_types, entity_types_kwargs)
     
     assert jnp.equal(entity_state.entity_type, jnp.array(expected_values["entity_type"])).all()
     assert jnp.equal(entity_state.entity_type_idx, jnp.array(expected_values["entity_type_idx"])).all()
@@ -63,7 +60,7 @@ def test_create_entity_state():
 
 def test_create_state():
 
-    state = create_state(config)
+    state = scene_config.create_state()
 
     assert jnp.equal(state.entity_state.entity_type, jnp.array(expected_values['entity_type'])).all()
     assert jnp.equal(state.entity_state.entity_type_idx, jnp.array(expected_values['entity_type_idx'])).all()
