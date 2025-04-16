@@ -2,8 +2,8 @@ import logging as lg
 
 import jax
 import jax.numpy as jnp
-
 from jax import random, lax, vmap
+
 from jax_md import space
 
 from vivarium.environments.base_env import BaseEnv, NeighborManager
@@ -14,11 +14,9 @@ from vivarium.environments.physics_engine import (
     init_state_fn,
     step_state_fn
 )
+
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.selective_sensing import (
-    AgentState,
-    EntityType
-)
+from vivarium.environments.braitenberg.selective_sensing import AgentState
 
 from vivarium.environments.braitenberg.simple.simple_env import (
     proximity_map,
@@ -331,6 +329,7 @@ compute_all_agents_proxs_motors = vmap(
     compute_agent_proxs_motors, in_axes=(None, 0, 0, 0, 0, 0, None, None, None)
 )
 
+
 def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_neighs_idx, agents_idx_dense, occlusion=True):
     
     assert occlusion, "Non occlusion not working yet"
@@ -403,7 +402,7 @@ def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_
 class SelectiveSensorsEnv(BaseEnv):
     def __init__(self, state, box_size, neighbor_radius, seed=42, space_fn=space.periodic, occlusion=True, **kwargs):
         
-        braitenberg_attr_name = state.attr_name_from_cls(AgentState)
+        braitenberg_attr_name = state.field_name(AgentState)
         assert braitenberg_attr_name is not None, "No braitenberg agent found in state"
         
         displacement, shift = space_fn(box_size)
