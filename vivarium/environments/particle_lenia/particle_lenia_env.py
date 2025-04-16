@@ -15,6 +15,8 @@ from vivarium.environments.physics_engine import (
     step_state_fn
 )
 
+from vivarium.environments.particle_lenia.state import ParticleLeniaState
+
 
 def disp(displacement, position, other_positions):
     return vmap(displacement, (None, 0))(position, other_positions)
@@ -37,7 +39,7 @@ def lenia_energy_fn(displacement):
 
 from_mask_fn = lambda state: jnp.array(range(len(state.entity_state.entity_type_idx)))
 
-to_mask_fn = lambda state: state.object_state.entity_idx
+to_mask_fn = lambda state: state.field(ParticleLeniaState).entity_idx
 
 
 def particle_lenia_state_fn(displacement, from_mask_fn=from_mask_fn, to_mask_fn=to_mask_fn):
@@ -48,7 +50,8 @@ def particle_lenia_state_fn(displacement, from_mask_fn=from_mask_fn, to_mask_fn=
         force = quantity.force(
             lambda x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep : lenia_energy_fn(displacement)(state.entity_state.position[from_mask], x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep)
             )
-        res = vmap(force)(state.entity_state.position[to_mask], state.object_state.mu_k, state.object_state.sigma_k, state.object_state.w_k, state.object_state.mu_g, state.object_state.sigma_g, state.object_state.c_rep)
+        particle_state = state.field(ParticleLeniaState)
+        res = vmap(force)(state.entity_state.position[to_mask], particle_state.mu_k, particle_state.sigma_k, particle_state.w_k, particle_state.mu_g, particle_state.sigma_g, particle_state.c_rep)
         all = jnp.zeros_like(state.entity_state.force)
         all = all.at[to_mask].set(res)
         return state.set(
