@@ -1,10 +1,9 @@
-import enum
-
 import jax.numpy as jnp
 
 from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environments.state import ParticleState
+
 
 @md_dataclass
 class AgentState(ParticleState):
@@ -22,19 +21,19 @@ class AgentState(ParticleState):
     proxs_cos_min: jnp.array
     
     @classmethod
-    def create(cls, entity_idx_offset, params, entity_type_field):
+    def create(cls, entity_idx_offset, entity_types_kwargs, entity_type):
         
-        agent_kwargs = params['state_data'][entity_type_field]['kwargs']
-        n_entities = len(agent_kwargs['position'])
-        n_total_entities = sum([len(params['state_data'][field]['kwargs']['position']) for field in params['state_data']['entity_state']['entity_types']])
+        agent_kwargs = entity_types_kwargs[entity_type]
+        n_entities = agent_kwargs['n_exists']
+        n_total_entities = sum([kwargs['n_exists'] for kwargs in entity_types_kwargs.values()])
         n_behaviors = agent_kwargs['n_behaviors']
         n_subtypes = 0
-        for entity_type in params['state_data']['entity_state']['entity_types']:
-            for st, n in params['state_data'][entity_type]['kwargs']['subtype_to_n']:
+        for etype, kwargs in entity_types_kwargs.items():
+            for st, n in kwargs['subtype_to_n']:
                 n_subtypes = max(n_subtypes, st + 1)
         proximity_map_dist = jnp.zeros((n_entities, n_total_entities))
         proximity_map_theta = jnp.zeros((n_entities, n_total_entities))
-        return cls._create(entity_idx_offset, params, entity_type_field, 
+        return cls._create(entity_idx_offset, entity_types_kwargs, entity_type,
                            prox=jnp.zeros((n_entities, 2)),
                            motor=jnp.zeros((n_entities, 2)),
                            prox_sensed_ent_type=jnp.zeros((n_entities, 2), dtype=int),
@@ -50,10 +49,5 @@ class AgentState(ParticleState):
 @md_dataclass
 class ObjectState(ParticleState):
     @classmethod
-    def create(cls, entity_idx_offset, params, entity_type_field):
-        return cls._create(entity_idx_offset, params, entity_type_field)
-
-# TODO: Remove?
-class EntityType(enum.Enum):
-    AGENT = 0
-    OBJECT = 1
+    def create(cls, entity_idx_offset, entity_types_kwargs, entity_type):
+        return cls._create(entity_idx_offset, entity_types_kwargs, entity_type)
