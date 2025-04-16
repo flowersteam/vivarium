@@ -186,20 +186,21 @@ def motor_command(wheel_activation, base_length, wheel_diameter):
 motor_command = vmap(motor_command, (0, 0, 0))
 
 
-def motor_force(state, mask):
+def motor_force(state, braitenberg_state, mask):
     """Returns the motor force function of the environment
 
     :param state: state
+    :param braitenberg_state: braitenberg state (usually state.agents)
     :param mask: mask on entities (e.g. existing ones)
     :return: motor force
     """
-    agent_idx = state.agent_state.ent_idx
+    agent_idx = braitenberg_state.entity_idx
 
     n = normal(state.entity_state.unified_orientation[agent_idx])
 
-    fwd, rot = motor_command(state.agent_state.motor,
+    fwd, rot = motor_command(braitenberg_state.motor,
                              state.entity_state.diameter[agent_idx],
-                             state.agent_state.wheel_diameter)
+                             braitenberg_state.wheel_diameter)
 
     cur_vel = (
         state.entity_state.unified_momentum[agent_idx]
@@ -213,7 +214,6 @@ def motor_force(state, mask):
     fwd_force = (
         n
         * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
-        * jnp.tile(state.agent_state.speed_mul, (SPACE_NDIMS, 1)).T
     )
 
     center = (
@@ -227,7 +227,7 @@ def motor_force(state, mask):
             / state.entity_state.mass.orientation[agent_idx]
         )
         rot_delta = rot - cur_rot_vel
-        rot_force = rot_delta * state.agent_state.theta_mul
+        rot_force = rot_delta  # * state.agent_state.theta_mul
     else:
         rot_force = state.dt * rot
 
@@ -252,7 +252,6 @@ def sum_force_to_entities(entity_state, center, orientation=0.):
         orientation += entity_state.force.orientation         
         return entity_state.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
-
 
 def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
     def state_fn(state, neighbors):
