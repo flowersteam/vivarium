@@ -3,11 +3,8 @@ import logging as lg
 from jax import jit, lax
 
 from jax_md import partition
-from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.utils.scene_configs import import_class, load_scene_config
 from vivarium.utils.converters import access_nested_fields
-from vivarium.environments.state import create_state
 
 
 class NeighborManager:
@@ -41,9 +38,11 @@ class NeighborManager:
             self.allocate(state)
             assert not self.neighbors.did_buffer_overflow
 
+
 nested_fields_to_access = {
     'neighbor_manager': ['box_size', 'neighbor_radius'],
 }
+
 
 @access_nested_fields({'neighbor_manager': ['box_size', 'neighbor_radius']})
 class BaseEnv:
@@ -56,28 +55,9 @@ class BaseEnv:
         self.state_fns = state_fns
         self.neighbor_manager = neighbor_manager
         self.num_scan_steps = num_scan_steps
+        self.to_jit = to_jit
         if to_jit:
             self._step_env = jit(self._step_env, static_argnums=(2,))
-
-    @classmethod
-    def from_scene(cls, scene_name):
-        """Alternative constructor to create a Simulator instance from a scene name.
-
-        :param scene_name: YAML file containing the scene configuration (without extension)
-        :return: Simulator instance
-        """
-        scene_config = load_scene_config(scene_name)
-        return cls.from_scene_config(scene_config)
-
-
-    @classmethod
-    def from_scene_config(cls, scene_config):
-        state = create_state(scene_config)
-        env_cls = import_class(scene_config.environment.cls)
-        return env_cls(state=state, **scene_config.environment.kwargs)
-
-    def init_state(self):
-        raise (NotImplementedError)
 
     def _step_env(
         self, state, neighbors, num_scan_steps=1
