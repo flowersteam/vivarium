@@ -1,0 +1,148 @@
+environment:
+  cls: vivarium.environments.braitenberg.selective_sensing.SelectiveSensorsEnv
+  kwargs:
+    box_size: 100.0
+    neighbor_radius: 300.0
+    num_scan_steps: 8
+    to_jit: True
+    seed: 42
+
+simulator:
+  cls: vivarium.simulator.Simulator
+  kwargs:
+    update_freq: -1
+
+subtypes:
+  - prey
+  - predator
+  - resource
+
+state:
+  cls: vivarium.environments.state.BaseState
+  kwargs:
+    dt: 0.1
+    collision_alpha: 2.0
+    collision_eps: 1.0
+
+entities:
+  entity_state:
+    cls: vivarium.environments.state.EntityState
+  entity_types:
+    - agents
+    - objects
+
+  agents:
+    cls: vivarium.environments.braitenberg.selective_sensing.state.AgentState
+    simulator_controller_cls: vivarium.controllers.simulator_controller.ControllerAgent
+    kwargs:
+      n_exists: 5
+      mass:
+        - 1
+        - 1
+        - 1
+        - 1
+        - 2
+      position: random
+      orientation: random
+      diameter:
+        _all_values_: 6.0
+      friction:
+        - 1.0
+        - 1.0
+        - 1.0
+        - 1.0
+        - 0.2
+      n_behaviors: 4
+      subtype_to_n:
+        - [0, 2]
+        - [1, 3]
+      wheel_diameter:
+        - 2.0
+        - 2.0
+        - 2.0
+        - 2.0
+        - 3.0
+      proxs_dist_max:
+        - 20.0
+        - 20.0
+        - 20.0
+        - 20.0
+        - 30.0
+      proxs_cos_min:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.3
+
+  objects:
+    cls: vivarium.environments.braitenberg.selective_sensing.state.ObjectState
+    simulator_controller_cls: vivarium.controllers.simulator_controller.ControllerObject
+    kwargs:
+      n_exists: 3
+      mass:
+        - 1
+        - 1
+        - 1
+      position:
+        - [1.0, 2.0]
+        - [0.0, 2.0]
+        - [1.0, 0.2]
+      orientation:
+        - 0.0
+        - 0.0
+        - 0.0
+      diameter:
+        - 3.0
+        - 3.0
+        - 3.0
+      friction:
+        - 1.0
+        - 1.0
+        - 1.0
+      subtype_to_n:
+        - [2, 3]
+
+client:
+  agents:
+    simulator_controller:
+      cls: vivarium.controllers.simulator_controller.ControllerAgent
+      kwargs: {}
+    notebook_controller:
+      cls: vivarium.controllers.notebook_controller.Agent
+      kwargs: {}
+    param:
+      cls: vivarium.controllers.panel_controller.Agent
+      kwargs: {}
+    panel_controller:
+      cls: vivarium.controllers.panel_controller.PanelControllerAgent
+      kwargs:
+        color:
+          - red
+          - red
+          - red
+          - red
+          - red
+    panel_interface:
+      cls: vivarium.interface.panel_app.AgentManager
+      kwargs: {}
+  objects:
+    simulator_controller:
+      cls: vivarium.controllers.simulator_controller.ControllerObject
+      kwargs: {}
+    notebook_controller:
+      cls: vivarium.controllers.notebook_controller.Object
+      kwargs: {}
+    param:
+      cls: vivarium.controllers.panel_controller.Object
+      kwargs: {}
+    panel_controller:
+      cls: vivarium.controllers.panel_controller.PanelControllerObject
+      kwargs:
+        color:
+          - blue
+          - blue
+          - blue
+    panel_interface:
+      cls: vivarium.interface.panel_app.ObjectManager
+      kwargs: {}

@@ -4,42 +4,74 @@ environment:
     box_size: 35.0
     neighbor_radius: 50.0
     num_scan_steps: 8
-    to_jit: False
+    to_jit: True
     seed: 42
 
 simulator:
+  cls: vivarium.simulator.Simulator
   kwargs:
     update_freq: -1
 
 subtypes:
   - particle
-state_data:
-  state:
-    cls: vivarium.environments.state.BaseState
-    kwargs:
-      dt: 0.1
-      collision_alpha: 2.0
-      collision_eps: 1.0
 
+state:
+  cls: vivarium.environments.state.BaseState
+  kwargs:
+    dt: 0.1
+    collision_alpha: 2.0
+    collision_eps: 1.0
+
+entities:
   entity_state:
     cls: vivarium.environments.state.EntityState
-    entity_types:
-      - object_state
+    
+  entity_types:
+    - particles
 
-  object_state:
-    cls: vivarium.environments.particle_lenia.state.ObjectState
+  particles:
+    cls: vivarium.environments.particle_lenia.state.ParticleLeniaState
     kwargs:
-      n_exists: 20
-      mass: 1.
-      diameter: 0.2
-      friction: 1.0
+      n_exists: 600
+      mass:
+        _all_values_: 1.0
+      diameter:
+        _all_values_: 0.2
+      friction:
+        _all_values_: 1.0
       subtype_to_n:
-        - [0, 200]
-      position: None
-      orientation: None
-      mu_k: 4.0
-      sigma_k: 1.0
-      w_k: 0.022
-      mu_g: 0.6
-      sigma_g: 0.15
-      c_rep: 0.0 
+        - [0, 600]
+      position: random
+      orientation: random
+      mu_k:
+        _all_values_: 4.0
+      sigma_k:
+        _all_values_: 1.0
+      w_k:
+        _all_values_: 0.022
+      mu_g:
+        _all_values_: 0.6
+      sigma_g:
+        _all_values_: 0.15
+      c_rep:
+        _all_values_: 0.0 
+
+client:
+  particles:
+    simulator_controller:
+      cls: vivarium.controllers.simulator_controller.ControllerObject
+      kwargs: {}
+    notebook_controller:
+      cls: vivarium.controllers.notebook_controller.Object
+      kwargs: {}
+    param:
+      cls: vivarium.controllers.panel_controller.Object
+      kwargs: {}
+    panel_controller:
+      cls: vivarium.controllers.panel_controller.PanelControllerObject
+      kwargs:
+        color:
+          _all_values_: red
+    panel_interface:
+      cls: vivarium.interface.panel_app.ObjectManager
+      kwargs: {}
