@@ -3,146 +3,37 @@ import time
 import math
 import pickle
 import logging
-import threading
 import datetime
-
+import threading
 from functools import partial
 from contextlib import contextmanager
 
-import jax
-import jax.numpy as jnp
+from vivarium.utils.converters import access_nested_fields
 
-from vivarium.utils.scene_configs import load_scene_config
-from vivarium.simulator.simulator_states import SimState, SimulatorState
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
-    SelectiveSensorsEnv,
-    init_state,
-)
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
-    State as EnvState,
-)
-
-from vivarium.controllers.dataclass_wrapper import update_state_from_change_list, DataclassWrapper
+from vivarium.controllers.dataclass_wrapper import update_state_from_change_list
+from vivarium.utils.scene_configs import SimulatorConfiguration, SceneConfiguration
 
 
 lg = logging.getLogger(__name__)
 
 
-@jax.jit
-def env_to_sim_state(
-    env_state, num_steps_lax, freq, use_fori_loop, to_jit
-):
-    """Jitted function that transform environment state (used in self.env) into a simulator state for the client-server interaction
+nested_fields_to_access = {
+    'env': [
+        'box_size',
+        'neighbor_radius',
+        'num_scan_steps',
+        'to_jit'
+    ]
+}
 
-    :param env_state: env_state
-    :param num_steps_lax: num_steps_lax
-    :param freq: freq
-    :param use_fori_loop: use_fori_loop
-    :param jit_step: jit_step
-    :return: simulator state
-    """
-    simulator_state = SimulatorState(
-        # why 0 and not 2 ? Like in state types
-        idx=jnp.array(0),
-        time=jnp.array(env_state.time),
-        box_size=jnp.array(env_state.box_size),
-        max_agents=jnp.array(env_state.max_agents),
-        max_objects=jnp.array(env_state.max_objects),
-        dt=jnp.array(env_state.dt),
-        neighbor_radius=jnp.array(env_state.neighbor_radius),
-        collision_alpha=jnp.array(env_state.collision_alpha),
-        collision_eps=jnp.array(env_state.collision_eps),
-        num_steps_lax=jnp.array(num_steps_lax),
-        freq=jnp.array(freq),
-        # convert bool to either 1 or 0
-        use_fori_loop=jnp.array(1 * use_fori_loop),
-        to_jit=jnp.array(1 * to_jit),
-    )
-
-    sim_state = SimState(
-        agent_state=env_state.agent_state,
-        entity_state=env_state.entity_state,
-        object_state=env_state.object_state,
-        simulator_state=simulator_state,
-    )
-
-    return sim_state
-
-
-@jax.jit
-def sim_to_env_state(sim_state, ent_sub_types_and_num):
-    """Transform the simulator state used for client server connection into env state (used in self.env)
-
-    :param sim_state: simulator state
-    :return: environment state
-    """
-    sim = sim_state.simulator_state
-
-    env_state = EnvState(
-        time=sim.time,
-        ent_sub_types=ent_sub_types_and_num,
-        box_size=sim.box_size,
-        max_agents=sim.max_agents,
-        max_objects=sim.max_objects,
-        dt=sim.dt,
-        neighbor_radius=sim.neighbor_radius,
-        collision_alpha=sim.collision_alpha,
-        collision_eps=sim.collision_eps,
-        entity_state=sim_state.entity_state,
-        agent_state=sim_state.agent_state,
-        object_state=sim_state.object_state,
-    )
-
-    return env_state
-
-
-def create_property(field_name):
-    @property
-    def prop(self):
-        return getattr(self.state.simulator_state, field_name)
-
-    @prop.setter
-    def prop(self, value):
-        self.state = getattr(DataclassWrapper().simulator_state, field_name).set(value).apply(self.state)
-    return prop
-
+@access_nested_fields(nested_fields_to_access)
 class Simulator:
-    freq = create_property('freq')
-    num_steps_lax = create_property('num_steps_lax')
-    use_fori_loop = create_property('use_fori_loop')
-    to_jit = create_property('to_jit')
-    def __init__(
-        self,
-        env,
-        env_state,
-        scene_name="scene",
-        num_steps_lax=4,
-        update_freq=-1,
-        to_jit=True,
-        use_fori_loop=True,
-        seed=0,
-    ):
+    def __init__( self, env, scene_name=None, freq=-1):
+        
         self.env = env
-        assert isinstance(
-            self.env, SelectiveSensorsEnv
-        ), "You have to use an environment with selective sensors within the simulator"
-        # assert (
-        #     self.env.occlusion
-        # ), "You have to use an environment with occlusion sensors within the simulator"
-
         self.scene_name = scene_name
-
-        # First initialize fields in the class because they will be used to define the simulator state below
-        self.key = jax.random.PRNGKey(seed)
-
-        self.ent_sub_types_and_num = (
-            env_state.ent_sub_types
-        )  # information about entities sub types in a dictionary
-        self.ent_sub_types = self.process_ent_sub_types(self.ent_sub_types_and_num)
-
-        # transform the env state (only used in env class) into a simulator state with a simulator state (used only in client server communication)
-        self.state = self.env_to_sim_state(env_state, num_steps_lax=num_steps_lax, freq=update_freq, to_jit=to_jit, use_fori_loop=use_fori_loop)
-
+        self.state = env.state
+        self.freq = freq
         self._is_started = False
         self._to_stop = False
 
@@ -151,25 +42,7 @@ class Simulator:
         self.records = None
         self.saving_dir = None
 
-        # Do a first step to initialize the momentum of the state
-        self.step()
         lg.info("Simulator initialized")
-
-    def load_state(self, state, env):
-        """Load a state in the simulator
-
-        :param state: state to load
-        """
-        lg.info("Loading a new state")
-
-        self.__init__(
-            env=env,
-            env_state=state,
-            num_steps_lax=self.num_steps_lax,
-            update_freq=self.freq,
-            jit_step=self.jit_step,
-            use_fori_loop=self.use_fori_loop,
-        )
 
     def load_scene(self, scene_name):
         """Load a scene in the simulator
@@ -178,37 +51,35 @@ class Simulator:
         """
         lg.info("Loading a new scene\n")
 
-        # load a scene and init the corresponding state
-        scene_config = load_scene_config(scene_name=scene_name)
-        state = init_state(**scene_config)
-        env = SelectiveSensorsEnv(state=state)
+        if self.is_started():
+            self.stop(blocking=True)
+        scene_config = SceneConfiguration(scene_name=scene_name)
+        self.freq = scene_config.config.simulator.kwargs.freq
+        del self.env
+        self.env = scene_config.create_environment()
+        self.state = self.env.state
 
-        self.load_state(state, env)
-
-    def _step(self, state, num_scan_steps):
+    def _step(self, state):
         """Do num_updates jitted steps in the simulation. This is done by converting state into environment state, and convert it back to simulation state during return
 
         :param state: current simulation state
         :param num_updates: current simulation neighbors array
         :return: updated state
         """
-        # convert the sim_state into env state to call env.step()
-        new_env_state = self.env.step(
-            state=self.env_state, num_scan_steps=num_scan_steps
-        )
+        new_state = self.env.step(state=state)
 
         # record the env state because it is the one we can plot and use without client-server interaction
         if self.recording:
-            self.record(new_env_state)
+            self.record(new_state)
 
         # return the next sim state (convert new env state)
-        return self.env_to_sim_state(new_env_state)
+        return new_state  # self.env_to_sim_state(new_env_state)
 
     def step(self, changes=[]):
         """Do a step in the simulation by calling _step"""
         if len(changes) > 0:
             self.apply_changes(changes)
-        self.state = self._step(self.state, self.num_steps_lax)
+        self.state = self._step(self.state)
         return self.state
 
     def run(self, threaded=False, num_steps=math.inf, save=False, saving_name=None):
@@ -236,7 +107,6 @@ class Simulator:
 
         :param num_steps: number of simulation steps
         """
-        # Encode that the simulation is started in the class
         self._is_started = True
         lg.info("Simulation run starts")
 
@@ -253,8 +123,7 @@ class Simulator:
                 self._to_stop = False
                 break
 
-            # self.state = self._step(state=self.state, num_iterations=self.num_steps_lax)
-            self.state = self.step()
+            self.step()
             loop_count += 1
 
             # Sleep for updated sleep_time seconds
@@ -339,6 +208,7 @@ class Simulator:
         self.save_records()
         self.recording = False
 
+    # TODO: This shouldn't be a method, just a function
     def load(self, saving_name):
         """Load data corresponding to saving_name
         :param saving_name: name used while saving the data
@@ -351,10 +221,7 @@ class Simulator:
             return data
 
     def apply_changes(self, changes):
-        self.state = update_state_from_change_list(self.state, changes)
-
-    def get_subtype_labels(self):
-        return self.ent_sub_types
+        self = update_state_from_change_list(self, changes)
 
     def start(self):
         """Start the simulation"""
@@ -363,7 +230,7 @@ class Simulator:
     def stop(self, blocking=True):
         """Stop the simulation
 
-        :param blocking: TODO, defaults to True
+        :param blocking: If True, wait for the simulation to actually stop before returning
         """
         self._to_stop = True
         if blocking:
@@ -391,47 +258,12 @@ class Simulator:
         finally:
             self.run(threaded=True)
 
-    # TODO : Update documentation
-    def update_attr(self, attr, type_):
-        """_summary_
-
-        :param attr: _description_
-        :param type_: _description_
-        """
-        lg.debug(f"\nUpdate attribute: {attr = }; {type_ = }")
-        setattr(self, attr, type_(getattr(self.state.simulator_state, attr)[0]))
-
     def get_state(self):
         """Get current simulation state
 
         :return: simulation state
         """
         return self.state
-
-    def process_ent_sub_types(self, ent_sub_types_and_num):
-        """Process the entity sub types and number to remove number of entities, and add idx as keys,
-        from {label: (idx, num)} to {idx: label}
-
-        :param ent_sub_types_and_num: dictionary of entity sub types and number of entities
-        :return: processed dictionary
-        """
-        return {int(idx): label for label, (idx, _) in ent_sub_types_and_num.items()}
-
-
-    def env_to_sim_state(self, env_state, num_steps_lax=None, freq=None, use_fori_loop=None, to_jit=None):
-        """Transform environment state (used in self.env) into a simulator state for the client-server interactoon
-
-        :param env_state: env_state
-        :return: simulator state
-        """
-        freq = freq or self.freq
-        num_steps_lax = num_steps_lax or self.num_steps_lax
-        use_fori_loop = use_fori_loop or self.use_fori_loop
-        to_jit = to_jit if to_jit is not None else self.to_jit
-        return env_to_sim_state(
-            env_state, num_steps_lax, freq, use_fori_loop, to_jit
-        )
-
-    @property
-    def env_state(self):
-        return sim_to_env_state(self.state, self.ent_sub_types_and_num)
+    
+    def get_simulator_parameters(self):
+        return SimulatorConfiguration.from_simulator(self)
