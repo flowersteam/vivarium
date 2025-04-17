@@ -1,4 +1,6 @@
+from dataclasses import is_dataclass
 import numpy as np
+
 import jax.numpy as jnp
 
 from jax_md.rigid_body import RigidBody
@@ -49,7 +51,7 @@ def changes_to_proto(changes):
                 proto_change.value.CopyFrom(
                     simulator_pb2.Value(ndarray=ndarray_to_proto(change['__value']))
                 )
-            elif isinstance(change['__value'], float):
+            elif isinstance(change['__value'], (float, np.float32, jnp.float32)):
                 proto_change.value.CopyFrom(
                     simulator_pb2.Value(float_value=change['__value'])
                 )
@@ -171,19 +173,26 @@ def proto_to_state(state, dataclass_type):
     :return: State object
     """
 
-    if dataclass_type in [np.ndarray, jnp.ndarray, jnp.array, jnp.int32, jnp.float32]:
-        return proto_to_ndarray(state.array_data)
+    if is_dataclass(dataclass_type):
+        kwargs = {}
+        for field in fields(dataclass_type):
+            kwargs[field.name] = proto_to_state(state.nested_fields[field.name], field.type)
+        return dataclass_type(**kwargs)
+    elif state.value.HasField('int_value'):
+        return state.value.int_value
+    elif state.value.HasField('float_value'):
+        return state.value.float_value
+    elif state.value.HasField('bool_value'):
+        return state.value.bool_value
+    elif state.value.HasField('str_value'):
+        return state.value.str_value
+    elif state.value.HasField('ndarray'):
+        return proto_to_ndarray(state.value.ndarray)
     elif 'center' in state.nested_fields and 'orientation' in state.nested_fields:
         return RigidBody(
             center=proto_to_ndarray(state.nested_fields['center'].array_data).astype(float),
             orientation=proto_to_ndarray(state.nested_fields['orientation'].array_data).astype(float),
         )
-    else:
-        kwargs = {}
-        for field in fields(dataclass_type):
-            kwargs[field.name] = proto_to_state(state.nested_fields[field.name], field.type)
-
-        return dataclass_type(**kwargs)
 
 
 def state_to_proto(state):
@@ -195,8 +204,26 @@ def state_to_proto(state):
 
     message = simulator_pb2.Dataclass()
 
-    if isinstance(state, (np.ndarray, jnp.ndarray, int, float)):
-        message.array_data.CopyFrom(ndarray_to_proto(state))
+    if isinstance(state, (np.ndarray, jnp.ndarray)):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(ndarray=ndarray_to_proto(state))
+                )
+    elif isinstance(state, bool):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(bool_value=state)
+                )
+    elif isinstance(state, int):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(int_value=state)
+                )
+    elif isinstance(state, float):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(float_value=state)
+                )
+    elif isinstance(state, str):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(string_value=state)
+                )
     else:
         for field in fields(state):
             value = getattr(state, field.name)
