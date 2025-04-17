@@ -196,6 +196,7 @@ class SceneConfiguration:
     
     def create_simulator(self, state=None, env=None):
         state = state or self.state
+        # What about the case where state is not None and env is None?
         env = env or self.create_environment(state=state)
         simulator_cls = import_class(self.config.simulator.cls)
         return simulator_cls(env=env, scene_name=self.scene_name, **self.config.simulator.kwargs)
