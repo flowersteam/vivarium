@@ -1,28 +1,42 @@
 import numpy as np
 import jax.numpy as jnp
 
+from jax_md.dataclasses import is_dataclass
 
-def update_state_from_change_list(state, change_list):
+from vivarium.environments.state import field_accessors
+
+
+def update_dataclass_from_change_list(dataclass_instance, change_list):
     for changes in change_list:
-        state = update_state(state, changes)
-    return state
+        dataclass_instance = update_dataclass(dataclass_instance, changes)
+    return dataclass_instance
 
 
 #TODO: Is it possible to jit part of this?
-def update_state(state, changes):
+def update_dataclass(dataclass_instance, changes):
     if isinstance(changes, list):
         for change in changes:
             if change['__idx'] is None:
-                state = change['__value']
+                dataclass_instance = change['__value']
             else:
-                if isinstance(state, np.ndarray):
-                    state[change['__idx']] = change['__value']
+                if isinstance(dataclass_instance, np.ndarray):
+                    dataclass_instance[change['__idx']] = change['__value']
                 else:
-                    state = state.at[change['__idx']].set(change['__value'])
+                    if isinstance(dataclass_instance, jnp.ndarray):
+                        dataclass_instance = dataclass_instance.at[change['__idx']].set(change['__value'])
+                    else:
+                        if change['__idx'] is not None:
+                            dataclass_instance = change['__value']
+                        else:
+                            dataclass_instance[change['__idx']] = change['__value']
     else:
         for attr, child in changes.items():
-            state = state.set(**{attr: update_state(getattr(state, attr), child)})
-    return state
+            if is_dataclass(dataclass_instance):
+                dataclass_instance = dataclass_instance.set(**{attr: update_dataclass(getattr(dataclass_instance, attr), child)})
+            else:
+                setattr(dataclass_instance, attr, update_dataclass(getattr(dataclass_instance, attr), child))
+
+    return dataclass_instance
 
 
 class ChangeRecorder:
@@ -120,12 +134,12 @@ def create_property(field_name, rigid_body_field):
                 raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
     return prop
 
-
+@field_accessors
 class DataclassWrapper:
-    def __init__(self, state=None):
+    def __init__(self, dataclass_instance=None):
         object.__setattr__(self, '_root_change_recorder', ChangeRecorder())
         object.__setattr__(self, '_last_change_recorder', self._root_change_recorder)
-        object.__setattr__(self, '_state', state)
+        object.__setattr__(self, '_dataclass_instance', dataclass_instance)
         object.__setattr__(self, '_nested_fields', [])
 
     def _reinit(self):
@@ -138,8 +152,8 @@ class DataclassWrapper:
         
         #TODO: The possibility to use this class with an internal state might not be needed, 
         # EntityState does this (but its usecase is the notebook controller, not raw state as here)
-        if self._state is not None:
-            if attr in self._state.__dict__:
+        if self._dataclass_instance is not None:
+            if attr in self._dataclass_instance.__dict__:
                 self._reinit()
             leaf = self._get_if_leaf(attr)
             if leaf is not None:
@@ -164,12 +178,12 @@ class DataclassWrapper:
         self._last_change_recorder[idx] = value
 
     def _get_if_leaf(self, attr):
-        state = self._state
+        dataclass_instance = self._dataclass_instance
         for field in self._nested_fields:
-            state = getattr(state, field)
-        if isinstance(getattr(state, attr), (np.ndarray, jnp.ndarray)):
+            dataclass_instance = getattr(dataclass_instance, field)
+        if isinstance(getattr(dataclass_instance, attr), (np.ndarray, jnp.ndarray)):
             self._reinit()
-            return getattr(state, attr)
+            return getattr(dataclass_instance, attr)
         else:
             return None
 
@@ -177,9 +191,9 @@ class DataclassWrapper:
         self._last_change_recorder.store_change(value)
         return self
 
-    def update_state(self, state, changes):
-        state = update_state(state, changes)
-        return state
+    def update_dataclass(self, dataclass_instance, changes):
+        dataclass_instance = update_dataclass(dataclass_instance, changes)
+        return dataclass_instance
     
     def fetch_changes(self):
         changes = self._root_change_recorder.fetch_changes()
@@ -187,26 +201,26 @@ class DataclassWrapper:
         self._last_change_recorder = self._root_change_recorder
         return changes
 
-    def apply(self, state=None):
-        state = state or self._state
-        assert state is not None, 'State must be provided either in the constructor or as argument of this method.'
+    def apply(self, dataclass_instance=None):
+        dataclass_instance = dataclass_instance or self._dataclass_instance
+        assert dataclass_instance is not None, 'A dataclass instance must be provided either in the constructor or as argument of this method.'
         changes = self.fetch_changes()
-        state = update_state(state, changes)
-        if self._state is not None:
-            self._state = state
-        return state
+        dataclass_instance = update_dataclass(dataclass_instance, changes)
+        if self._dataclass_instance is not None:
+            self._dataclass_instance = dataclass_instance
+        return dataclass_instance
 
-
-class SimulatorStateWrapper:
-    def __init__(self, state):
-        object.__setattr__(self, '_state', state)
+  
+class SimulatorParametersWrapper:
+    def __init__(self, simulator_parameters):
+        object.__setattr__(self, '_simulator_parameters', simulator_parameters)
         object.__setattr__(self, '_change_recorder', ChangeRecorder())
 
     def __getattr__(self, attr):
-        return getattr(self._state.simulator_state, attr)
+        return getattr(self._simulator_parameters, attr)
 
     def _setitem(self, attr, value, idx=None):
-        setattr(self._change_recorder.simulator_state, attr, value)
+        setattr(self._change_recorder, attr, value)
 
     def __setattr__(self, attr, value):
         if attr in self.__dict__:
@@ -218,14 +232,11 @@ class SimulatorStateWrapper:
         changes = self._change_recorder.fetch_changes()
         return changes
 
-    def apply_to_state(self, state):
+    def apply_to_state(self, simulator):
         changes = self.fetch_changes()
-        self._state = update_state(state, changes)
+        self._simulator = update_dataclass(simulator, changes)
         self._change_recorder = ChangeRecorder()
-        return self._state
-    
-    def set_state(self, state):
-        self._state = state
+        return self._simulator
 
 
 class EntityWrapper:
@@ -245,7 +256,7 @@ class EntityWrapper:
         object.__setattr__(self, '_is_rigid_body', self._state.entity_state.is_rigid_body())
         object.__setattr__(self, '_change_recorder', ChangeRecorder())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_type_attr', entity_type.name.lower() + '_state')
+        object.__setattr__(self, '_entity_type_attr', entity_type) #.name.lower() + '_state')
         object.__setattr__(self, '_entity_fields', ['ent_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
                                'position', 'momentum', 'force', 'mass',
@@ -257,11 +268,11 @@ class EntityWrapper:
     def __getattr__(self, attr):
         if attr in self._entity_fields:
             return getattr(self._state.entity_state, attr)[self._ent_idx]
-        return getattr(getattr(self._state, self._entity_type_attr), attr)[self._state.entity_state.entity_idx[self._ent_idx]]
+        return getattr(getattr(self._state, self._entity_type_attr), attr)[self._state.entity_state.entity_type_idx[self._ent_idx]]
 
     def _setitem(self, attr, value, idx=None):
         entity_state_idx = self._ent_idx if idx is None else (self._ent_idx, idx)
-        x_state_idx = self._state.entity_state.entity_idx[self._ent_idx] if idx is None else (self._state.entity_state.entity_idx[self._ent_idx], idx)
+        x_state_idx = self._state.entity_state.entity_type_idx[self._ent_idx] if idx is None else (self._state.entity_state.entity_type_idx[self._ent_idx], idx)
         if attr in self._entity_fields:
             if attr.endswith('_center') or attr.endswith('_orientation'):
                 field_name, rigid_body_field = attr.split('_', 1)
@@ -280,7 +291,7 @@ class EntityWrapper:
 
     def apply_to_state(self, state):
         changes = self._change_recorder.fetch_changes()
-        self._state = update_state(state, changes)
+        self._state = update_dataclass(state, changes)
         self._change_recorder = ChangeRecorder()
         return self._state
     
@@ -289,10 +300,10 @@ class EntityWrapper:
 
 
 class EntityList:
-    def __init__(self, state, entity_type, entity_wrapper_list=None):
+    def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
         self._state = state
-        self._entity_type = entity_type.name.lower() + 's'
-        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type.value]
+        self._entity_type = entity_type
+        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type_idx]
 
     def __getitem__(self, idx):
         return self._entity_list[idx]
