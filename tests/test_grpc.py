@@ -47,7 +47,7 @@ def test_changes(state):
     changes = dw.fetch_changes()
     p_changes = changes_to_proto(changes)
     changes_2 = proto_to_changes(p_changes)
-    state = dw.update_state(state, changes_2)
+    state = dw.update_dataclass(state, changes_2)
     assert jnp.equal(jnp.array(value), state.entity_state.position.__getitem__(idx)).all()
     assert other_dim_value == state.entity_state.position[idx[0]][1]
 
@@ -58,7 +58,7 @@ def test_simulator_grpc(simulator):
     changes = dw.fetch_changes()
     p_changes = changes_to_proto(changes)
     changes_2 = proto_to_changes(p_changes)
-    simulator2 = dw.update_state(simulator, changes_2)
+    simulator2 = dw.update_dataclass(simulator, changes_2)
     assert simulator2 is simulator
     assert simulator2.env.num_scan_steps == 42
 
@@ -66,5 +66,5 @@ def test_simulator_grpc(simulator):
     changes = dw.fetch_changes()
     p_changes = changes_to_proto(changes)
     changes_2 = proto_to_changes(p_changes)
-    simulator = dw.update_state(simulator, changes_2)
+    simulator = dw.update_dataclass(simulator, changes_2)
     assert jnp.equal(jnp.array(42), simulator.state.entity_state.friction).all()
