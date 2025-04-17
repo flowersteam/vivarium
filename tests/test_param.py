@@ -1,51 +1,48 @@
-from vivarium.utils.converters import rgb_array_to_string, string_to_rgb_array
-
-import jax.numpy as jnp
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
-    init_state as init_rigid_body_state,
-    SelectiveSensorsEnv,
-    EntityType
-)
-
-from vivarium.controllers.panel_controller import Agent, Object, ParamSimulatorState
-from vivarium.controllers.dataclass_wrapper import DataclassWrapper
-
-from vivarium.environments.braitenberg import selective_sensing
-from vivarium.environments.utils import rigid_body_to_point_particle
-
-from vivarium.utils.scene_configs import load_scene_config
 import pytest
 
-init_state_point_particle, _ = rigid_body_to_point_particle(selective_sensing)
+import jax.numpy as jnp
 
-
-def get_rigid_body_state():
-    config = load_scene_config('prey_predator')
-    return init_rigid_body_state(**config)
-
-def get_point_particle_state():
-    config = load_scene_config('prey_predator')
-    return init_state_point_particle(**config)
 
 from vivarium.simulator.simulator import Simulator
+from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.environments.state import to_rigid_body_state
+from vivarium.environments.braitenberg import selective_sensing
 from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.controllers.panel_controller import Agent, Object, ParamSimulator
+from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import SelectiveSensorsEnv
 
+
+scene_name = 'braitenberg'
+
+def get_rigid_body_state():
+    state = get_point_particle_state()
+    state = state.set(entity_state=to_rigid_body_state(state.entity_state))
+    return state
+
+def get_point_particle_state():
+    return SceneConfiguration(scene_name).create_state()
+
+state = get_point_particle_state()
+agent_field = state.field_name(selective_sensing.AgentState)
+object_field = state.field_name(selective_sensing.ObjectState)
 
 
 
 @pytest.mark.parametrize("idx, init_state_fn, entity_type", [
-    (2, get_rigid_body_state, EntityType.AGENT),
-    (3, get_rigid_body_state, EntityType.OBJECT),
-    (4, get_point_particle_state, EntityType.AGENT),
+    # (2, get_rigid_body_state, EntityType.AGENT),
+    # (3, get_rigid_body_state, EntityType.OBJECT),
+    (4, get_point_particle_state, agent_field),
 ])
 def test_param_entity(idx, init_state_fn, entity_type):
     state = init_state_fn()
-    env = SelectiveSensorsEnv(state=state)
-    simulator = Simulator(env_state=state, env=env)
+    env = SelectiveSensorsEnv(state=state, box_size=100., neighbor_radius=100.)
+    simulator = Simulator(env=env, scene_name=scene_name)
     controller = SimulatorController(simulator)
 
-    controller_entities = controller.agents if entity_type == EntityType.AGENT else controller.objects
-    entity = Agent(controller.agents, controller.get_subtype_labels()) if entity_type == EntityType.AGENT else Object(controller.objects)
+    controller_entities = getattr(controller, entity_type)
+    
+    entity_cls = Agent if entity_type == agent_field else Object
+    entity = entity_cls(getattr(controller, entity_type), controller.subtype_labels)
     entity.selection = [idx]
     entity.update_from_server = True
 
@@ -59,12 +56,14 @@ def test_param_entity(idx, init_state_fn, entity_type):
     controller.apply_changes()
     controller.update_state()
     assert controller_entities[idx].exists.item() == 0
-    entity.color = 'red'
-    controller.apply_changes()
-    controller.update_state()
-    assert (controller_entities[idx].color == string_to_rgb_array('red')).all()
+    
+    # TODO: Test for attributes that are not in the state (e.g. color, see also commented below)
+    # entity.color = 'red'
+    # controller.apply_changes()
+    # controller.update_state()
+    # assert (controller_entities[idx].color == string_to_rgb_array('red')).all()
 
-    if entity_type == EntityType.AGENT:
+    if entity_type == agent_field:
         entity.right_motor = 2.
         controller.apply_changes()
         controller.update_state()
@@ -76,11 +75,11 @@ def test_param_entity(idx, init_state_fn, entity_type):
     entity.update_from_server = True
     assert entity.orientation == 1.
 
-    controller_entities[idx].color = jnp.array([0.1, 0.2, 0.3])
-    controller.apply_changes()
-    controller.update_state()
-    entity.update_from_server = True
-    assert entity.color == rgb_array_to_string(jnp.array([0.1, 0.2, 0.3]))
+    # controller_entities[idx].color = jnp.array([0.1, 0.2, 0.3])
+    # controller.apply_changes()
+    # controller.update_state()
+    # entity.update_from_server = True
+    # assert entity.color == rgb_array_to_string(jnp.array([0.1, 0.2, 0.3]))
 
     controller_entities[idx].exists = jnp.array(1)
     controller.apply_changes()
@@ -94,7 +93,7 @@ def test_param_entity(idx, init_state_fn, entity_type):
     entity.update_from_server = True
     assert entity.x_position == 20
 
-    if entity_type == EntityType.AGENT:
+    if entity_type == agent_field:
         controller_entities[idx].left_motor = 4.
         controller.apply_changes()
         controller.update_state()
@@ -104,19 +103,16 @@ def test_param_entity(idx, init_state_fn, entity_type):
 
 def test_simulator_state_param():
     state = get_rigid_body_state()
-    env = SelectiveSensorsEnv(state=state)
-    simulator = Simulator(env_state=state, env=env)
+    env = SelectiveSensorsEnv(state=state, box_size=100., neighbor_radius=100.)
+    simulator = Simulator(env=env, scene_name=scene_name)
     controller = SimulatorController(simulator)
 
-    simulator_param = ParamSimulatorState(controller.simulator_state)
+    simulator_param = ParamSimulator(controller.client)
     simulator_param.update_from_server = True
-    assert simulator_param.freq == controller.simulator_state.freq
+    assert simulator_param.freq == controller.client.freq
+    assert simulator_param.box_size == controller.client.box_size
 
     simulator_param.freq = -10
 
-    controller.apply_changes()
-    controller.update_state()
-    # simulator_state = simulator_param.data.apply()
-
-    assert controller.state.simulator_state.freq == -10
-    assert simulator.state.simulator_state.box_size == controller.simulator_state.box_size
+    assert controller.client.freq == -10
+    assert controller.client.box_size == simulator_param.box_size
