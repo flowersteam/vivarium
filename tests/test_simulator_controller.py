@@ -1,3 +1,4 @@
+import pytest
 import jax.numpy as jnp
 
 from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import AgentState
@@ -7,17 +8,22 @@ from vivarium.utils.scene_configs import SceneConfiguration
 
 NUM_STEPS = 10
 
-def test_base_entity():
-    config = SceneConfiguration('braitenberg')
-    state = config.create_state()
-    entity = ControllerEntity(state, 0, config.entity_types[0])
+@pytest.fixture
+def scene_config(request):
+    scene_name = request.param
+    return SceneConfiguration(scene_name)
+
+@pytest.mark.parametrize("scene_config", ['braitenberg', 'particle_lenia'], indirect=True)
+def test_base_entity(scene_config):
+    state = scene_config.create_state()
+    entity = ControllerEntity(state, 0, scene_config.entity_types[0])
     
     entity.x_position = 10
     entity.apply_to_state(state)
 
-
-def test_simulator_controller():
-    simulator = SceneConfiguration('braitenberg').create_simulator()
+@pytest.mark.parametrize("scene_config", ['braitenberg'], indirect=True)
+def test_simulator_controller(scene_config):
+    simulator = scene_config.create_simulator()
     controller = SimulatorController(simulator)
     controller.step()
 
