@@ -4,6 +4,7 @@ from concurrent import futures
 from collections import defaultdict
 from contextlib import contextmanager
 
+
 import simulator_pb2_grpc
 import simulator_pb2
 import grpc
@@ -11,10 +12,12 @@ import grpc
 from numproto.numproto import proto_to_ndarray
 
 from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_changes
+from vivarium.utils.scene_configs import SimulatorConfiguration
 
 
 lg = logging.getLogger(__name__)
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
+
 
 
 @contextmanager
@@ -51,6 +54,10 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         state = self.simulator.state
         p = state_to_proto(state)
         return p
+    
+    def GetSimulatorParameters(self, request, context):
+        parameters = SimulatorConfiguration.from_simulator(self.simulator)
+        return state_to_proto(parameters)
 
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
