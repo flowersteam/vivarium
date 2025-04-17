@@ -1,21 +1,20 @@
 import param
 import logging
 from functools import partial
+
 import jax.numpy as jnp
 
 from vivarium.controllers.simulator_controller import (
-    SimulatorController, EntityType, ControllerEntity, ControllerAgent, create_entity_lists
+    SimulatorController, ControllerEntity, ControllerAgent
 )
-
-from vivarium.controllers.dataclass_wrapper import SimulatorStateWrapper
-from vivarium.utils.converters import rgb_array_to_string, string_to_rgb_array
 from vivarium.environments.braitenberg.behaviors import Behaviors
+from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 
 
 lg = logging.getLogger(__name__)
 
 
-class PanelSimulatorStateWrapper(SimulatorStateWrapper):
+class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         object.__setattr__(self, 'hide_non_existing', True)
@@ -35,9 +34,11 @@ class PanelSimulatorStateWrapper(SimulatorStateWrapper):
 
 
 class PanelControllerEntity(ControllerEntity):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, state, ent_idx, entity_type, **kwargs):
+        super().__init__(state, ent_idx, entity_type)
         object.__setattr__(self, 'visible', bool(self.exists))
+        for attr, val in kwargs.items():
+            object.__setattr__(self, attr, val)
 
     def __getattr__(self, attr):
         if attr in self.__dict__:
@@ -52,11 +53,13 @@ class PanelControllerEntity(ControllerEntity):
 
 
 class PanelControllerAgent(ControllerAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, state, ent_idx, entity_type, **kwargs):
+        super().__init__(state, ent_idx, entity_type)
         object.__setattr__(self, 'visible', bool(self.exists))
         object.__setattr__(self, 'visible_wheels', True)
         object.__setattr__(self, 'visible_proxs', True)
+        for attr, val in kwargs.items():
+            object.__setattr__(self, attr, val)
 
     def __getattr__(self, attr):
         if attr in self.__dict__:
@@ -69,9 +72,11 @@ class PanelControllerAgent(ControllerAgent):
         else:
             super().__setattr__(attr, val)
 
-class PanelControllerObject(PanelControllerEntity):
-    pass
-
+class PanelControllerObject(PanelControllerEntity): #TODO: understand why super classes of agents and objects are different
+    def __init__(self, state, ent_idx, entity_type, **kwargs):
+        super().__init__(state, ent_idx, entity_type, **kwargs)
+        for attr, val in kwargs.items():
+            object.__setattr__(self, attr, val)
 
 class ParameterizedData(param.Parameterized):
     update_from_server = param.Event()
@@ -156,32 +161,18 @@ class ParameterMapping:
         self.param_to_jax_fn = param_to_jax_fn if param_to_jax_fn is not None else lambda x: x
 
 
-class ParamSimulatorState(ParameterizedData):
-    time = param.Integer()
+class ParamSimulator(ParameterizedData):
     box_size = param.Number()
-    num_steps_lax = param.Integer()
-    dt = param.Number()
+    num_scan_steps = param.Integer()
     freq = param.Number()
     neighbor_radius = param.Number()
-    use_fori_loop = param.Boolean()
-    collision_alpha = param.Number()
-    collision_eps = param.Number()
+    to_jit = param.Boolean()
     hide_non_existing = param.Boolean(True)
     config_update = param.Boolean(False)
 
     def __init__(self, simulator_state_wrapper, **params):
+        
         parameter_mapping = {}
-        for attr in ['time', 'box_size', 'num_steps_lax', 'dt', 'freq', 'neighbor_radius', 'collision_alpha', 'collision_eps']:
-            parameter_mapping[attr] = ParameterMapping(attr,
-                                                       jax_to_param_fn=lambda x: x.item(),
-                                                       param_to_jax_fn=lambda x: jnp.array(x)
-                                                       )
-        parameter_mapping['use_fori_loop'] = ParameterMapping(
-            'use_fori_loop',
-            jax_to_param_fn=lambda x: bool(x.item()),
-            param_to_jax_fn=lambda x: jnp.array(int(x))
-        )
-
         super().__init__(simulator_state_wrapper, 
                          parameter_mapping=parameter_mapping, 
                          panel_parameters=['hide_non_existing', 'config_update'],
@@ -194,11 +185,6 @@ entity_parameter_mapping = {
         'mass_center',
         jax_to_param_fn=lambda x: x[0].item(),
         param_to_jax_fn=lambda x: jnp.array([x])
-    ),
-    'color': ParameterMapping(
-        'color',
-        jax_to_param_fn=rgb_array_to_string,
-        param_to_jax_fn=string_to_rgb_array
     ),
     'exists': ParameterMapping(
         'exists',
@@ -221,7 +207,7 @@ class ParamEntity(ParameterizedData):
     def __init__(self, entities, panel_parameters=[], **params):
         super().__init__(entities, 
                          parameter_mapping=entity_parameter_mapping,
-                         panel_parameters=panel_parameters + ['visible'],
+                         panel_parameters=panel_parameters + ['visible', 'color'],
                          **params)
         self.selection = [0]
 
@@ -249,7 +235,7 @@ class Agent(ParamEntity):
     def __init__(self, entities, subtype_labels, **params):
         super().__init__(entities, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
         self.subtype_labels = subtype_labels
-        for i in range(self.selected_entity_data.params.shape[0]):
+        for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)
             self.panel_parameters.append(behavior)
             self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
@@ -269,7 +255,7 @@ class Agent(ParamEntity):
     def update_from(self):
         super().update_from()
         self.allow_update_to = False
-        for i in range(self.selected_entity_data.params.shape[0]):
+        for i in range(self.selected_entity_data.behavior_params.shape[0]):
             setattr(self, behavior_param_name(i), Behaviors(self.selected_entity_data.behavior[i]).name)
             for idx, label in self.subtype_labels.items():
                 sensed = self.selected_entity_data.sensed[i][idx]
@@ -290,13 +276,8 @@ class Agent(ParamEntity):
             self.data[ag_idx].set_behavior(slot_idx, behavior, sensed_indexes)
 
 class Object(ParamEntity):
-    pass
-
-
-etype_to_class = {
-    EntityType.AGENT: PanelControllerAgent,
-    EntityType.OBJECT: PanelControllerObject,
-}
+    def __init__(self, entities, subtype_labels, **params):
+        super().__init__(entities, **params)
 
 
 class Selected(param.Parameterized):
@@ -310,22 +291,21 @@ class Selected(param.Parameterized):
 
 class PanelController(SimulatorController):
     """Controller for the panel interface"""
-
+    config_field = 'panel_controller'
     def __init__(self, **params):
+        
         super().__init__(**params)
-        self.selected = {
-            EntityType.AGENT: Selected(),
-            EntityType.OBJECT: Selected(),
-        }
-        self.selected_entities = {
-            EntityType.AGENT: Agent(self.agents, self.get_subtype_labels()),
-            EntityType.OBJECT: Object(self.objects),
-        }
-        self.param_simulator_state = ParamSimulatorState(self.simulator_state)
+
+        self.selected = {etype: Selected() for etype in self.scene_config.entity_types}
+        
+        self.selected_entities = {etype: config.param.cls(self.entity_lists[etype], self.subtype_labels) 
+                                  for etype, config in self.scene_config.entity_type_client_configs.items()}
+
+        self.param_simulator = ParamSimulator(self.simulator_parameters)
         
         for s_ent in self.selected_entities.values():
             s_ent.update_from_server = True
-        self.param_simulator_state.update_from_server = True
+        self.param_simulator.update_from_server = True
 
         self.update_selected()
         for selected in self.selected.values():
@@ -336,17 +316,14 @@ class PanelController(SimulatorController):
                 precedence=1,
             )
 
-    def create_entity_lists(self):
-        self.entity_lists = create_entity_lists(self.state, etype_to_class)
-
-    def create_simulator_state(self):
-        self.simulator_state = PanelSimulatorStateWrapper(self.state)
+    def create_simulator_parameters_wrapper(self):
+        self.simulator_parameters = PanelSimulatorParametersWrapper(self.simulator_parameters)
 
     def update_selected(self, *events):
         """Update the entity list"""
         state = self.state
         for etype, selected in self.selected.items():
-            selected.param.selection.objects = state.entity_idx(etype).tolist()
+            selected.param.selection.objects = state.entity_type_idx(etype).tolist()
 
     def pull_selected_entities(self, *events):
         """Pull the selected configurations"""

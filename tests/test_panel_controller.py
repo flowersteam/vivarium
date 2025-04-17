@@ -1,34 +1,34 @@
+import pytest
+
 import jax.numpy as jnp
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
-    init_state,
-    SelectiveSensorsEnv,
-)
-from vivarium.simulator.simulator import Simulator
-from vivarium.controllers.simulator_controller import EntityType
+
+from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.controllers.panel_controller import PanelController
 
-
-def test_panel_controller():
-    state = init_state()
-    env = SelectiveSensorsEnv(state=state)
-    simulator = Simulator(env_state=state, env=env)
+@pytest.mark.parametrize("scene_name", [
+    'braitenberg',
+    'particle_lenia',
+])
+def test_panel_controller(scene_name):
+    config = SceneConfiguration(scene_name)
+    simulator = config.create_simulator()
     controller = PanelController(client=simulator)
+    for entity_type in config.entity_types:
+        entity_idx = 1
+        idx = getattr(controller.state, entity_type).entity_idx[entity_idx]
+        pos = controller.state.entity_state.position_center[idx]
 
-    idx = 3
-    pos = controller.state.entity_state.position_center[idx]
+        controller.selected[entity_type].selection = [entity_idx]
 
-    controller.selected[EntityType.AGENT].selection = [idx]
+        entity = getattr(controller, entity_type)[entity_idx]
+        assert (jnp.equal(pos, entity.position_center).all())
 
-    ag =controller.agents[idx]
-    assert (jnp.equal(pos, ag.position_center).all())
+        entity.visible = False
 
-    ag.visible = False
+        controller.selected_entities[entity_type].y_position = 5.42
+        controller.apply_changes()
+        controller.update_state()
 
-    controller.selected_entities[EntityType.AGENT].y_position = 5.42
-    controller.apply_changes()
-    controller.update_state()
-
-    assert controller.state.entity_state.position_center[idx][0] == pos[0]
-    assert controller.state.entity_state.position_center[idx][1] == 5.42
-    assert controller.agents[idx].position_center[1] == 5.42
-
+        assert controller.state.entity_state.position_center[idx][0] == pos[0]
+        assert controller.state.entity_state.position_center[idx][1] == 5.42
+        assert getattr(controller, entity_type)[entity_idx].position_center[1] == 5.42
