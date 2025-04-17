@@ -3,20 +3,15 @@ import grpc
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
 from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
-from vivarium.simulator.grpc_server.converters import (
-    proto_to_state,
-    changes_to_proto
-)
+from vivarium.simulator.grpc_server.converters import proto_to_state, changes_to_proto
 
-from vivarium.simulator.simulator import nested_fields_to_access
-from vivarium.utils.converters import access_nested_fields
-from vivarium.simulator.simulator_states import SimState
-
+from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.utils.scene_configs import SimulatorConfiguration
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
 
 
-@access_nested_fields(nested_fields_to_access)
+# @access_nested_fields(nested_fields_to_access)
 class SimulatorGRPCClient(SimulatorClient):
     """A client for the simulator server that uses gRPC.
     """
@@ -25,9 +20,9 @@ class SimulatorGRPCClient(SimulatorClient):
         self.name = name
         channel = grpc.insecure_channel("localhost:50051")
         self.stub = simulator_pb2_grpc.SimulatorServerStub(channel)
+        config = SceneConfiguration(self.scene_name)
+        self.state_cls = config.create_state_cls()
         self.state = self.get_state()
-        self.scene_name = self.get_scene_name()
-        self.subtypes_labels = self.get_subtype_labels()
 
     def apply_changes(self, changes):
         proto_changes = changes_to_proto(changes)
@@ -47,7 +42,11 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         state = self.stub.GetState(Empty())
-        return proto_to_state(state, SimState)
+        return proto_to_state(state, self.state_cls)
+    
+    def get_simulator_parameters(self):
+        parameters = self.stub.GetSimulatorParameters(Empty())
+        return proto_to_state(parameters, SimulatorConfiguration)
 
     @property
     def scene_name(self):
@@ -66,9 +65,9 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         if len(changes) > 0:
-            self.state = proto_to_state(self.stub.SetChangesAndStep(changes_to_proto(changes)), SimState)
+            self.state = proto_to_state(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_cls)
         else:
-            self.state = proto_to_state(self.stub.Step(Empty()), SimState)
+            self.state = proto_to_state(self.stub.Step(Empty()), self.state_cls)
         return self.state
 
     def is_started(self):
