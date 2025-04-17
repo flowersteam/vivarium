@@ -10,7 +10,7 @@ environment:
 simulator:
   cls: vivarium.simulator.Simulator
   kwargs:
-    update_freq: -1
+    freq: -1
 
 subtypes:
   - particle
@@ -42,7 +42,8 @@ entities:
       subtype_to_n:
         - [0, 600]
       position: random
-      orientation: random
+      orientation:
+        _all_values_: 0.0
       mu_k:
         _all_values_: 4.0
       sigma_k:

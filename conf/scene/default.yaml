@@ -1,22 +1,28 @@
 # Default scene attributes
-seed: 0
-n_dims: 2
-box_size: 100
-diameter: 5.0
-friction: 0.1
-mass_center: 1.0
-mass_orientation: 0.125
-neighbor_radius: None  # Same as box_size by default
-collision_alpha: 0.5
-collision_eps: 0.1
-dt: 0.1
-wheel_diameter: 2.0
-speed_mul: 1.0
-max_speed: 10.0
-theta_mul: 1.0
-prox_dist_max: 40.0
-prox_cos_min: 0.0
-existing_agents: null
-existing_objects: null
+# seed: 0
+# n_dims: 2
+# box_size: 100
+# diameter: 5.0
+# friction: 0.1
+# mass_center: 1.0
+# mass_orientation: 0.125
+# neighbor_radius: None  # Same as box_size by default
+# collision_alpha: 0.5
+# collision_eps: 0.1
+# dt: 0.1
+# wheel_diameter: 2.0
+# speed_mul: 1.0
+# max_speed: 10.0
+# theta_mul: 1.0
+# prox_dist_max: 40.0
+# prox_cos_min: 0.0
+# existing_agents: null
+# existing_objects: null
 
-entities_data: None
+environment: None
+simulator: None
+subtypes: None
+# state_data: None
+entities: None
+state: None
+client: None

@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - scene@default: default
-  - scene: prey_predator
+  - scene: braitenberg
 
 log_level: INFO
 num_steps: 10

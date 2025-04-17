@@ -10,7 +10,7 @@ environment:
 simulator:
   cls: vivarium.simulator.Simulator
   kwargs:
-    update_freq: -1
+    freq: -1
 
 subtypes:
   - prey
