@@ -1,15 +1,16 @@
 import numpy as np
-from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.dataclass_wrapper import (
-    EntityList, EntityWrapper, SimulatorStateWrapper
-)
-from vivarium.simulator.simulator_states import EntityType
-from vivarium.utils.converters import string_to_rgb_array
+
 from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
+from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.controllers.dataclass_wrapper import (
+    EntityList, EntityWrapper, SimulatorParametersWrapper
+)
 
 
 class InternalData:
     pass
+
 
 def is_split_attribute(attr):
     return attr.startswith('left_') or attr.startswith('right_') or attr.startswith('x_') or attr.startswith('y_')
@@ -47,9 +48,8 @@ class ControllerEntity(EntityWrapper):
             self._setitem(suffix, val, idx)
             return
         else:
-            if item == 'color' and isinstance(val, str):
-                val = string_to_rgb_array(val)
             super().__setattr__(item, val)
+
 
 class ControllerAgent(ControllerEntity):
 
@@ -63,49 +63,60 @@ class ControllerAgent(ControllerEntity):
         cur_sensed = np.array(self.sensed)
         cur_sensed[slot_idx] = [int(i in sensed) for i in range(len(cur_sensed[slot_idx]))]
         self.sensed = cur_sensed
-        cur_params = np.array(self.params)
+        cur_params = np.array(self.behavior_params)
         cur_params[slot_idx] = behavior_to_params(behavior)
-        self.params = cur_params
+        self.behavior_params = cur_params
+
 
 class ControllerObject(ControllerEntity):
     pass
     
 
-def create_entity_lists(state, etype_to_class):
+def create_entity_lists(state, etype_to_class, etype_to_idx, etype_to_kwargs):
+
     entity_lists = {
         etype: EntityList(
-            state=state, entity_type=etype,
+            state=state, entity_type=etype, entity_type_idx=etype_to_idx[etype],
             entity_wrapper_list=[
-                eclass(state, idx, etype) 
-                for idx, type in enumerate(state.entity_state.entity_type) if type == etype.value]
+                eclass(state, idx, etype, 
+                       **{attr: val[int(state.entity_state.entity_type_idx[idx])]
+                          for attr, val in etype_to_kwargs[etype].items()}
+                       ) 
+                for idx, type in enumerate(state.entity_state.entity_type)
+                if type == etype_to_idx[etype]]
         )
         for etype, eclass in etype_to_class.items()
     }
     return entity_lists
 
+def entity_type_property(entity_type):
+    @property
+    def prop(self):
+        return self.entity_lists[entity_type]
+    return prop
 
 class SimulatorController:
+    config_field = 'simulator_controller'
+
     def __init__(self, client=None):
         self.client = client or SimulatorGRPCClient()
         self.state = self.client.state
+        self.simulator_parameters = self.client.get_simulator_parameters()
+        self.scene_config = SceneConfiguration(self.client.scene_name)
+        self.subtype_labels = self.scene_config.subtype_labels
         self.create_entity_lists()
-        self.create_simulator_state()
+        for etype in self.scene_config.entity_types:
+            setattr(self, etype, self.entity_lists[etype])
+        self.create_simulator_parameters_wrapper()
         
     def create_entity_lists(self):
-        self.entity_lists = create_entity_lists(self.state, 
-                                                {EntityType.AGENT: ControllerAgent,
-                                                 EntityType.OBJECT: ControllerObject})
+        etype_to_class = {etype: getattr(config, self.config_field).cls for etype, config in self.scene_config.entity_type_client_configs.items()}
+        etype_to_idx = {etype: config.idx for etype, config in self.scene_config.entity_type_configs.items()}
+        etype_to_kwargs = {etype: getattr(config, self.config_field).kwargs for etype, config in self.scene_config.entity_type_client_configs.items()}
+        self.entity_lists = create_entity_lists(self.state, etype_to_class, etype_to_idx, etype_to_kwargs)
 
-    def create_simulator_state(self):
-        self.simulator_state = SimulatorStateWrapper(self.state)
-
-    @property
-    def agents(self):
-        return self.entity_lists[EntityType.AGENT]
-    
-    @property
-    def objects(self):
-        return self.entity_lists[EntityType.OBJECT]
+    def create_simulator_parameters_wrapper(self):
+        self.simulator_parameters = SimulatorParametersWrapper(self.simulator_parameters)
 
     def start(self):
         """Start the simulator."""
@@ -130,29 +141,24 @@ class SimulatorController:
         for _, ent_list in self.entity_lists.items():
             ent_list.set_state(state)
 
-    def update_simulator_state(self, state=None):
-        """Update the simulator state."""
-        state = state or self.state
-        self.simulator_state.set_state(self.state)
-
     def update_state(self):
-        """Update the state of the simulator."""
+        """Update the state from server to client."""
         self.state = self.client.get_state()
         self.update_entity_lists()
-        self.update_simulator_state()
         return self.state
 
     def fetch_changes(self):
         changes = []
         for etype, elist in self.entity_lists.items():
-            changes.extend(elist.fetch_changes())
-        changes.extend([self.simulator_state.fetch_changes()])
+            change = elist.fetch_changes()
+            change = [{'state': c} for c in change]
+            changes.extend(change)
+        change = self.simulator_parameters.fetch_changes()
+        if change:
+            changes.extend([change])
         return changes
 
     def apply_changes(self):
         changes = self.fetch_changes()
         if len(changes) > 0:
             self.client.apply_changes(changes)
-
-    def get_subtype_labels(self):
-        return self.client.get_subtype_labels()
