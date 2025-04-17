@@ -1,8 +1,8 @@
+import logging
+import panel as pn
 from contextlib import contextmanager
 
-import logging
 import numpy as np
-import panel as pn
 
 from bokeh.plotting import figure, curdoc
 from bokeh.models import (
@@ -17,12 +17,10 @@ from param import Parameterized
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.panel_controller import PanelController
-from vivarium.simulator.simulator_states import EntityType
+from vivarium.utils.scene_configs import SceneConfiguration
 
 
 lg = logging.getLogger(__name__)
-pn.extension()
-pn.config.theme = 'dark'
 
 
 def normal(array):
@@ -69,9 +67,9 @@ class EntityManager:
         :param old: (unused)
         :param new: The event containing the new positions of the entities
         """
-        for i, c in enumerate(self.config):
-            c.x_position = new["x"][i]
-            c.y_position = new["y"][i]
+        for i, e in enumerate(self.entities):
+            e.x_position = new["x"][i]
+            e.y_position = new["y"][i]
 
     @contextmanager
     def no_drag_cb(self):
@@ -107,7 +105,7 @@ class EntityManager:
         return {
             attr: CDSView(
                 filter=BooleanFilter(
-                    [getattr(pc, attr) and pc.visible for pc in self.entities]
+                    [getattr(e, attr) and e.visible for e in self.entities]
                 )
             )
             for attr in self.selected_param_entity.panel_visibility_parameters
@@ -182,12 +180,12 @@ class AgentManager(EntityManager):
         x, y = pos[:, 0], pos[:, 1]
         thetas = state.position_orientation(self.etype)
         radii = state.diameter(self.etype) / 2.0
-        colors = state.agent_state.color
-        motors = state.agent_state.motor
-        proxs = state.agent_state.prox
-        max_prox = state.agent_state.proxs_dist_max
-        angle_min = np.arccos(state.agent_state.proxs_cos_min)
-        wheel_diameter = state.agent_state.wheel_diameter
+        colors = [e.color for e in self.entities]
+        motors = getattr(state, self.etype).motor
+        proxs = getattr(state, self.etype).prox
+        max_prox = getattr(state, self.etype).proxs_dist_max
+        angle_min = np.arccos(getattr(state, self.etype).proxs_cos_min)
+        wheel_diameter = getattr(state, self.etype).wheel_diameter
 
         # line direction
         angles = np.array(thetas)
@@ -350,7 +348,7 @@ class ObjectManager(EntityManager):
         x, y = pos[:, 0], pos[:, 1]
         thetas = state.position_orientation(self.etype)
         d = state.diameter(self.etype)
-        colors = state.object_state.color
+        colors = [e.color for e in self.entities]
 
         data = dict(x=x, y=y, width=d, height=d, angle=thetas, fill_color=colors)
         return data
@@ -383,11 +381,13 @@ class WindowManager(Parameterized):
         name="Timestep (ms)", value=40, start=1, end=1000
     )
 
-    def __init__(self, client=None, notebook_mode=False, **kwargs):
+    def __init__(self, client=None, notebook_mode=False, testing_mode=False, **kwargs):
         super().__init__(**kwargs)
+        pn.config.theme = 'dark'
         client = client or SimulatorGRPCClient()
+        self.scene_config = SceneConfiguration(client.scene_name)
         self.controller = PanelController(client=client)
-        self.entity_types = [k.name for k, v in self.controller.selected_entities.items()]
+        self.entity_types = list(self.controller.scene_config.entity_types)
         self.start_toggle = pn.widgets.Toggle(
             **(
                 {"name": "Stop", "value": True}
@@ -403,15 +403,13 @@ class WindowManager(Parameterized):
             value=self.entity_types,
         )
         self.notebook_mode = notebook_mode
-        self.entity_manager_classes = {
-            EntityType.AGENT: AgentManager,
-            EntityType.OBJECT: ObjectManager,
-        }
+        
+        self.entity_manager_classes = {etype: config.panel_interface.cls for etype, config in self.controller.scene_config.entity_type_client_configs.items()}
         self.entity_managers = {
             etype: manager_class(
                 entities = self.controller.entity_lists[etype],
                 selected_param_entity=self.controller.selected_entities[etype],
-                param_simulator_state=self.controller.param_simulator_state,
+                param_simulator_state=self.controller.param_simulator,
                 selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
@@ -421,7 +419,8 @@ class WindowManager(Parameterized):
 
         self.plot = self.create_plot()
         self.app = self.create_app()
-        self.set_callbacks()
+        if not testing_mode:
+            self.set_callbacks()
         self.update_plot_cb()
 
     def start_toggle_cb(self, event):
@@ -453,7 +452,7 @@ class WindowManager(Parameterized):
             em.update_selected_simulator()
         self.controller.apply_changes()
         state = self.controller.update_state()
-        if self.controller.param_simulator_state.config_update:
+        if self.controller.param_simulator.config_update:
             self.controller.pull_selected_entities()
         for em in self.entity_managers.values():
             with em.no_drag_cb():
@@ -483,10 +482,10 @@ class WindowManager(Parameterized):
         p.grid.visible = False
         hover = HoverTool(tooltips=None)
         p.add_tools(hover)
-        p.x_range = Range1d(0, self.controller.param_simulator_state.box_size)
-        p.y_range = Range1d(0, self.controller.param_simulator_state.box_size)
+        p.x_range = Range1d(0, self.controller.param_simulator.box_size)
+        p.y_range = Range1d(0, self.controller.param_simulator.box_size)
         draw_tool = PointDrawTool(
-            renderers=[self.entity_managers[etype].plot(p) for etype in EntityType],
+            renderers=[self.entity_managers[etype].plot(p) for etype in self.scene_config.entity_types],
             add=False,
         )
         p.add_tools(draw_tool)
@@ -501,7 +500,7 @@ class WindowManager(Parameterized):
             *[
                 pn.Column(
                     pn.pane.Markdown("### SIMULATOR", align="center"),
-                    pn.panel(self.controller.param_simulator_state, name="Configuration"),
+                    pn.panel(self.controller.param_simulator, name="Configuration"),
                     visible=True,
                     sizing_mode="scale_height",
                     scroll=True,
@@ -510,7 +509,7 @@ class WindowManager(Parameterized):
             ]
             + [
                 pn.Column(
-                    pn.pane.Markdown(f"### {etype.name}", align="center"),
+                    pn.pane.Markdown(f"### {etype}", align="center"),
                     self.controller.selected[etype],
                     pn.panel(
                         self.controller.selected_entities[etype],
@@ -519,14 +518,13 @@ class WindowManager(Parameterized):
                     visible=True,
                     sizing_mode="scale_height",
                     scroll=True,
-                    name=etype.name,
+                    name=etype,
                 )
                 for etype in self.entity_managers.keys()
             ]
         )
 
         app = pn.Row(
-            # TODO : if notebook mode : remove start / stop server button
             pn.Column(
                 (
                     pn.Row(
