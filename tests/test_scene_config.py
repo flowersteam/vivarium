@@ -27,4 +27,4 @@ def test_simulator(scene_name):
     config = SceneConfiguration(scene_name)
     simulator = config.create_simulator()
     assert simulator.env.box_size == config.config.environment.kwargs.box_size
-    assert simulator.freq == config.config.simulator.kwargs.update_freq
+    assert simulator.freq == config.config.simulator.kwargs.freq
