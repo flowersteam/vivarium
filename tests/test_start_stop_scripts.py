@@ -9,6 +9,7 @@ from vivarium.utils.handle_server_interface import (
 
 WAIT_TIME = 0
 
+#TODO: A breakpoint in start_server_and_interface() is never reached, weird
 
 @pytest.fixture
 def start_and_stop_server():
@@ -24,7 +25,7 @@ def start_and_stop_server():
 
 
 def test_start_stop(start_and_stop_server):
-    scene_name = "quickstart"
+    scene_name = "braitenberg"
     start_and_stop_server(scene_name, False)
     assert True
 
