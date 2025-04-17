@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 from vivarium.utils.converters import access_nested_fields
 
-from vivarium.controllers.dataclass_wrapper import update_state_from_change_list
+from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list
 from vivarium.utils.scene_configs import SimulatorConfiguration, SceneConfiguration
 
 
@@ -58,6 +58,10 @@ class Simulator:
         del self.env
         self.env = scene_config.create_environment()
         self.state = self.env.state
+
+    def init_state(self):
+        if self.state.entity_state.momentum is None:
+            self.state = self.env.init_fn(self.state)
 
     def _step(self, state):
         """Do num_updates jitted steps in the simulation. This is done by converting state into environment state, and convert it back to simulation state during return
@@ -221,7 +225,7 @@ class Simulator:
             return data
 
     def apply_changes(self, changes):
-        self = update_state_from_change_list(self, changes)
+        self = update_dataclass_from_change_list(self, changes)
 
     def start(self):
         """Start the simulation"""
