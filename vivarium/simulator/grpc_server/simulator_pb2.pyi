@@ -7,7 +7,7 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class Dataclass(_message.Message):
-    __slots__ = ("array_data", "nested_fields")
+    __slots__ = ("value", "nested_fields")
     class NestedFieldsEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -15,11 +15,11 @@ class Dataclass(_message.Message):
         key: str
         value: Dataclass
         def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[Dataclass, _Mapping]] = ...) -> None: ...
-    ARRAY_DATA_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
     NESTED_FIELDS_FIELD_NUMBER: _ClassVar[int]
-    array_data: NDArray
+    value: Value
     nested_fields: _containers.MessageMap[str, Dataclass]
-    def __init__(self, array_data: _Optional[_Union[NDArray, _Mapping]] = ..., nested_fields: _Optional[_Mapping[str, Dataclass]] = ...) -> None: ...
+    def __init__(self, value: _Optional[_Union[Value, _Mapping]] = ..., nested_fields: _Optional[_Mapping[str, Dataclass]] = ...) -> None: ...
 
 class Slice(_message.Message):
     __slots__ = ("start", "stop", "step")
@@ -115,19 +115,6 @@ class IsStartedState(_message.Message):
     IS_STARTED_FIELD_NUMBER: _ClassVar[int]
     is_started: bool
     def __init__(self, is_started: bool = ...) -> None: ...
-
-class SubtypesLabels(_message.Message):
-    __slots__ = ("data",)
-    class DataEntry(_message.Message):
-        __slots__ = ("key", "value")
-        KEY_FIELD_NUMBER: _ClassVar[int]
-        VALUE_FIELD_NUMBER: _ClassVar[int]
-        key: int
-        value: str
-        def __init__(self, key: _Optional[int] = ..., value: _Optional[str] = ...) -> None: ...
-    DATA_FIELD_NUMBER: _ClassVar[int]
-    data: _containers.ScalarMap[int, str]
-    def __init__(self, data: _Optional[_Mapping[int, str]] = ...) -> None: ...
 
 class Scene(_message.Message):
     __slots__ = ("scene_name",)

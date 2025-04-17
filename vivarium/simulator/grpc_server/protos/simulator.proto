@@ -16,8 +16,9 @@ service SimulatorServer {
   
   // Get state of the simulation
   rpc GetState(google.protobuf.Empty) returns (Dataclass) {}
+  rpc GetSimulatorParameters(google.protobuf.Empty) returns (Dataclass) {}
 
-  // set the state of the simulation
+  // send changes made on the client side to the simulator server
   rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
 
   // send the labels of subtypes and scene name
@@ -30,7 +31,7 @@ service SimulatorServer {
 }
 
 message Dataclass {
-  NDArray array_data = 1;  // For numpy arrays
+  Value value = 1;  // For numpy arrays
   map<string, Dataclass> nested_fields = 2;  // For nested dataclasses
 }
 
