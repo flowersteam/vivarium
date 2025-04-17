@@ -1,31 +1,28 @@
 import time
 import math
+import logging
+import warnings
 import threading
 import functools
-import warnings
-
-warnings.filterwarnings("ignore", category=FutureWarning, module="jax")
 
 import numpy as np
-import logging
 
-from vivarium.environments.braitenberg.behaviors import Behaviors
 from vivarium.controllers.simulator_controller import (
-    SimulatorController, ControllerEntity, create_entity_lists
+    SimulatorController, ControllerEntity
 )
-from vivarium.simulator.simulator_states import StateType, EntityType
+from vivarium.environments.braitenberg.behaviors import Behaviors
 from vivarium.controllers.utils import Logger, RoutineHandler, BehaviorHandler
 
 
 lg = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=FutureWarning, module="jax")
+
 
 if logging.root.handlers:
     lg.setLevel(logging.root.level)
 else:
     lg.setLevel(logging.WARNING)
 
-class InternalData:
-    pass
 
 class NotebookControllerEntity(ControllerEntity):
     """Entity class that represents an entity in the simulation"""
@@ -54,7 +51,7 @@ class NotebookControllerEntity(ControllerEntity):
         """Detach all routines from the entity"""
         self.routine_handler.detach_all_routines()
 
-    def routine_step(self, time, catch_errors):
+    def step(self, time, catch_errors):
         """Execute the entity's routines with their corresponding execution intervals"""
         # Give self object as parameter to the routine function so it executes functions on the entity
         self.routine_handler.routine_step(self, time, catch_errors)
@@ -90,8 +87,6 @@ class NotebookControllerEntity(ControllerEntity):
 
 class Agent(NotebookControllerEntity):
     """Agent class that represents an agent in the simulation
-
-    :param Entity: Entity
     """
 
     def __init__(self, *args, **kwargs):
@@ -120,7 +115,7 @@ class Agent(NotebookControllerEntity):
         """
         left, right = self.prox
         if sensed_entities is not None:
-            # transform the strings of sensed entities into ints (this fn can surely be optimized)
+            # TODO: transform the strings of sensed entities into ints (this fn can surely be optimized)
             assert all(
                 ent_subtype in self.valid_subtypes for ent_subtype in sensed_entities
             ), f"Please specify valid sensed entities among {self.valid_subtypes}"
@@ -225,6 +220,10 @@ class Agent(NotebookControllerEntity):
         """
         self.behavior_handler.change_behavior_weight(name, new_weight)
 
+    def step(self, time, catch_errors):
+        super().step(time, catch_errors)
+        self.behave(time)
+
     def behave(self, time):
         """Make the agent behave according to its active behaviors
 
@@ -321,22 +320,14 @@ class Agent(NotebookControllerEntity):
 
 class Object(NotebookControllerEntity):
     """Object class that represents an object in the simulation
-
-    :param Entity: Entity
     """
     pass
 
 
-# map the entity type to their corresponding class
-etype_to_class = {EntityType.AGENT: Agent, EntityType.OBJECT: Object}
-
-
 class NotebookController(SimulatorController):
-    """NotebookController class that enables the user to control the simulation from a notebook
-
-    :param SimulatorController: SimulatorController
+    """NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook
     """
-
+    config_field = 'notebook_controller'
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.time = 0
@@ -344,12 +335,10 @@ class NotebookController(SimulatorController):
         self._is_running = False
 
         # # set frequency of the simulator to max speed
-        self.simulator_state.freq = -1
-        self.apply_changes()
+        self.client.freq = -1
 
         # handle the different subtypes labels objects
-        self.subtypes_labels = self.get_subtype_labels()
-        self._subtype_idx_to_label = self.subtypes_labels
+        self._subtype_idx_to_label = self.subtype_labels
         self._subtype_label_to_idx = {
             v: k for k, v in self._subtype_idx_to_label.items()
         }
@@ -357,9 +346,6 @@ class NotebookController(SimulatorController):
 
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
-
-    def create_entity_lists(self):
-        self.entity_lists = create_entity_lists(self.state, etype_to_class)
 
     def is_running(self):
         """Check if the simulator is running"""
@@ -502,8 +488,6 @@ class NotebookController(SimulatorController):
         # Add a local time for the run function independant from the controller time
         run_time = 0
         while run_time < num_steps and self._is_running:
-            # with self.batch_set_state():
-
             self.execute_routines_and_behaviors(catch_errors=catch_errors)
 
             self.step()
@@ -522,9 +506,7 @@ class NotebookController(SimulatorController):
         for etype, elist in self.entity_lists.items():
             # TODO : Add a check to ensure that the entity exists
             for entity in elist:
-                entity.routine_step(self.time, catch_errors=catch_errors)
-                if entity._entity_type == EntityType.AGENT:
-                    entity.behave(self.time)
+                entity.step(self.time, catch_errors=catch_errors)
 
     def stop(self):
         """Pause the simulation"""
@@ -581,6 +563,7 @@ class NotebookController(SimulatorController):
         entity_type_idx = self._subtype_label_to_idx[label]
         return entity_type_idx
 
+    # TODO: this method to be revised
     def print_fps(self, record_time=2, server=False):
         """Compute the fps of the simulation for a given record time without blocking
 
@@ -605,21 +588,13 @@ class NotebookController(SimulatorController):
         """Print the controller's routines"""
         self.routine_handler.print_routines()
 
-    @property
-    def server_time(self):
-        """Return the current time of the simulation
+    # @property
+    # def server_time(self):
+    #     """Return the current time of the simulation
 
-        :return: time
-        """
-        return self.configs[StateType.SIMULATOR][0].time
-
-    @property
-    def box_size(self):
-        """Return the box size of the simulation
-
-        :return: box size
-        """
-        return self.configs[StateType.SIMULATOR][0].box_size
+    #     :return: time
+    #     """
+    #     return self.configs[StateType.SIMULATOR][0].time
 
     @property
     def existing_agents(self):

@@ -1,30 +1,27 @@
 import jax.numpy as jnp
+
 from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import (
-    init_state,
-    SelectiveSensorsEnv,
+    AgentState
 )
-from vivarium.simulator.simulator import Simulator
-
 from vivarium.controllers.notebook_controller import NotebookController
+from vivarium.utils.scene_configs import SceneConfiguration
 
-from vivarium.utils.scene_configs import load_scene_config
-
-NUM_STEPS = 10
+NUM_STEPS = 4
 
 
 def test_notebook_controller():
     """Test default simulator run"""
-    state = init_state()
-    env = SelectiveSensorsEnv(state=state)
-    simulator = Simulator(env_state=state, env=env)
+
+    simulator = SceneConfiguration('braitenberg').create_simulator()
+    agent_field = simulator.state.field_name(AgentState)
     controller = NotebookController(simulator)
     controller.step()
 
-    assert controller.state.simulator_state.freq == -1
+    assert controller.client.freq == -1
 
     def beh(agent):
         left, right = agent.sensors()
-        return right, left
+        return 1 - right, 1 - left
 
     idx = 0
     pos = controller.state.entity_state.position_center[idx]
@@ -32,40 +29,20 @@ def test_notebook_controller():
     ag =controller.agents[idx]
 
     ag.attach_behavior(beh)
+    
     controller.execute_routines_and_behaviors()
 
     assert (jnp.equal(pos, ag.position_center).all())
 
     for _ in range(NUM_STEPS):
         pos = controller.state.entity_state.position_center[idx]
-        controller.step()
+        controller.run(threaded=False, num_steps=1)
         assert (not jnp.equal(pos, ag.position_center).all())
 
-    ag.behavior = [3, 1]
+    ag.behavior = [3, 1, 2, 0]
     controller.step()
-    assert jnp.equal(jnp.array([3, 1]), controller.state.agent_state.behavior[idx]).all()
+    assert jnp.equal(jnp.array([3, 1, 2, 0]), getattr(controller.state, agent_field).behavior[idx]).all()
 
-
-def test_scene():
-    config = load_scene_config("session_6")
-    state = init_state(**config)
-    env = SelectiveSensorsEnv(state=state, to_jit=False)
-    simulator = Simulator(env_state=state, env=env)
-    controller = NotebookController(simulator)
-    
-    # controller.step()
-
-    idx = 0
-    ag = controller.agents[idx]
-
-    print('change behavior')
-    ag.behavior = [2]
-
-    controller.step()
-
-if __name__ == "__main__":
-    # test_notebook_controller()
-    test_scene()
 
 # import time
 
