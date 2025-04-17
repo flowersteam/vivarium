@@ -13,7 +13,7 @@ from typing import Type
 
 import jax.numpy as jnp
 
-from vivarium.environments.state import create_state_cls
+from vivarium.environments.state import create_state_cls, to_rigid_body_state
 from vivarium.utils.converters import import_class
 
 
@@ -171,7 +171,7 @@ class SceneConfiguration:
 
         return State
     
-    def create_state(self):
+    def create_state(self, rigid_body=False):
 
         entity_idx_offset = 0
         etype_instance = {}
@@ -185,14 +185,17 @@ class SceneConfiguration:
         state = state_cls(**{attr: jnp.array(val) for attr, val in self.config.state.kwargs.items()},
                         entity_state = self.entity_state_cls.create(self.entity_types, entity_types_kwargs),  #, etype_order), 
                         **etype_instance)
-        
+        if rigid_body:
+            state = state.set(entity_state = to_rigid_body_state(state.entity_state))
         return state
     
-    def create_environment(self):
+    def create_environment(self, state=None):
+        state = state or self.state
         env_cls = import_class(self.config.environment.cls)
-        return env_cls(state=self.state, **self.config.environment.kwargs)
+        return env_cls(state=state, **self.config.environment.kwargs)
     
-    def create_simulator(self):
-        env = self.create_environment()
+    def create_simulator(self, state=None, env=None):
+        state = state or self.state
+        env = env or self.create_environment(state=state)
         simulator_cls = import_class(self.config.simulator.cls)
         return simulator_cls(env=env, scene_name=self.scene_name, **self.config.simulator.kwargs)
