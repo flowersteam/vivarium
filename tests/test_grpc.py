@@ -51,6 +51,13 @@ def test_changes(state):
     assert jnp.equal(jnp.array(value), state.entity_state.position.__getitem__(idx)).all()
     assert other_dim_value == state.entity_state.position[idx[0]][1]
 
+    dw.entity_state.position = [1., 2.]
+    changes = dw.fetch_changes()
+    p_changes = changes_to_proto(changes)
+    changes_2 = proto_to_changes(p_changes)
+    state = dw.update_dataclass(state, changes_2)
+    assert jnp.equal(jnp.array([1., 2.]), state.entity_state.position).all()
+
 
 def test_simulator_grpc(simulator):
     dw = DataclassWrapper()

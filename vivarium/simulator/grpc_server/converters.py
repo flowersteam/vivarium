@@ -65,7 +65,11 @@ def changes_to_proto(changes):
                 )
             elif isinstance(change['__value'], str):
                 proto_change.value.CopyFrom(
-                    simulator_pb2.Value(string_value=change['__value'])
+                    simulator_pb2.Value(str_value=change['__value'])
+                )
+            elif isinstance(change['__value'], list):
+                proto_change.value.CopyFrom(
+                    simulator_pb2.Value(list_value=simulator_pb2.List(list=change['__value']))
                 )
             else:
                 raise ValueError(f"Unknown value type {type(change['__value'])}")
@@ -137,8 +141,10 @@ def proto_to_changes(proto_changes):
             value = proto_changes.value.int_value
         elif proto_changes.value.HasField('bool_value'):
             value = proto_changes.value.bool_value
-        elif proto_changes.value.HasField('string_value'):
-            value = proto_changes.value.string_value
+        elif proto_changes.value.HasField('str_value'):
+            value = proto_changes.value.str_value
+        elif proto_changes.value.HasField('list_value'):
+            value = proto_changes.value.list_value.list
         change = {
             '__idx': proto_to_indexes(proto_changes.idx),
             '__value': value
@@ -186,6 +192,8 @@ def proto_to_state(state, dataclass_type):
         return state.value.bool_value
     elif state.value.HasField('str_value'):
         return state.value.str_value
+    elif state.value.HasField('list_value'):
+        return state.value.list_value
     elif state.value.HasField('ndarray'):
         return proto_to_ndarray(state.value.ndarray)
     elif 'center' in state.nested_fields and 'orientation' in state.nested_fields:
@@ -212,6 +220,10 @@ def state_to_proto(state):
         message.value.CopyFrom(
                     simulator_pb2.Value(bool_value=state)
                 )
+    elif isinstance(state, list):
+        message.value.CopyFrom(
+                    simulator_pb2.Value(list_value=state)
+                )
     elif isinstance(state, int):
         message.value.CopyFrom(
                     simulator_pb2.Value(int_value=state)
@@ -222,7 +234,7 @@ def state_to_proto(state):
                 )
     elif isinstance(state, str):
         message.value.CopyFrom(
-                    simulator_pb2.Value(string_value=state)
+                    simulator_pb2.Value(str_value=state)
                 )
     else:
         for field in fields(state):

@@ -48,18 +48,26 @@ class Indexes(_message.Message):
     def __init__(self, idx: _Optional[_Iterable[_Union[Idx, _Mapping]]] = ...) -> None: ...
 
 class Value(_message.Message):
-    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value")
+    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value", "list_value")
     NDARRAY_FIELD_NUMBER: _ClassVar[int]
     BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
     INT_VALUE_FIELD_NUMBER: _ClassVar[int]
     FLOAT_VALUE_FIELD_NUMBER: _ClassVar[int]
     STR_VALUE_FIELD_NUMBER: _ClassVar[int]
+    LIST_VALUE_FIELD_NUMBER: _ClassVar[int]
     ndarray: NDArray
     bool_value: bool
     int_value: int
     float_value: float
     str_value: str
-    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ...) -> None: ...
+    list_value: List
+    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ..., list_value: _Optional[_Union[List, _Mapping]] = ...) -> None: ...
+
+class List(_message.Message):
+    __slots__ = ("list",)
+    LIST_FIELD_NUMBER: _ClassVar[int]
+    list: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, list: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class Change(_message.Message):
     __slots__ = ("idx", "value")

@@ -60,7 +60,12 @@ message Value {
     int32 int_value = 4;
     float float_value = 5;
     string str_value = 6;
+    List list_value = 7;
   }
+}
+
+message List {
+  repeated float list = 1;
 }
 
 message Change {

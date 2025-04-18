@@ -15,7 +15,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fsimulator.proto\x12\tsimulator\x1a\x1bgoogle/protobuf/empty.proto\"\xb6\x01\n\tDataclass\x12\x1f\n\x05value\x18\x01 \x01(\x0b\x32\x10.simulator.Value\x12=\n\rnested_fields\x18\x02 \x03(\x0b\x32&.simulator.Dataclass.NestedFieldsEntry\x1aI\n\x11NestedFieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.simulator.Dataclass:\x02\x38\x01\"]\n\x05Slice\x12\x12\n\x05start\x18\x01 \x01(\x05H\x00\x88\x01\x01\x12\x11\n\x04stop\x18\x02 \x01(\x05H\x01\x88\x01\x01\x12\x11\n\x04step\x18\x03 \x01(\x05H\x02\x88\x01\x01\x42\x08\n\x06_startB\x07\n\x05_stopB\x07\n\x05_step\"Y\n\x03Idx\x12\x11\n\x07int_idx\x18\x01 \x01(\x05H\x00\x12%\n\tslice_idx\x18\x02 \x01(\x0b\x32\x10.simulator.SliceH\x00\x12\x11\n\x07is_none\x18\x03 \x01(\x08H\x00\x42\x05\n\x03idx\"&\n\x07Indexes\x12\x1b\n\x03idx\x18\x01 \x03(\x0b\x32\x0e.simulator.Idx\"\x8e\x01\n\x05Value\x12%\n\x07ndarray\x18\x01 \x01(\x0b\x32\x12.simulator.NDArrayH\x00\x12\x14\n\nbool_value\x18\x03 \x01(\x08H\x00\x12\x13\n\tint_value\x18\x04 \x01(\x05H\x00\x12\x15\n\x0b\x66loat_value\x18\x05 \x01(\x02H\x00\x12\x13\n\tstr_value\x18\x06 \x01(\tH\x00\x42\x07\n\x05value\"J\n\x06\x43hange\x12\x1f\n\x03idx\x18\x01 \x01(\x0b\x32\x12.simulator.Indexes\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.simulator.Value\"-\n\x07\x43hanges\x12\"\n\x07\x63hanges\x18\x01 \x03(\x0b\x32\x11.simulator.Change\"\xaa\x01\n\x0bStateChange\x12#\n\x07\x63hanges\x18\x01 \x01(\x0b\x32\x12.simulator.Changes\x12\x30\n\x05\x63hild\x18\x02 \x03(\x0b\x32!.simulator.StateChange.ChildEntry\x1a\x44\n\nChildEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.simulator.StateChange:\x02\x38\x01\"@\n\x0fStateChangeList\x12-\n\rstate_changes\x18\x01 \x03(\x0b\x32\x16.simulator.StateChange\"\x1a\n\x07NDArray\x12\x0f\n\x07ndarray\x18\x01 \x01(\x0c\"X\n\tRigidBody\x12\"\n\x06\x63\x65nter\x18\x01 \x01(\x0b\x32\x12.simulator.NDArray\x12\'\n\x0borientation\x18\x02 \x01(\x0b\x32\x12.simulator.NDArray\"$\n\x0eIsStartedState\x12\x12\n\nis_started\x18\x01 \x01(\x08\"\x1b\n\x05Scene\x12\x12\n\nscene_name\x18\x01 \x01(\t2\xc9\x04\n\x0fSimulatorServer\x12\x36\n\x04Step\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12G\n\x11SetChangesAndStep\x12\x1a.simulator.StateChangeList\x1a\x14.simulator.Dataclass\"\x00\x12:\n\x08GetState\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12H\n\x16GetSimulatorParameters\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12\x42\n\nSetChanges\x12\x1a.simulator.StateChangeList\x1a\x16.google.protobuf.Empty\"\x00\x12\x34\n\x0cGetSceneName\x12\x10.simulator.Scene\x1a\x10.simulator.Scene\"\x00\x12@\n\tIsStarted\x12\x16.google.protobuf.Empty\x1a\x19.simulator.IsStartedState\"\x00\x12\x39\n\x05Start\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x12\x38\n\x04Stop\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x42\x34\n\x1aio.grpc.examples.simulatorB\x0eSimulatorProtoP\x01\xa2\x02\x03SIMb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fsimulator.proto\x12\tsimulator\x1a\x1bgoogle/protobuf/empty.proto\"\xb6\x01\n\tDataclass\x12\x1f\n\x05value\x18\x01 \x01(\x0b\x32\x10.simulator.Value\x12=\n\rnested_fields\x18\x02 \x03(\x0b\x32&.simulator.Dataclass.NestedFieldsEntry\x1aI\n\x11NestedFieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12#\n\x05value\x18\x02 \x01(\x0b\x32\x14.simulator.Dataclass:\x02\x38\x01\"]\n\x05Slice\x12\x12\n\x05start\x18\x01 \x01(\x05H\x00\x88\x01\x01\x12\x11\n\x04stop\x18\x02 \x01(\x05H\x01\x88\x01\x01\x12\x11\n\x04step\x18\x03 \x01(\x05H\x02\x88\x01\x01\x42\x08\n\x06_startB\x07\n\x05_stopB\x07\n\x05_step\"Y\n\x03Idx\x12\x11\n\x07int_idx\x18\x01 \x01(\x05H\x00\x12%\n\tslice_idx\x18\x02 \x01(\x0b\x32\x10.simulator.SliceH\x00\x12\x11\n\x07is_none\x18\x03 \x01(\x08H\x00\x42\x05\n\x03idx\"&\n\x07Indexes\x12\x1b\n\x03idx\x18\x01 \x03(\x0b\x32\x0e.simulator.Idx\"\xb5\x01\n\x05Value\x12%\n\x07ndarray\x18\x01 \x01(\x0b\x32\x12.simulator.NDArrayH\x00\x12\x14\n\nbool_value\x18\x03 \x01(\x08H\x00\x12\x13\n\tint_value\x18\x04 \x01(\x05H\x00\x12\x15\n\x0b\x66loat_value\x18\x05 \x01(\x02H\x00\x12\x13\n\tstr_value\x18\x06 \x01(\tH\x00\x12%\n\nlist_value\x18\x07 \x01(\x0b\x32\x0f.simulator.ListH\x00\x42\x07\n\x05value\"\x14\n\x04List\x12\x0c\n\x04list\x18\x01 \x03(\x02\"J\n\x06\x43hange\x12\x1f\n\x03idx\x18\x01 \x01(\x0b\x32\x12.simulator.Indexes\x12\x1f\n\x05value\x18\x02 \x01(\x0b\x32\x10.simulator.Value\"-\n\x07\x43hanges\x12\"\n\x07\x63hanges\x18\x01 \x03(\x0b\x32\x11.simulator.Change\"\xaa\x01\n\x0bStateChange\x12#\n\x07\x63hanges\x18\x01 \x01(\x0b\x32\x12.simulator.Changes\x12\x30\n\x05\x63hild\x18\x02 \x03(\x0b\x32!.simulator.StateChange.ChildEntry\x1a\x44\n\nChildEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12%\n\x05value\x18\x02 \x01(\x0b\x32\x16.simulator.StateChange:\x02\x38\x01\"@\n\x0fStateChangeList\x12-\n\rstate_changes\x18\x01 \x03(\x0b\x32\x16.simulator.StateChange\"\x1a\n\x07NDArray\x12\x0f\n\x07ndarray\x18\x01 \x01(\x0c\"X\n\tRigidBody\x12\"\n\x06\x63\x65nter\x18\x01 \x01(\x0b\x32\x12.simulator.NDArray\x12\'\n\x0borientation\x18\x02 \x01(\x0b\x32\x12.simulator.NDArray\"$\n\x0eIsStartedState\x12\x12\n\nis_started\x18\x01 \x01(\x08\"\x1b\n\x05Scene\x12\x12\n\nscene_name\x18\x01 \x01(\t2\xc9\x04\n\x0fSimulatorServer\x12\x36\n\x04Step\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12G\n\x11SetChangesAndStep\x12\x1a.simulator.StateChangeList\x1a\x14.simulator.Dataclass\"\x00\x12:\n\x08GetState\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12H\n\x16GetSimulatorParameters\x12\x16.google.protobuf.Empty\x1a\x14.simulator.Dataclass\"\x00\x12\x42\n\nSetChanges\x12\x1a.simulator.StateChangeList\x1a\x16.google.protobuf.Empty\"\x00\x12\x34\n\x0cGetSceneName\x12\x10.simulator.Scene\x1a\x10.simulator.Scene\"\x00\x12@\n\tIsStarted\x12\x16.google.protobuf.Empty\x1a\x19.simulator.IsStartedState\"\x00\x12\x39\n\x05Start\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x12\x38\n\x04Stop\x12\x16.google.protobuf.Empty\x1a\x16.google.protobuf.Empty\"\x00\x42\x34\n\x1aio.grpc.examples.simulatorB\x0eSimulatorProtoP\x01\xa2\x02\x03SIMb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -38,25 +38,27 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_INDEXES']._serialized_start=430
   _globals['_INDEXES']._serialized_end=468
   _globals['_VALUE']._serialized_start=471
-  _globals['_VALUE']._serialized_end=613
-  _globals['_CHANGE']._serialized_start=615
-  _globals['_CHANGE']._serialized_end=689
-  _globals['_CHANGES']._serialized_start=691
-  _globals['_CHANGES']._serialized_end=736
-  _globals['_STATECHANGE']._serialized_start=739
-  _globals['_STATECHANGE']._serialized_end=909
-  _globals['_STATECHANGE_CHILDENTRY']._serialized_start=841
-  _globals['_STATECHANGE_CHILDENTRY']._serialized_end=909
-  _globals['_STATECHANGELIST']._serialized_start=911
-  _globals['_STATECHANGELIST']._serialized_end=975
-  _globals['_NDARRAY']._serialized_start=977
-  _globals['_NDARRAY']._serialized_end=1003
-  _globals['_RIGIDBODY']._serialized_start=1005
-  _globals['_RIGIDBODY']._serialized_end=1093
-  _globals['_ISSTARTEDSTATE']._serialized_start=1095
-  _globals['_ISSTARTEDSTATE']._serialized_end=1131
-  _globals['_SCENE']._serialized_start=1133
-  _globals['_SCENE']._serialized_end=1160
-  _globals['_SIMULATORSERVER']._serialized_start=1163
-  _globals['_SIMULATORSERVER']._serialized_end=1748
+  _globals['_VALUE']._serialized_end=652
+  _globals['_LIST']._serialized_start=654
+  _globals['_LIST']._serialized_end=674
+  _globals['_CHANGE']._serialized_start=676
+  _globals['_CHANGE']._serialized_end=750
+  _globals['_CHANGES']._serialized_start=752
+  _globals['_CHANGES']._serialized_end=797
+  _globals['_STATECHANGE']._serialized_start=800
+  _globals['_STATECHANGE']._serialized_end=970
+  _globals['_STATECHANGE_CHILDENTRY']._serialized_start=902
+  _globals['_STATECHANGE_CHILDENTRY']._serialized_end=970
+  _globals['_STATECHANGELIST']._serialized_start=972
+  _globals['_STATECHANGELIST']._serialized_end=1036
+  _globals['_NDARRAY']._serialized_start=1038
+  _globals['_NDARRAY']._serialized_end=1064
+  _globals['_RIGIDBODY']._serialized_start=1066
+  _globals['_RIGIDBODY']._serialized_end=1154
+  _globals['_ISSTARTEDSTATE']._serialized_start=1156
+  _globals['_ISSTARTEDSTATE']._serialized_end=1192
+  _globals['_SCENE']._serialized_start=1194
+  _globals['_SCENE']._serialized_end=1221
+  _globals['_SIMULATORSERVER']._serialized_start=1224
+  _globals['_SIMULATORSERVER']._serialized_end=1809
 # @@protoc_insertion_point(module_scope)
