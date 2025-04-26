@@ -59,9 +59,18 @@ entities:
 
 client:
   particles:
+    kwargs:
+      color:
+        _all_values_: red
+      visible:
+        _all_values_: true
+      visible_wheels:
+        _all_values_: true
+      visible_proxs:
+        _all_values_: true
     simulator_controller:
       cls: vivarium.controllers.simulator_controller.ControllerObject
-      kwargs: {}
+      kwargs: {}  #TODO: kwargs now defined a level upper, could be all removed at this level? (also in objects)
     notebook_controller:
       cls: vivarium.controllers.notebook_controller.Object
       kwargs: {}
@@ -70,9 +79,7 @@ client:
       kwargs: {}
     panel_controller:
       cls: vivarium.controllers.panel_controller.PanelControllerObject
-      kwargs:
-        color:
-          _all_values_: red
+      kwargs: {}
     panel_interface:
       cls: vivarium.interface.panel_app.ObjectManager
       kwargs: {}
