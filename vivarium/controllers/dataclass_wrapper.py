@@ -1,10 +1,58 @@
 import numpy as np
 import jax.numpy as jnp
 
+from omegaconf import DictConfig
 from jax_md.dataclasses import is_dataclass
 
 from vivarium.environments.state import field_accessors
 
+
+from dataclasses import dataclass, field, make_dataclass
+from typing import Any
+
+def create_dataclass_from_dict(class_name: str, data: dict):
+    """
+    Dynamically creates a dataclass from a dictionary, recursively handling nested dictionaries.
+
+    Args:
+        class_name (str): The name of the dataclass.
+        data (dict): The dictionary to define fields for the dataclass.
+
+    Returns:
+        A dataclass instance populated with the dictionary values.
+    """
+    def process_value(key, value):
+        if isinstance(value, (dict, DictConfig)):
+            # Recursively create a nested dataclass for dictionaries
+            nested_class_name = f"{class_name}_{key.capitalize()}"
+            return (key, create_dataclass_from_dict(nested_class_name, value).__class__, field(default_factory=lambda: create_dataclass_from_dict(nested_class_name, value)))
+        else:
+            return (key, type(value), field(default=value))
+
+    # Create fields for the dataclass
+    fields = [process_value(key, value) for key, value in data.items()]
+    
+    # Dynamically create the dataclass
+    DynamicDataclass = make_dataclass(class_name, fields)
+
+    # Add a dummy method to the dataclass
+    def getitem(self, idx):
+        return DynamicDataclass(**{field: getattr(self, field)[idx] for field in self.__dataclass_fields__.keys()})   
+    setattr(DynamicDataclass, "__getitem__", getitem)
+    
+    def set(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise AttributeError(f"'{class_name}' object has no attribute '{key}'")
+        return self
+    setattr(DynamicDataclass, "set", set)
+
+    # Create an instance of the dataclass
+    instance = DynamicDataclass(**{key: (value if not isinstance(value, (dict, DictConfig)) else create_dataclass_from_dict(f"{class_name}_{key.capitalize()}", value)) for key, value in data.items()})
+    
+    return instance
 
 def update_dataclass_from_change_list(dataclass_instance, change_list):
     for changes in change_list:
@@ -25,7 +73,7 @@ def update_dataclass(dataclass_instance, changes):
                     if isinstance(dataclass_instance, jnp.ndarray):
                         dataclass_instance = dataclass_instance.at[change['__idx']].set(change['__value'])
                     else:
-                        if change['__idx'] is not None:
+                        if change['__idx'] == (None,):
                             dataclass_instance = change['__value']
                         else:
                             dataclass_instance[change['__idx']] = change['__value']
