@@ -28,9 +28,10 @@ nested_fields_to_access = {
 
 @access_nested_fields(nested_fields_to_access)
 class Simulator:
-    def __init__( self, env, scene_name=None, freq=-1):
+    def __init__( self, env, controller_parameters=None, scene_name=None, freq=-1):
         
         self.env = env
+        self.controller_parameters = controller_parameters
         self.scene_name = scene_name
         self.state = env.state
         self.freq = freq
