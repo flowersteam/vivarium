@@ -57,7 +57,7 @@ def test_changes(state):
     changes_2 = proto_to_changes(p_changes)
     state = dw.update_dataclass(state, changes_2)
     assert jnp.equal(jnp.array([1., 2.]), state.entity_state.position).all()
-
+    
 
 def test_simulator_grpc(simulator):
     dw = DataclassWrapper()

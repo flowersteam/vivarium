@@ -11,7 +11,7 @@ import grpc
 
 from numproto.numproto import proto_to_ndarray
 
-from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_changes
+from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_state, proto_to_changes
 from vivarium.utils.scene_configs import SimulatorConfiguration
 
 
@@ -64,6 +64,11 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         scene_name = self.simulator.scene_name
         return simulator_pb2.Scene(scene_name=scene_name)
 
+    def SetControllerAtrributes(self, request, context):
+        with self._lock:
+            self.simulator.controller_parameters = proto_to_state(request)
+        return Empty()
+    
     def Start(self, request, context):
         self.simulator.run(threaded=True)
         return Empty()
