@@ -3,14 +3,14 @@ environment:
   kwargs:
     box_size: 100.0
     neighbor_radius: 300.0
-    num_scan_steps: 8
+    num_scan_steps: 100
     to_jit: True
     seed: 42
 
 simulator:
   cls: vivarium.simulator.Simulator
   kwargs:
-    freq: -1
+    freq: 40
 
 subtypes:
   - prey

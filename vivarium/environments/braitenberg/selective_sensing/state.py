@@ -40,7 +40,7 @@ class AgentState(ParticleState):
                            prox_sensed_ent_idx=jnp.zeros((n_entities, 2), dtype=int),
                            proximity_map_dist=proximity_map_dist,
                            proximity_map_theta=proximity_map_theta,
-                           behavior=jnp.full((n_entities, n_behaviors), 5, dtype=int),
+                           behavior=jnp.full((n_entities, n_behaviors), 4, dtype=int),
                            behavior_params= jnp.zeros((n_entities, n_behaviors, 2, 3)),
                            sensed=jnp.ones((n_entities, n_behaviors, n_subtypes), dtype=int) #TODO: Check if this is correct
                            )

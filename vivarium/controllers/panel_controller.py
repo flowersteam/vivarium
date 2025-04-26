@@ -80,14 +80,15 @@ class ParameterizedData(param.Parameterized):
 
     def update_to(self, event):
         if self.allow_update_to:
-            mapping = self.param_to_jax[event.name]
-            if self.selection is None:
-                setattr(self.data,
-                        mapping.param_name, mapping.param_to_jax_fn(event.new))
-                return
-            for idx in self.selection:
-                setattr(self.data[idx],
-                        mapping.param_name, mapping.param_to_jax_fn(event.new))
+            if event.name in self.param_to_jax:
+                mapping = self.param_to_jax[event.name]
+                if self.selection is None:
+                    setattr(self.data,
+                            mapping.param_name, mapping.param_to_jax_fn(event.new))
+                    return
+                for idx in self.selection:
+                    setattr(self.data[idx],
+                            mapping.param_name, mapping.param_to_jax_fn(event.new))
 
     def udpate_panel_parameter(self, event):
         if self.selection is None:
