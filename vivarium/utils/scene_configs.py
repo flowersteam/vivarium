@@ -14,6 +14,7 @@ from typing import Type
 import jax.numpy as jnp
 
 from vivarium.environments.state import create_state_cls, to_rigid_body_state
+from vivarium.controllers.dataclass_wrapper import create_dataclass_from_dict
 from vivarium.utils.converters import import_class
 
 
@@ -130,12 +131,12 @@ class SceneConfiguration:
             )
             for idx, entity_type in enumerate(self.config.entities.entity_types)}
         if self.config.client != 'None':
+            controller_parameters = self.create_controller_parameters()
             self.entity_type_client_configs = {
                 entity_type: EntityTypeClientConfiguration(**{attr: ConstructorConfiguration(
                     cls= import_class(data.cls),
-                    kwargs=extend_kwargs(data.kwargs,
-                                         self.config.entities[entity_type].kwargs.n_exists),
-                    ) for attr, data in config.items()})
+                    kwargs={'controller_parameters': getattr(controller_parameters, entity_type)}
+                    ) for attr, data in config.items() if attr != 'kwargs'})
                 for entity_type, config in self.config.client.items()}
 
         self.subtype_labels = {i: label for i, label in enumerate(self.config.subtypes)}
@@ -199,4 +200,12 @@ class SceneConfiguration:
         # What about the case where state is not None and env is None?
         env = env or self.create_environment(state=state)
         simulator_cls = import_class(self.config.simulator.cls)
-        return simulator_cls(env=env, scene_name=self.scene_name, **self.config.simulator.kwargs)
+        return simulator_cls(env=env, scene_name=self.scene_name, 
+                             controller_parameters=self.create_controller_parameters(), 
+                             **self.config.simulator.kwargs)
+
+    def create_controller_parameters(self):
+        if self.config.client == 'None':
+            return None
+        kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_exists) for entity_type, config in self.config.client.items()}
+        return create_dataclass_from_dict('ControllerParameters', kwargs)

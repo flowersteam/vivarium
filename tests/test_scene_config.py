@@ -28,3 +28,8 @@ def test_simulator(scene_name):
     simulator = config.create_simulator()
     assert simulator.env.box_size == config.config.environment.kwargs.box_size
     assert simulator.freq == config.config.simulator.kwargs.freq
+
+def test_controller_parameters():
+    config = SceneConfiguration('braitenberg')
+    controller_parameters = config.create_controller_parameters()
+    assert controller_parameters.agents.color == ['red'] * config.config.entities.agents.kwargs.n_exists
