@@ -5,7 +5,7 @@ from functools import partial
 import jax.numpy as jnp
 
 from vivarium.controllers.simulator_controller import (
-    SimulatorController, ControllerEntity, ControllerAgent
+    SimulatorController, ControllerAgent, ControllerObject
 )
 from vivarium.environments.braitenberg.behaviors import Behaviors
 from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
@@ -33,33 +33,9 @@ class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
             super().__setattr__(attr, val)
 
 
-class PanelControllerEntity(ControllerEntity):
-    def __init__(self, state, ent_idx, entity_type, **kwargs):
-        super().__init__(state, ent_idx, entity_type)
-        object.__setattr__(self, 'visible', bool(self.exists))
-        for attr, val in kwargs.items():
-            object.__setattr__(self, attr, val)
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return object.__getattr__(self, attr)
-        return super().__getattr__(attr)
-    
-    def __setattr__(self, attr, val):
-        if attr in self.__dict__:
-            object.__setattr__(self, attr, val)
-        else:
-            super().__setattr__(attr, val)
-
-
 class PanelControllerAgent(ControllerAgent):
-    def __init__(self, state, ent_idx, entity_type, **kwargs):
-        super().__init__(state, ent_idx, entity_type)
-        object.__setattr__(self, 'visible', bool(self.exists))
-        object.__setattr__(self, 'visible_wheels', True)
-        object.__setattr__(self, 'visible_proxs', True)
-        for attr, val in kwargs.items():
-            object.__setattr__(self, attr, val)
+    def __init__(self, state, ent_idx, entity_type, controller_parameters):
+        super().__init__(state, ent_idx, entity_type, controller_parameters)
 
     def __getattr__(self, attr):
         if attr in self.__dict__:
@@ -72,11 +48,11 @@ class PanelControllerAgent(ControllerAgent):
         else:
             super().__setattr__(attr, val)
 
-class PanelControllerObject(PanelControllerEntity): #TODO: understand why super classes of agents and objects are different
-    def __init__(self, state, ent_idx, entity_type, **kwargs):
-        super().__init__(state, ent_idx, entity_type, **kwargs)
-        for attr, val in kwargs.items():
-            object.__setattr__(self, attr, val)
+
+class PanelControllerObject(ControllerObject):
+    def __init__(self, state, ent_idx, entity_type, controller_parameters):
+        super().__init__(state, ent_idx, entity_type, controller_parameters)
+
 
 class ParameterizedData(param.Parameterized):
     update_from_server = param.Event()
@@ -238,6 +214,8 @@ class Agent(ParamEntity):
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)
             self.panel_parameters.append(behavior)
+            # self.param_to_jax[behavior] = ParameterMapping(behavior)
+            # self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
             self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
             self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=None), behavior, onlychanged=True)
             for idx, label in subtype_labels.items():

@@ -1,14 +1,13 @@
-import numpy as np
+from dataclasses import field, make_dataclass
+
 import jax.numpy as jnp
+import numpy as np
 
 from omegaconf import DictConfig
 from jax_md.dataclasses import is_dataclass
 
 from vivarium.environments.state import field_accessors
 
-
-from dataclasses import dataclass, field, make_dataclass
-from typing import Any
 
 def create_dataclass_from_dict(class_name: str, data: dict):
     """
@@ -150,24 +149,24 @@ def create_property(field_name, rigid_body_field):
     @property
     def prop(self):
         if self._is_rigid_body:
-            return getattr(getattr(self._state.entity_state, field_name), rigid_body_field)[self._ent_idx]
+            return getattr(getattr(self._state.entity_state, field_name), rigid_body_field)[self._entity_idx]
         else:
             if rigid_body_field == 'orientation':
                 if field_name == 'position':
-                    return self._state.entity_state.orientation[self._ent_idx]
+                    return self._state.entity_state.orientation[self._entity_idx]
                 else:
                     return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
             elif rigid_body_field == 'center':
-                return getattr(self._state.entity_state, field_name)[self._ent_idx]
+                return getattr(self._state.entity_state, field_name)[self._entity_idx]
             else:
                 return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
 
     @prop.setter
     def prop(self, value, idx=None):
         if idx is None:
-            idx = self._ent_idx
+            idx = self._entity_idx
         else:
-            idx = (self._ent_idx, idx)
+            idx = (self._entity_idx, idx)
         if self._is_rigid_body:
             getattr(getattr(self._change_recorder.entity_state, field_name), rigid_body_field)[idx] = value
         else:
@@ -300,11 +299,11 @@ class EntityWrapper:
 
     def __init__(self, state, ent_idx, entity_type):
         object.__setattr__(self, '_state', state)
-        object.__setattr__(self, '_ent_idx', ent_idx)
+        object.__setattr__(self, '_entity_idx', ent_idx)
+        object.__setattr__(self, '_entity_type_idx', state.entity_state.entity_type_idx[ent_idx])
         object.__setattr__(self, '_is_rigid_body', self._state.entity_state.is_rigid_body())
         object.__setattr__(self, '_change_recorder', ChangeRecorder())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_type_attr', entity_type) #.name.lower() + '_state')
         object.__setattr__(self, '_entity_fields', ['ent_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
                                'position', 'momentum', 'force', 'mass',
@@ -315,12 +314,12 @@ class EntityWrapper:
 
     def __getattr__(self, attr):
         if attr in self._entity_fields:
-            return getattr(self._state.entity_state, attr)[self._ent_idx]
-        return getattr(getattr(self._state, self._entity_type_attr), attr)[self._state.entity_state.entity_type_idx[self._ent_idx]]
+            return getattr(self._state.entity_state, attr)[self._entity_idx]
+        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_type_idx[self._entity_idx]]
 
     def _setitem(self, attr, value, idx=None):
-        entity_state_idx = self._ent_idx if idx is None else (self._ent_idx, idx)
-        x_state_idx = self._state.entity_state.entity_type_idx[self._ent_idx] if idx is None else (self._state.entity_state.entity_type_idx[self._ent_idx], idx)
+        entity_state_idx = self._entity_idx if idx is None else (self._entity_idx, idx)
+        x_state_idx = self._state.entity_state.entity_type_idx[self._entity_idx] if idx is None else (self._state.entity_state.entity_type_idx[self._entity_idx], idx)
         if attr in self._entity_fields:
             if attr.endswith('_center') or attr.endswith('_orientation'):
                 field_name, rigid_body_field = attr.split('_', 1)
@@ -329,7 +328,7 @@ class EntityWrapper:
             else:
                 getattr(self._change_recorder.entity_state, attr)[entity_state_idx] = value
         else:
-            getattr(getattr(self._change_recorder, self._entity_type_attr), attr)[x_state_idx] = value
+            getattr(getattr(self._change_recorder, self._entity_type), attr)[x_state_idx] = value
 
     def __setattr__(self, attr, value):
         if attr in self.__dict__:

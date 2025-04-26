@@ -16,10 +16,21 @@ def scene_config(request):
 @pytest.mark.parametrize("scene_config", ['braitenberg', 'particle_lenia'], indirect=True)
 def test_base_entity(scene_config):
     state = scene_config.create_state()
-    entity = ControllerEntity(state, 0, scene_config.entity_types[0])
+    entity_type = scene_config.entity_types[0]
+    idx = 0
+    entity = ControllerEntity(state, idx, entity_type, 
+                              getattr(scene_config.create_controller_parameters(), entity_type)[idx]
+                              )
     
     entity.x_position = 10
-    entity.apply_to_state(state)
+    state = entity.apply_to_state(state)
+    assert state.entity_state.position[0, 0] == 10
+
+    entity.color = 'pink'
+
+    changes = entity._controller_change_recorder.fetch_changes()
+    assert changes['color'][0]['__value'] == 'pink'
+
 
 @pytest.mark.parametrize("scene_config", ['braitenberg'], indirect=True)
 def test_simulator_controller(scene_config):
@@ -55,3 +66,9 @@ def test_simulator_controller(scene_config):
     assert controller.client.freq == -10
     assert controller.client.box_size == 42.
     assert controller.client.env.box_size == 42.
+
+    controller.agents[0].color = 'pink'
+    controller.objects[2].visible = False
+    controller.apply_changes()
+    assert controller.client.controller_parameters.agents.color[0] == 'pink'
+    assert not controller.client.controller_parameters.objects.visible[2]

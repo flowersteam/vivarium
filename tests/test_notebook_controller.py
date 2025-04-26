@@ -43,6 +43,8 @@ def test_notebook_controller():
     controller.step()
     assert jnp.equal(jnp.array([3, 1, 2, 0]), getattr(controller.state, agent_field).behavior[idx]).all()
 
+    ag.color = 'pink'
+    controller.step()
 
 # import time
 

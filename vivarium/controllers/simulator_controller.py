@@ -4,7 +4,7 @@ from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_p
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.controllers.dataclass_wrapper import (
-    EntityList, EntityWrapper, SimulatorParametersWrapper
+    EntityList, EntityWrapper, SimulatorParametersWrapper, ChangeRecorder
 )
 
 
@@ -25,8 +25,10 @@ def split(attr):
 class ControllerEntity(EntityWrapper):
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, state, ent_idx, entity_type):
+    def __init__(self, state, ent_idx, entity_type, controller_parameters):
         super().__init__(state, ent_idx, entity_type)
+        object.__setattr__(self, 'controller_parameters', controller_parameters)
+        object.__setattr__(self, '_controller_change_recorder', ChangeRecorder())
         object.__setattr__(self, 'internal', InternalData())
 
     def __getattr__(self, item):
@@ -38,9 +40,15 @@ class ControllerEntity(EntityWrapper):
             if suffix == 'position' and self._is_rigid_body:
                 field = field.center
             return field[idx]
+        if item in self.controller_parameters.__class__.__dataclass_fields__:
+            return getattr(self.controller_parameters, item)
         return super().__getattr__(item)
     
     def __setattr__(self, item, val):
+        if item in self.controller_parameters.__class__.__dataclass_fields__:
+            getattr(self._controller_change_recorder, item)[self._entity_type_idx] = val
+            object.__setattr__(self.controller_parameters, item, val)
+            return
         if item in self.__dict__:
             super().__setattr__(item, val)
         elif is_split_attribute(item):
@@ -153,6 +161,10 @@ class SimulatorController:
             change = elist.fetch_changes()
             change = [{'state': c} for c in change]
             changes.extend(change)
+            for e in elist:
+                change = e._controller_change_recorder.fetch_changes()
+                if change:
+                    changes.extend([{'controller_parameters': {etype: change}}])
         change = self.simulator_parameters.fetch_changes()
         if change:
             changes.extend([change])

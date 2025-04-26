@@ -27,9 +27,10 @@ else:
 class NotebookControllerEntity(ControllerEntity):
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, state, ent_idx, entity_type):
-        super().__init__(state, ent_idx, entity_type)
+    def __init__(self, state, ent_idx, entity_type, controller_parameters):
+        super().__init__(state, ent_idx, entity_type, controller_parameters)
         object.__setattr__(self, 'routine_handler', RoutineHandler())
+        object.__setattr__(self, 'controller_parameters', controller_parameters)
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
