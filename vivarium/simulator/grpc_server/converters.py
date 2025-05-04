@@ -13,42 +13,30 @@ from vivarium.simulator.grpc_server.numproto.numproto import (
     ndarray_to_proto,
 )
 
+def slice_args_to_proto(arg):
+    if arg is None:
+        return simulator_pb2.SliceArg(is_none=True)
+    else:
+        return simulator_pb2.SliceArg(int_arg=arg)
 
 def idx_to_proto(idx):
-    proto_index = simulator_pb2.Index()
     if isinstance(idx, (int, np.int32)):
-        proto_index.idx.CopyFrom(simulator_pb2.Idx(int_idx=idx))
+        return simulator_pb2.Idx(int_idx=idx)
+    elif isinstance(idx, (tuple, list)):
+        proto_indexes = simulator_pb2.IndexList()
+        for i in idx:
+            proto_indexes.index_list.append(idx_to_proto(i))
+        return simulator_pb2.Idx(index_list=proto_indexes)    
     elif isinstance(idx, slice):
-        proto_index.slice_idx.start = idx.start
-        proto_index.slice_idx.stop = idx.stop
-        proto_index.slice_idx.step = idx.step
+        return simulator_pb2.Idx(slice_idx=simulator_pb2.Slice(
+            start=slice_args_to_proto(idx.start),
+            stop=slice_args_to_proto(idx.stop),
+            step=slice_args_to_proto(idx.step)
+        ))
+    elif idx is None:
+        return simulator_pb2.Idx(is_none=True)
     else:
         raise ValueError(f"Unknown index type {type(idx)}")
-    return proto_index
-
-
-def indexes_to_proto(indexes):
-    if isinstance(indexes, (int, np.int32, slice)):
-        return idx_to_proto(indexes)
-    #     index = simulator_pb2.Index()
-    #     index.idx.CopyFrom(simulator_pb2.Idx(int_idx=indexes))
-    #     return index
-    # # proto_indexes = simulator_pb2.Indexes()
-    # if isinstance(indexes, slice):
-    #     proto_indexes.idx.append(idx_to_proto(indexes))
-    elif isinstance(indexes, tuple):
-        proto_indexes = simulator_pb2.Indexes()
-        for idx in indexes:
-            proto_indexes.idx.append(simulator_pb2.Idx(int_idx=idx))
-        return simulator_pb2.Index(indexes=proto_indexes)
-    elif indexes is None:
-        index = simulator_pb2.Index()
-        index.idx.CopyFrom(simulator_pb2.Idx(is_none=True))
-        return index
-        # proto_indexes.idx.append(simulator_pb2.Idx(is_none=True))
-    else:
-        raise ValueError(f"Unknown index type {type(indexes)}")
-    # return proto_indexes
 
 
 def changes_to_proto(changes):
@@ -56,8 +44,7 @@ def changes_to_proto(changes):
         proto_changes = simulator_pb2.Changes()
         for change in changes:
             proto_change = simulator_pb2.Change()
-            # idx = indexes_to_proto(change['__idx'])
-            proto_change.idx.CopyFrom(indexes_to_proto(change['__idx']))
+            proto_change.idx.CopyFrom(idx_to_proto(change['__idx']))
             if isinstance(change['__value'], (np.ndarray, jnp.ndarray)):
                 proto_change.value.CopyFrom(
                     simulator_pb2.Value(ndarray=ndarray_to_proto(change['__value']))
@@ -104,27 +91,31 @@ def changes_to_proto(changes):
         return proto_state_change_list
 
 
+def proto_to_slice_arg(proto_arg):
+    if proto_arg.HasField('int_arg'):
+        return proto_arg.int_arg
+    elif proto_arg.HasField('is_none'):
+        return None
+    else:
+        raise ValueError(f"Unknown slice argument type {proto_arg}")
+
 def proto_to_idx(proto_idx):
     if proto_idx.HasField('int_idx'):
         return proto_idx.int_idx
+    elif proto_idx.HasField('index_list'):
+        indexes = []
+        for idx in proto_idx.index_list.index_list:
+            indexes.append(proto_to_idx(idx))
+        return tuple(indexes)
     elif proto_idx.HasField('slice_idx'):
-        return slice(proto_idx.slice_idx.start, proto_idx.slice_idx.stop, proto_idx.slice_idx.step)
+        return slice(proto_to_slice_arg(proto_idx.slice_idx.start), 
+                     proto_to_slice_arg(proto_idx.slice_idx.stop), 
+                     proto_to_slice_arg(proto_idx.slice_idx.step)
+                     )
     elif proto_idx.HasField('is_none'):
         return None
     else:
         raise ValueError(f"Unknown index type {proto_idx}")
-
-
-def proto_to_indexes(proto_indexes):
-    indexes = []
-    if proto_indexes.HasField('indexes'):
-        for proto_idx in proto_indexes.indexes.idx:
-            idx = proto_to_idx(proto_idx)
-            indexes.append(idx)
-        return tuple(indexes)
-    if proto_indexes.HasField('idx'):
-        return proto_to_idx(proto_indexes.idx)
-    raise ValueError(f"Unknown index type {proto_indexes}")
 
 
 def proto_to_changes(proto_changes):
@@ -161,7 +152,7 @@ def proto_to_changes(proto_changes):
         elif proto_changes.value.HasField('list_value'):
             value = list(proto_changes.value.list_value.list)
         change = {
-            '__idx': proto_to_indexes(proto_changes.idx),
+            '__idx': proto_to_idx(proto_changes.idx),
             '__value': value
         }
         return change
