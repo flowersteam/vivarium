@@ -11,7 +11,7 @@ import grpc
 
 from numproto.numproto import proto_to_ndarray
 
-from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_state, proto_to_changes
+from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, proto_to_changes
 from vivarium.utils.scene_configs import SimulatorConfiguration
 
 
@@ -53,12 +53,12 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     
     def GetState(self, request, context):
         state = self.simulator.state
-        p = state_to_proto(state)
+        p = dataclass_to_proto(state)
         return p
     
     def GetSimulatorParameters(self, request, context):
         parameters = SimulatorConfiguration.from_simulator(self.simulator)
-        return state_to_proto(parameters)
+        return dataclass_to_proto(parameters)
 
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
@@ -66,7 +66,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
     def SetControllerAtrributes(self, request, context):
         with self._lock:
-            self.simulator.controller_parameters = proto_to_state(request)
+            self.simulator.controller_parameters = proto_to_dataclass(request)
         return Empty()
     
     def Start(self, request, context):
@@ -92,7 +92,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def Step(self, request, context):
         assert not self.simulator.is_started()
         self.simulator.step()
-        return state_to_proto(self.simulator.state)
+        return dataclass_to_proto(self.simulator.state)
 
 
 def serve(simulator):

@@ -178,72 +178,72 @@ def proto_to_changes(proto_changes):
     return changes
 
 
-def proto_to_state(state, dataclass_type):
-    """Convert a protobuf state to a State object.
+def proto_to_dataclass(dataclass, dataclass_type):
+    """Convert a protobuf to a dataclass instance.
 
-    :param state: simulation state in protobuf format
-    :return: State object
+    :param dataclass: simulator_pb2.Dataclass message
+    :return: python dataclass instance
     """
 
     if is_dataclass(dataclass_type):
         kwargs = {}
         for field in fields(dataclass_type):
-            kwargs[field.name] = proto_to_state(state.nested_fields[field.name], field.type)
+            kwargs[field.name] = proto_to_dataclass(dataclass.nested_fields[field.name], field.type)
         return dataclass_type(**kwargs)
-    elif state.value.HasField('int_value'):
-        return state.value.int_value
-    elif state.value.HasField('float_value'):
-        return state.value.float_value
-    elif state.value.HasField('bool_value'):
-        return state.value.bool_value
-    elif state.value.HasField('str_value'):
-        return state.value.str_value
-    elif state.value.HasField('list_value'):
-        return state.value.list_value
-    elif state.value.HasField('ndarray'):
-        return proto_to_ndarray(state.value.ndarray)
-    elif 'center' in state.nested_fields and 'orientation' in state.nested_fields:
+    elif dataclass.value.HasField('int_value'):
+        return dataclass.value.int_value
+    elif dataclass.value.HasField('float_value'):
+        return dataclass.value.float_value
+    elif dataclass.value.HasField('bool_value'):
+        return dataclass.value.bool_value
+    elif dataclass.value.HasField('str_value'):
+        return dataclass.value.str_value
+    elif dataclass.value.HasField('list_value'):
+        return dataclass.value.list_value
+    elif dataclass.value.HasField('ndarray'):
+        return proto_to_ndarray(dataclass.value.ndarray)
+    elif 'center' in dataclass.nested_fields and 'orientation' in dataclass.nested_fields:
         return RigidBody(
-            center=proto_to_ndarray(state.nested_fields['center'].array_data).astype(float),
-            orientation=proto_to_ndarray(state.nested_fields['orientation'].array_data).astype(float),
+            center=proto_to_ndarray(dataclass.nested_fields['center'].array_data).astype(float),
+            orientation=proto_to_ndarray(dataclass.nested_fields['orientation'].array_data).astype(float),
         )
 
 
-def state_to_proto(state):
-    """Convert a State object to a protobuf state.
+def dataclass_to_proto(dataclass):
+    """Convert a dataclass object to a protobuf message.
 
-    :param state: simulation state
-    :return: protobuf state
+    :param dataclass: python dataclass instance
+    :return: simulator_pb2.Dataclass message
     """
 
     message = simulator_pb2.Dataclass()
 
-    if isinstance(state, (np.ndarray, jnp.ndarray)):
+    if isinstance(dataclass, (np.ndarray, jnp.ndarray)):
         message.value.CopyFrom(
-                    simulator_pb2.Value(ndarray=ndarray_to_proto(state))
+                    simulator_pb2.Value(ndarray=ndarray_to_proto(dataclass))
                 )
-    elif isinstance(state, bool):
+    elif isinstance(dataclass, bool):
         message.value.CopyFrom(
-                    simulator_pb2.Value(bool_value=state)
+                    simulator_pb2.Value(bool_value=dataclass)
                 )
-    elif isinstance(state, list):
+    elif isinstance(dataclass, list):
         message.value.CopyFrom(
-                    simulator_pb2.Value(list_value=state)
+                    simulator_pb2.Value(list_value=dataclass)
                 )
-    elif isinstance(state, int):
+    elif isinstance(dataclass, int):
         message.value.CopyFrom(
-                    simulator_pb2.Value(int_value=state)
+                    simulator_pb2.Value(int_value=dataclass)
                 )
-    elif isinstance(state, float):
+    elif isinstance(dataclass, float):
         message.value.CopyFrom(
-                    simulator_pb2.Value(float_value=state)
+                    simulator_pb2.Value(float_value=dataclass)
                 )
-    elif isinstance(state, str):
+    elif isinstance(dataclass, str):
         message.value.CopyFrom(
-                    simulator_pb2.Value(str_value=state)
+                    simulator_pb2.Value(str_value=dataclass)
                 )
     else:
-        for field in fields(state):
-            value = getattr(state, field.name)
-            message.nested_fields[field.name].CopyFrom(state_to_proto(value))
+        for field in fields(dataclass):
+            value = getattr(dataclass, field.name)
+            message.nested_fields[field.name].CopyFrom(dataclass_to_proto(value))
     return message

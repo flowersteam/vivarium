@@ -3,7 +3,7 @@ import grpc
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
 from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
-from vivarium.simulator.grpc_server.converters import proto_to_state, changes_to_proto
+from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 
 from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.utils.scene_configs import SimulatorConfiguration
@@ -42,11 +42,11 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         state = self.stub.GetState(Empty())
-        return proto_to_state(state, self.state_cls)
+        return proto_to_dataclass(state, self.state_cls)
     
     def get_simulator_parameters(self):
         parameters = self.stub.GetSimulatorParameters(Empty())
-        return proto_to_state(parameters, SimulatorConfiguration)
+        return proto_to_dataclass(parameters, SimulatorConfiguration)
 
     @property
     def scene_name(self):
@@ -65,9 +65,9 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         if len(changes) > 0:
-            self.state = proto_to_state(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_cls)
+            self.state = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_cls)
         else:
-            self.state = proto_to_state(self.stub.Step(Empty()), self.state_cls)
+            self.state = proto_to_dataclass(self.stub.Step(Empty()), self.state_cls)
         return self.state
 
     def is_started(self):

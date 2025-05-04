@@ -1,8 +1,10 @@
 import pytest
+from dataclasses import dataclass
+from typing import List
 from jax import random
 import jax.numpy as jnp
 
-from vivarium.simulator.grpc_server.converters import state_to_proto, proto_to_state, changes_to_proto, proto_to_changes
+from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, changes_to_proto, proto_to_changes
 from vivarium.controllers.dataclass_wrapper import DataclassWrapper
 from vivarium.environments.physics_engine import init_state_fn
 from vivarium.utils.scene_configs import SceneConfiguration
@@ -25,15 +27,15 @@ def simulator(scene_config):
 
 
 def test_state_de_serialization(state):
-    p_state = state_to_proto(state)
-    state_2 = proto_to_state(p_state, state.__class__)
+    p_state = dataclass_to_proto(state)
+    state_2 = proto_to_dataclass(p_state, state.__class__)
     assert state.entity_state.position_center[0, 1] == state_2.entity_state.position_center[0, 1]
 
 
 def test_parameters_de_serialization(simulator):
     simulator_parameters = simulator.get_simulator_parameters()
-    p_parameters = state_to_proto(simulator_parameters)
-    simulator_parameters_2 = proto_to_state(p_parameters, simulator_parameters.__class__)
+    p_parameters = dataclass_to_proto(simulator_parameters)
+    simulator_parameters_2 = proto_to_dataclass(p_parameters, simulator_parameters.__class__)
     assert simulator_parameters.freq == simulator_parameters_2.freq
     assert simulator_parameters.box_size == simulator_parameters_2.box_size
 
@@ -51,12 +53,19 @@ def test_changes(state):
     assert jnp.equal(jnp.array(value), state.entity_state.position.__getitem__(idx)).all()
     assert other_dim_value == state.entity_state.position[idx[0]][1]
 
-    dw.entity_state.position = [1., 2.]
+    dw.entity_state.position[0, 0:2] = [1., 2.]
     changes = dw.fetch_changes()
     p_changes = changes_to_proto(changes)
     changes_2 = proto_to_changes(p_changes)
     state = dw.update_dataclass(state, changes_2)
-    assert jnp.equal(jnp.array([1., 2.]), state.entity_state.position).all()
+    assert jnp.equal(jnp.array([1., 2.]), state.entity_state.position[0]).all()
+
+    dw.entity_state.position[0:2, 0] = 43.0
+    changes = dw.fetch_changes()
+    p_changes = changes_to_proto(changes)
+    changes_2 = proto_to_changes(p_changes)
+    state = dw.update_dataclass(state, changes_2)
+    assert jnp.equal(jnp.array([43.0, 43.0]), state.entity_state.position[0:2, 0]).all()
     
 
 def test_simulator_grpc(simulator):
@@ -75,3 +84,19 @@ def test_simulator_grpc(simulator):
     changes_2 = proto_to_changes(p_changes)
     simulator = dw.update_dataclass(simulator, changes_2)
     assert jnp.equal(jnp.array(42), simulator.state.entity_state.friction).all()
+
+def test_index_grpc():
+    @dataclass
+    class Test:
+        visible_wheels: List
+        def set(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+    test = Test([True, True])
+    dw = DataclassWrapper()
+    dw.visible_wheels[0] = False
+    changes = dw.fetch_changes()
+    p_changes = changes_to_proto(changes)
+    changes_2 = proto_to_changes(p_changes)
+    dw.update_dataclass(test, changes_2)
+    # assert changes_2.agents[0].visible_wheels == False
