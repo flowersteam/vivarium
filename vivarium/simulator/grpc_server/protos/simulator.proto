@@ -55,6 +55,13 @@ message Indexes {
   repeated Idx idx = 1;
 }
 
+message Index {
+  oneof index {
+    Idx idx = 1;
+    Indexes indexes = 2;
+  }
+}
+
 message Value {
   oneof value {
     NDArray ndarray = 1;
@@ -71,7 +78,7 @@ message List {
 }
 
 message Change {
-  Indexes idx = 1;
+  Index idx = 1;
   Value value = 2;
 }
 
