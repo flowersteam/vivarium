@@ -132,6 +132,8 @@ class ParticleState(BaseParticleState):
         base_instance = BaseParticleState.create(entity_idx_offset, etype_kwargs['n_exists'])
         return cls(**cls_kwargs, **base_instance.__dict__, **kwargs)
     
+    def state_fns(self):
+        return []
 
 def field_accessors(cls):
     """
@@ -208,13 +210,22 @@ def create_state_cls(base_state_cls, entity_state_cls, entity_types, entity_type
         if name not in entity_types:
             raise ValueError(f"Entity type '{name}' not found in entity_types.")
         return entity_types.index(name)
+    State.entity_type_to_int = entity_type_to_int
     
     def entity_type_to_str(self, idx):
         if idx < 0 or idx >= len(entity_types):
             raise ValueError(f"Entity type index '{idx}' out of range.")
         return entity_types[idx]
-    
-    State.entity_type_to_int = entity_type_to_int
     State.entity_type_to_str = entity_type_to_str
+
+    def state_fns(self, neighbor_manager=None):
+        fns = []
+        for field_name in self.__dataclass_fields__.keys():
+            field = getattr(self, field_name)
+            if isinstance(field, ParticleState):
+                for f in field.state_fns():
+                    fns.append(f(self, neighbor_manager))
+        return fns
+    State.state_fns = state_fns
 
     return md_dataclass(State)

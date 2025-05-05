@@ -5,7 +5,7 @@ from jax import random, ops
 
 from jax_md import space, rigid_body
 
-from vivarium.environments.base_env import BaseEnv, NeighborManager
+from vivarium.environments.environment import Environment, NeighborManager
 from vivarium.environments.utils import normal, relative_position
 
 from vivarium.environments.physics_engine import (
@@ -281,7 +281,7 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
     return state_fn
 
 
-class BraitenbergEnv(BaseEnv):
+class BraitenbergEnv(Environment):
     def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42):
         
         displacement, shift = space_fn(state.box_size)

@@ -1,11 +1,10 @@
 environment:
-  cls: vivarium.environments.particle_lenia.ParticleLeniaEnv
+  cls: vivarium.environments.Environment
   kwargs:
-    box_size: 35.0
+    box_size: 36.0
     neighbor_radius: 50.0
     num_scan_steps: 8
     to_jit: True
-    seed: 42
 
 simulator:
   cls: vivarium.simulator.Simulator
