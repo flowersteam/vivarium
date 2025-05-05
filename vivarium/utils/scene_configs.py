@@ -28,10 +28,17 @@ abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
 
 
-def generate_random_positions(n, box_size, seed=None):
-    # Generate random positions within the box size
+def generate_random_positions(n, position_range, seed=None):
+    """
+    Generate random positions within a given range
+    :param n: number of positions to generate
+    :param position_range: range of positions (x_min, x_max, y_min, y_max)
+    :param seed: random seed
+    :return: list of random positions
+    """
+    x_min, x_max, y_min, y_max = position_range
     rng = random.Random(seed)
-    return [[rng.uniform(0, box_size), rng.uniform(0, box_size)] for _ in range(n)]
+    return [[rng.uniform(x_min, x_max), rng.uniform(y_min, y_max)] for _ in range(n)]
 
 
 def generate_random_orientations(n, seed=None):
@@ -151,7 +158,12 @@ class SceneConfiguration:
             n = entity_params.n_exists
             if entity_params.position == 'random':
                 # Generate random positions if not provided
-                entity_params.position = generate_random_positions(n, self.config.environment.kwargs.box_size, self.seed)
+                pos_range = [0, self.config.environment.kwargs.box_size,
+                             0, self.config.environment.kwargs.box_size]
+                entity_params.position = generate_random_positions(n, pos_range, self.seed)
+            elif 'range' in entity_params.position:
+                # Generate random positions within a specified range
+                entity_params.position = generate_random_positions(n, entity_params.position['range'], self.seed)
             if entity_params.orientation == 'random':
                 # Generate random orientations if not provided
                 entity_params.orientation = generate_random_orientations(n, self.seed)
@@ -193,7 +205,7 @@ class SceneConfiguration:
     def create_environment(self, state=None):
         state = state or self.state
         env_cls = import_class(self.config.environment.cls)
-        return env_cls(state=state, **self.config.environment.kwargs)
+        return env_cls.init_neighbor_manager(state=state, **self.config.environment.kwargs)
     
     def create_simulator(self, state=None, env=None):
         state = state or self.state
