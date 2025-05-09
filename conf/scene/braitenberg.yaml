@@ -55,7 +55,7 @@ entities:
         _all_values_: 0.0
 
   objects:
-    cls: vivarium.environments.braitenberg.selective_sensing.state.ObjectState
+    cls: vivarium.environments.objects.state.ObjectState
     simulator_controller_cls: vivarium.controllers.simulator_controller.ControllerObject
     kwargs:
       n_exists: 10

@@ -2,11 +2,12 @@ import pytest
 
 import jax.numpy as jnp
 
+from vivarium.environments.objects.state import ObjectState
 from vivarium.utils.scene_configs import SceneConfiguration
 
 from vivarium.environments.state import EntityState
 
-from vivarium.environments.braitenberg.selective_sensing.state import AgentState, ObjectState
+from vivarium.environments.braitenberg.selective_sensing.state import AgentState
 
 
 scene_config = SceneConfiguration('braitenberg')
