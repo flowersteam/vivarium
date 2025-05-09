@@ -64,7 +64,12 @@ def update_dataclass(dataclass_instance, changes):
     if isinstance(changes, list):
         for change in changes:
             if change['__idx'] is None:
-                dataclass_instance = change['__value']
+                if isinstance(dataclass_instance, jnp.ndarray):
+                    dataclass_instance = jnp.array(change['__value'])
+                elif isinstance(dataclass_instance, np.ndarray):
+                    dataclass_instance = np.array(change['__value'])
+                else:
+                    dataclass_instance = change['__value']
             else:
                 if isinstance(dataclass_instance, np.ndarray):
                     dataclass_instance[change['__idx']] = change['__value']
