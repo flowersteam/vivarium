@@ -6,17 +6,9 @@ from jax import random, lax, vmap
 
 from jax_md import space
 
-from vivarium.environments.base_env import BaseEnv, NeighborManager
-from vivarium.environments.physics_engine import (
-    reset_force_state_fn,
-    collision_state_fn,
-    friction_state_fn,
-    init_state_fn,
-    step_state_fn
-)
+from vivarium.environments.environment import Environment, NeighborManager
 
 from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.selective_sensing import AgentState
 
 from vivarium.environments.braitenberg.simple.simple_env import (
     proximity_map,
@@ -396,43 +388,3 @@ def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_
         return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
     
     return state_fn
-    
-
-# TODO : Fix the non occlusion error in the step
-class SelectiveSensorsEnv(BaseEnv):
-    def __init__(self, state, box_size, neighbor_radius, seed=42, space_fn=space.periodic, occlusion=True, **kwargs):
-        
-        braitenberg_attr_name = state.field_name(AgentState)
-        assert braitenberg_attr_name is not None, "No braitenberg agent found in state"
-        
-        displacement, shift = space_fn(box_size)
-
-        exists_mask_fn = lambda state: state.entity_state.exists == 1
-        key = random.PRNGKey(seed)
-        key, new_key = random.split(key)
-        init_fn = init_state_fn(key)
-        neighbor_manager = NeighborManager(displacement, box_size, neighbor_radius, state)
-        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == state.entity_type_to_int(braitenberg_attr_name)
-        agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
-
-        # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
-        agents_idx_dense_senders = jnp.array(
-            [
-                jnp.argwhere(jnp.equal(agents_neighs_idx[0, :], idx)).flatten()
-                for idx in jnp.arange(getattr(state, braitenberg_attr_name).count())
-            ]
-        )
-        # Note: jnp.argwhere(jnp.equal(self.agents_neighs_idx[0, :], idx)).flatten() ~ jnp.where(agents_idx[0, :] == idx)
-
-        # Give the idx of the agent neighbors in dense representation
-        agents_idx_dense_receivers = agents_neighs_idx[1, :][agents_idx_dense_senders]
-        agents_idx_dense = agents_idx_dense_senders, agents_idx_dense_receivers
-
-        state_fns = [reset_force_state_fn(),
-                     braitenberg_state_fn(braitenberg_attr_name, displacement, exists_mask_fn, 
-                                          agents_neighs_idx, 
-                                          agents_idx_dense, occlusion=occlusion),
-                     collision_state_fn(displacement, exists_mask_fn),
-                     friction_state_fn(exists_mask_fn),
-                     step_state_fn(shift, exists_mask_fn, new_key)]
-        super().__init__(state, init_fn, state_fns, neighbor_manager, **kwargs)
