@@ -29,7 +29,7 @@ entities:
     - particles
 
   particles:
-    cls: vivarium.environments.particle_lenia.state.ParticleLeniaState
+    cls: vivarium.environments.entities.particle_lenia.ParticleLeniaState
     kwargs:
       n_exists: 600
       mass:

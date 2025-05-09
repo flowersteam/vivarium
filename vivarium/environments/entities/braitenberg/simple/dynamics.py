@@ -1,23 +1,14 @@
 import jax.numpy as jnp
 
 from jax import vmap
-from jax import random, ops
+from jax import ops
 
 from jax_md import space, rigid_body
 
-from vivarium.environments.environment import Environment, NeighborManager
 from vivarium.environments.utils import normal, relative_position
 
-from vivarium.environments.physics_engine import (
-    reset_force_state_fn,
-    collision_state_fn,
-    friction_state_fn,
-    init_state_fn,
-    step_state_fn
-)
-from vivarium.environments.braitenberg.simple import init_state
-from vivarium.environments.braitenberg.behaviors import Behaviors
-from vivarium.environments.braitenberg.simple.state import EntityType
+
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 
 
 ### Define the constants and the classes of the environment to store its state ###
@@ -279,31 +270,3 @@ def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
 
         return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
     return state_fn
-
-
-class BraitenbergEnv(Environment):
-    def __init__(self, state, space_fn=space.periodic, occlusion=True, seed=42):
-        
-        displacement, shift = space_fn(state.box_size)
-
-        exists_mask_fn = lambda state: state.entity_state.exists == 1
-        key = random.PRNGKey(seed)
-        key, new_key = random.split(key)
-        init_fn = init_state_fn(key)
-        neighbor_manager = NeighborManager(displacement, state)
-        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == EntityType.AGENT.value
-        agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
-        state_fns = [reset_force_state_fn(),
-                     braitenberg_state_fn(displacement, exists_mask_fn, 
-                                          agents_neighs_idx),
-                     collision_state_fn(displacement, exists_mask_fn),
-                     friction_state_fn(exists_mask_fn),
-                     step_state_fn(shift, exists_mask_fn, new_key)]
-        super().__init__(state, init_fn, state_fns, neighbor_manager)
-
-
-if __name__ == "__main__":
-    state = init_state()
-    env = BraitenbergEnv(state)
-    for _ in range(10):
-        state = env.step(state)

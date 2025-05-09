@@ -2,10 +2,10 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.controllers.dataclass_wrapper import *
-from vivarium.environments.objects.state import ObjectState
 from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.environments.state import to_rigid_body_state
-from vivarium.environments.braitenberg.selective_sensing import AgentState
+from vivarium.environments.entities.objects import ObjectState
+from vivarium.environments.entities.braitenberg import AgentState
 
 
 @pytest.fixture

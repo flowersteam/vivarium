@@ -1,6 +1,6 @@
 import numpy as np
 
-from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors, behavior_to_params
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.controllers.dataclass_wrapper import (

@@ -1,1 +1,0 @@
-from vivarium.environments.braitenberg.selective_sensing.state import AgentState

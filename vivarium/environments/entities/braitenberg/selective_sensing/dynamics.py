@@ -2,15 +2,13 @@ import logging as lg
 
 import jax
 import jax.numpy as jnp
-from jax import random, lax, vmap
+from jax import lax, vmap
 
 from jax_md import space
 
-from vivarium.environments.environment import Environment, NeighborManager
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 
-from vivarium.environments.braitenberg.behaviors import Behaviors
-
-from vivarium.environments.braitenberg.simple.simple_env import (
+from vivarium.environments.entities.braitenberg.simple.dynamics import (
     proximity_map,
     sensor_fn,
     linear_behavior,

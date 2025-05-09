@@ -7,7 +7,7 @@ import jax.numpy as jnp
 from vivarium.controllers.simulator_controller import (
     SimulatorController, ControllerAgent, ControllerObject
 )
-from vivarium.environments.braitenberg.behaviors import Behaviors
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 
 

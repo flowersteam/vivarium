@@ -1,9 +1,8 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.environments.braitenberg.selective_sensing.selective_sensing_env import AgentState
 from vivarium.controllers.simulator_controller import SimulatorController, ControllerEntity
-from vivarium.environments.braitenberg.selective_sensing.state import AgentState
+from vivarium.environments.entities.braitenberg import AgentState
 from vivarium.utils.scene_configs import SceneConfiguration
 
 NUM_STEPS = 10

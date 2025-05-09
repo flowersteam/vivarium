@@ -1,7 +1,7 @@
 import pytest
 from vivarium.utils.scene_configs import SceneConfiguration
-from vivarium.environments.braitenberg.selective_sensing.state import AgentState
-from vivarium.environments.particle_lenia.state import ParticleLeniaState
+from vivarium.environments.entities.braitenberg import AgentState
+from vivarium.environments.entities.particle_lenia import ParticleLeniaState
 
 NUM_STEPS = 10
 

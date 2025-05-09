@@ -6,7 +6,7 @@ from vivarium.environments.state import ParticleState
 
 from vivarium.environments.environment import exists_mask_fn
 
-from vivarium.environments.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
+from vivarium.environments.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
 
 def get_state_function(state, neighbor_manager):
     braitenberg_attr_name = state.field_name(AgentState)

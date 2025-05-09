@@ -10,7 +10,7 @@ import numpy as np
 from vivarium.controllers.simulator_controller import (
     SimulatorController, ControllerEntity
 )
-from vivarium.environments.braitenberg.behaviors import Behaviors
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 from vivarium.controllers.utils import Logger, RoutineHandler, BehaviorHandler
 
 

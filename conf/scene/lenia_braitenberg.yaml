@@ -31,7 +31,7 @@ entities:
     - particles
 
   agents:
-    cls: vivarium.environments.braitenberg.selective_sensing.state.AgentState
+    cls: vivarium.environments.entities.braitenberg.AgentState
     simulator_controller_cls: vivarium.controllers.simulator_controller.ControllerAgent
     kwargs:
       n_exists: 12
@@ -55,7 +55,7 @@ entities:
         _all_values_: 0.0
 
   particles:
-    cls: vivarium.environments.particle_lenia.state.ParticleLeniaState
+    cls: vivarium.environments.entities.particle_lenia.ParticleLeniaState
     kwargs:
       n_exists: 600
       mass:

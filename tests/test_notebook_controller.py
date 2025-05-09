@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from vivarium.environments.braitenberg.selective_sensing.state import AgentState
+from vivarium.environments.entities.braitenberg import AgentState
 from vivarium.controllers.notebook_controller import NotebookController
 from vivarium.utils.scene_configs import SceneConfiguration
 
