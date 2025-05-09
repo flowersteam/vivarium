@@ -1,1 +1,1 @@
-from vivarium.environments.particle_lenia.particle_lenia_env import ParticleLeniaEnv
+from vivarium.environments.particle_lenia.state import ParticleLeniaState
