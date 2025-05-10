@@ -4,7 +4,7 @@ import pytest
 NUM_STEPS = 10
 
 
-@pytest.mark.parametrize("scene_name", ["braitenberg", "particle_lenia"])
+@pytest.mark.parametrize("scene_name", ["braitenberg", "particle_lenia", "lenia_braitenberg"])
 def test_env(scene_name):
     """Test the stepping mechanism of the env with occlusion (default)"""
 

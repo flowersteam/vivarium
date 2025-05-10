@@ -3,11 +3,28 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.utils.scene_configs import SceneConfiguration
-from vivarium.controllers.panel_controller import PanelController
+from vivarium.controllers.panel_controller import PanelController, Agent
+
+
+@pytest.fixture(autouse=True)
+def cleanup_parameterized_class(request):
+    """
+    Remove the dynamically added parameters from the Agent class
+    as they might be remnants from previous tests
+    """
+    to_del = []
+    for field in Agent.__dict__.keys():
+        if field.startswith('sensed_') or field.startswith('behavior_'):
+            to_del.append(field)
+    for field in to_del:
+            delattr(Agent, field)
+            del Agent._param__parameters._cls_parameters[field]
+
 
 @pytest.mark.parametrize("scene_name", [
-    'braitenberg',
+    'lenia_braitenberg',
     'particle_lenia',
+    'braitenberg',
 ])
 def test_panel_controller(scene_name):
     config = SceneConfiguration(scene_name)
