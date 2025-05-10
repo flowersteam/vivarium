@@ -81,3 +81,11 @@ def test_simulator_state_param():
 
     assert controller.client.freq == -10
     assert controller.client.box_size == simulator_param.box_size
+
+
+def test_controller_parameters():
+    simulator = SceneConfiguration('lenia_braitenberg').create_simulator()
+    controller = SimulatorController(simulator)
+    controller.agents[0].visible_wheels = False
+    controller.apply_changes()
+    controller.update_state()
