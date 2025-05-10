@@ -41,7 +41,7 @@ entities:
         range: [20, 40, 20, 40]
       orientation: random
       diameter:
-        _all_values_: 0.6
+        _all_values_: 1.0
       friction:
         _all_values_: 1.0
       n_behaviors: 4
@@ -50,7 +50,7 @@ entities:
       wheel_diameter:
         _all_values_: 3.0
       proxs_dist_max:
-        _all_values_: 20.0
+        _all_values_: 6.0
       proxs_cos_min:
         _all_values_: 0.0
 
@@ -63,7 +63,7 @@ entities:
       diameter:
         _all_values_: 0.2
       friction:
-        _all_values_: 1.0
+        _all_values_: 0.8
       subtype_to_n:
         - [1, 600]
       position:
