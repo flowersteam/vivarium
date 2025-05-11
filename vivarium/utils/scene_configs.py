@@ -74,11 +74,11 @@ def load_scene_config(scene_name: str, seed=None) -> DictConfig:
 
         return scene_config
 
-def extend_kwargs(kwargs, n_exists):
-    """Extend kwargs to n_exists items"""
+def extend_kwargs(kwargs, n):
+    """Extend kwargs to n items"""
     for attr, val in kwargs.items():
         if isinstance(val, Iterable) and '_all_values_' in val:
-            kwargs[attr] = [val['_all_values_']] * n_exists
+            kwargs[attr] = [val['_all_values_']] * n
     return kwargs
 
 
@@ -128,12 +128,18 @@ class SceneConfiguration:
         self.config = load_scene_config(scene_name)
         self._base_state_cls = import_class(self.config.state.cls)
         self.entity_state_cls = import_class(self.config.entities.entity_state.cls)
+        for etype in self.config.entities.entity_types:
+            assert 'n_exists' in self.config.entities[etype].kwargs or 'n_max' in self.config.entities[etype].kwargs, f"Either n_max ot n_exists has to be defined for {etype}"
+            if 'n_max' not in self.config.entities[etype].kwargs:
+                OmegaConf.update(self.config, 'entities[' + etype + '].kwargs', {'n_max': self.config.entities[etype].kwargs.n_exists}, force_add=True)
+            if 'n_exists' not in self.config.entities[etype].kwargs:
+                OmegaConf.update(self.config, 'entities[' + etype + '].kwargs', {'n_exists': self.config.entities[etype].kwargs.n_max}, force_add=True)
         self.entity_type_configs = {
             entity_type: EntityTypeConfiguration(
                 name=entity_type,
                 idx=idx,
                 kwargs=extend_kwargs(self.config.entities[entity_type].kwargs,
-                                     self.config.entities[entity_type].kwargs.n_exists),
+                                     self.config.entities[entity_type].kwargs.n_max),
                 state_cls=import_class(self.config.entities[entity_type].cls)
             )
             for idx, entity_type in enumerate(self.config.entities.entity_types)}
@@ -155,7 +161,7 @@ class SceneConfiguration:
     def generate_missing_params(self):
         for entity_type in self.config.entities.entity_types:
             entity_params = self.config.entities[entity_type].kwargs
-            n = entity_params.n_exists
+            n = entity_params.n_max
             if entity_params.position == 'random':
                 # Generate random positions if not provided
                 pos_range = [0, self.config.environment.kwargs.box_size,
@@ -192,7 +198,7 @@ class SceneConfiguration:
         for etype in self.entity_types:
             cls = self.entity_type_configs[etype].state_cls
             etype_instance[etype] = cls.create(entity_idx_offset, entity_types_kwargs, etype)
-            entity_idx_offset += self.entity_type_configs[etype].kwargs['n_exists']
+            entity_idx_offset += self.entity_type_configs[etype].kwargs['n_max']
 
         state_cls = self.create_state_cls()
         state = state_cls(**{attr: jnp.array(val) for attr, val in self.config.state.kwargs.items()},
@@ -219,5 +225,5 @@ class SceneConfiguration:
     def create_controller_parameters(self):
         if self.config.client == 'None':
             return None
-        kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_exists) for entity_type, config in self.config.client.items()}
+        kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_max) for entity_type, config in self.config.client.items()}
         return create_dataclass_from_dict('ControllerParameters', kwargs)

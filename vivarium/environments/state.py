@@ -37,7 +37,7 @@ class BaseEntityState(simulate.NVEState):
                   if field.name not in ['entity_type', 'entity_type_idx', 'exists', 'momentum', 'force', 'previous_force']]
         for i, t in enumerate(entity_types):
             entity_params = entity_types_kwargs[t]
-            n = entity_params['n_exists']
+            n = entity_params['n_max']
             entity_type.extend([i] * n)
             entity_type_idx.extend(range(n))
             exists.extend([1] * entity_params['n_exists'] + [0] * (n - entity_params['n_exists']))
@@ -129,7 +129,7 @@ class ParticleState(BaseParticleState):
         etype_kwargs = entity_types_kwargs[entity_type]
         fields = [field.name for field in cls.__dataclass_fields__.values()]
         cls_kwargs = {attr: jnp.array(val) for attr, val in etype_kwargs.items() if attr in fields}
-        base_instance = BaseParticleState.create(entity_idx_offset, etype_kwargs['n_exists'])
+        base_instance = BaseParticleState.create(entity_idx_offset, etype_kwargs['n_max'])
         return cls(**cls_kwargs, **base_instance.__dict__, **kwargs)
     
     def state_fns(self):

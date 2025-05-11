@@ -18,8 +18,8 @@ object_field = state.field_name(ObjectState)
 
 agent = scene_config.entity_type_configs[agent_field].kwargs
 object = scene_config.entity_type_configs[object_field].kwargs
-n_agents = agent.n_exists
-n_objects = object.n_exists
+n_agents = agent.n_max
+n_objects = object.n_max
 
 expected_values = {
     "entity_type": [0] * n_agents + [1] * n_objects,
@@ -40,8 +40,8 @@ entity_types_kwargs = {etype: config.kwargs for etype, config in scene_config.en
 def test_create_entity_type_state(entity_type, entity_idx_offset):
     cls = scene_config.entity_type_configs[entity_type].state_cls
     state = cls.create(entity_idx_offset, entity_types_kwargs, entity_type)
-    n_exists = n_agents if entity_type == agent_field else n_objects
-    assert jnp.equal(state.entity_idx, jnp.array(range(entity_idx_offset, entity_idx_offset + n_exists))).all()
+    n_max = n_agents if entity_type == agent_field else n_objects
+    assert jnp.equal(state.entity_idx, jnp.array(range(entity_idx_offset, entity_idx_offset + n_max))).all()
 
     if state.__class__ == AgentState:
         assert jnp.equal(state.proxs_dist_max, jnp.array(expected_values["proxs_dist_max"])).all()

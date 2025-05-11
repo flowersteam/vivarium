@@ -50,8 +50,8 @@ class AgentState(ParticleState):
     def create(cls, entity_idx_offset, entity_types_kwargs, entity_type):
         
         agent_kwargs = entity_types_kwargs[entity_type]
-        n_entities = agent_kwargs['n_exists']
-        n_total_entities = sum([kwargs['n_exists'] for kwargs in entity_types_kwargs.values()])
+        n_entities = agent_kwargs['n_max']
+        n_total_entities = sum([kwargs['n_max'] for kwargs in entity_types_kwargs.values()])
         n_behaviors = agent_kwargs['n_behaviors']
         n_subtypes = 0
         for etype, kwargs in entity_types_kwargs.items():
