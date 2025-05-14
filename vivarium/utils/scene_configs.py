@@ -211,8 +211,22 @@ class SceneConfiguration:
     def create_environment(self, state=None):
         state = state or self.state
         env_cls = import_class(self.config.environment.cls)
-        return env_cls.init_neighbor_manager(state=state, **self.config.environment.kwargs)
+        env = env_cls.init_neighbor_manager(state=state, **self.config.environment.kwargs)
+        state_fns = self.create_state_fns(env)
+        env.state_fns.extend(state_fns)
+        return env
     
+    def create_state_fns(self, env):
+        state_fns = []
+        for name, data in self.config.environment.state_fns.items():
+            kwargs = data.kwargs if 'kwargs' in data else {}
+            kwargs = {kw: hydra.utils.instantiate(v) 
+                      if isinstance(v, DictConfig) and '_target_' in v 
+                      else v 
+                      for kw, v in kwargs.items()}
+            state_fns.append(import_class(data.factory)(env, **kwargs))
+        return state_fns
+
     def create_simulator(self, state=None, env=None):
         state = state or self.state
         # What about the case where state is not None and env is None?

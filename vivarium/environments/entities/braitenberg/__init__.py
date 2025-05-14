@@ -1,1 +1,1 @@
-from vivarium.environments.entities.braitenberg.selective_sensing.state import AgentState
+from vivarium.environments.entities.braitenberg.selective_sensing.state import AgentState, get_state_function

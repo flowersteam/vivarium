@@ -325,7 +325,7 @@ def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_
     assert occlusion, "Non occlusion not working yet"
     prox_motor_function = compute_all_agents_proxs_motors_occl if occlusion else compute_all_agents_proxs_motors
      
-    def state_fn(state, neighbors):
+    def state_fn(state, neighbors, key):
 
         # Retrieve different neighbors format
         senders, receivers = agents_neighs_idx

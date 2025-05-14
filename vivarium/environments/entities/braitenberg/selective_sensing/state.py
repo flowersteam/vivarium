@@ -4,21 +4,21 @@ from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environments.state import ParticleState
 
-from vivarium.environments.environment import exists_mask_fn
+from vivarium.environments.environment import get_mask_fn
 
 from vivarium.environments.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
 
-def get_state_function(state, neighbor_manager):
-    braitenberg_attr_name = state.field_name(AgentState)
+def get_state_function(env):
+    braitenberg_attr_name = env.state.field_name(AgentState)
     assert braitenberg_attr_name is not None, "No braitenberg agent found in state"
-    ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == state.entity_type_to_int(braitenberg_attr_name)
-    agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
+    ag_idx = env.state.entity_state.entity_type[env.neighbor_manager.neighbors.idx[0]] == env.state.entity_type_to_int(braitenberg_attr_name)
+    agents_neighs_idx = env.neighbor_manager.neighbors.idx[:, ag_idx]
 
     # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
     agents_idx_dense_senders = jnp.array(
         [
             jnp.argwhere(jnp.equal(agents_neighs_idx[0, :], idx)).flatten()
-            for idx in jnp.arange(getattr(state, braitenberg_attr_name).count())
+            for idx in jnp.arange(getattr(env.state, braitenberg_attr_name).count())
         ]
     )
     # Note: jnp.argwhere(jnp.equal(self.agents_neighs_idx[0, :], idx)).flatten() ~ jnp.where(agents_idx[0, :] == idx)
@@ -27,7 +27,7 @@ def get_state_function(state, neighbor_manager):
     agents_idx_dense_receivers = agents_neighs_idx[1, :][agents_idx_dense_senders]
     agents_idx_dense = agents_idx_dense_senders, agents_idx_dense_receivers
 
-    return braitenberg_state_fn(braitenberg_attr_name, neighbor_manager.displacement, exists_mask_fn, 
+    return braitenberg_state_fn(braitenberg_attr_name, env.neighbor_manager.displacement, get_mask_fn('exists'), 
                                 agents_neighs_idx, 
                                 agents_idx_dense, occlusion=True)
 

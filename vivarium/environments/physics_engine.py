@@ -117,9 +117,9 @@ def collision_force_fn(displacement):
     return force_fn
 
 
-def collision_state_fn(displacement, mask_fn):
-    coll_fn = collision_force_fn(displacement)
-    def state_fn(state, neighbor):
+def collision_state_fn(env, mask_fn):
+    coll_fn = collision_force_fn(env.neighbor_manager.displacement)
+    def state_fn(state, neighbor, key):
         mask = mask_fn(state)
         force = coll_fn(state, neighbor, mask)
         if state.entity_state.is_rigid_body():
@@ -152,8 +152,8 @@ def friction_force_fn(displacement):
     return friction_force
 
 
-def friction_state_fn(mask_fn):
-    def state_fn(state, neighbor):
+def friction_state_fn(env, mask_fn):
+    def state_fn(state, neighbor, key):
         mask = mask_fn(state)
         force = friction_force(state, neighbor, mask)
         if state.entity_state.is_rigid_body():
@@ -207,8 +207,8 @@ def mask_momentum(entity_state, exists_mask):
     return entity_state.set(momentum=momentum)
 
 
-def reset_force_state_fn():
-    def fn(state, neighbor):
+def reset_force_state_fn(env):
+    def fn(state, neighbor, key):
         if state.entity_state.is_rigid_body():
             zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
         else:
@@ -230,9 +230,9 @@ def init_state_fn(key, kT=0.0):
     return fn
 
 
-def step_state_fn(shift, mask_fn, key, kT=0.0):
-    
-    def state_fn(state, neighbor):
+def step_state_fn(env, mask_fn):
+    shift = env.neighbor_manager.shift
+    def state_fn(state, neighbor, key):
         mask = mask_fn(state)
 
         dt_2 = state.dt / 2.0
