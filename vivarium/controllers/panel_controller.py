@@ -179,7 +179,7 @@ class ParamEntity(ParameterizedData):
     friction = param.Number()
     exists = param.Boolean()
     color = param.Color()
-    visible = param.Boolean(True)
+    visible = param.Boolean()
 
     def __init__(self, entities, panel_parameters=[], **params):
         super().__init__(entities, 

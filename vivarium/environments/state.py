@@ -173,6 +173,7 @@ def field_accessors(cls):
 
 @field_accessors
 class BaseState:
+    time: jnp.int32
     dt: jnp.float32
     collision_alpha: jnp.float32
     collision_eps: jnp.float32

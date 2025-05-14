@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from jax import vmap
+from jax import vmap, random
 
 from jax_md.dataclasses import dataclass as md_dataclass, fields
 
@@ -85,3 +85,44 @@ def rigid_body_to_point_particle(module):
 
     return init_state, init_entities
 
+
+def generate_random_positions(n, position_range, key=random.PRNGKey(0)):
+    """
+    Generate random positions within a given as a jax array
+    :param n: number of positions to generate
+    :param position_range: range of positions (x_min, x_max, y_min, y_max)
+    :param key: jax random key
+    :return: array of random positions
+    """
+    x_min, x_max, y_min, y_max = position_range
+    key_x, key_y = random.split(key)
+    x_positions = random.uniform(key_x, shape=(n,), minval=x_min, maxval=x_max)
+    y_positions = random.uniform(key_y, shape=(n,), minval=y_min, maxval=y_max)
+    return jnp.stack([x_positions, y_positions], axis=-1)
+
+
+def generate_random_orientations(n, orientation_range, key=random.PRNGKey(0)):
+    """
+    Generate random orientations within the range [0, 2*pi) as a jax array
+    :param n: number of orientations to generate
+    :param key: jax random key
+    :return: array of random orientations
+    """
+    min, max = orientation_range
+    return random.uniform(key, shape=(n,), minval=min, maxval=max)
+
+def are_two_positions_close(position1, position2, atol):
+    """
+    Check if two positions are close to each other
+    :param position1: first position
+    :param position2: second position
+    :param atol: absolute tolerance
+    :return: boolean array indicating if the positions are close
+    """
+    return jnp.linalg.norm(position1 - position2, axis=-1) < atol
+
+
+def is_position_close(position, idx, other_positions, atol):
+    closes = vmap(are_two_positions_close, (None, 0, None))(position, other_positions, atol)
+    closes = closes.at[idx].set(False)
+    return jnp.any(closes, axis=-1)

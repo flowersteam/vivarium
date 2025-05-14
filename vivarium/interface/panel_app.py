@@ -93,6 +93,11 @@ class EntityManager:
 
         :param state: The state coming from the server
         """
+        if self.param_simulator_state.hide_non_existing:
+            exists = state.entity_state.exists[getattr(state, self.etype).entity_idx]
+            for i, e in enumerate(self.entities):
+                e.visible = bool(exists[i])
+            self.apply_visible_filter()      
         self.cds.data.update(self.get_cds_data(state))
 
     def create_cds_view(self):

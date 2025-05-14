@@ -5,6 +5,55 @@ environment:
     neighbor_radius: 300.0
     num_scan_steps: 100
     to_jit: True
+  state_fns:
+    reset:
+      factory: vivarium.environments.physics_engine.reset_force_state_fn
+    braitenberg:
+      factory: vivarium.environments.entities.braitenberg.get_state_function
+    collision:
+      factory: vivarium.environments.physics_engine.collision_state_fn
+      kwargs:
+        mask_fn:
+          _target_: vivarium.environments.environment.get_mask_fn
+          label: exists
+    friction:
+      factory: vivarium.environments.physics_engine.friction_state_fn
+      kwargs:
+        mask_fn:
+          _target_: vivarium.environments.environment.get_mask_fn
+          label: exists
+    spawn_resources:
+      factory: vivarium.environments.dynamics.existence.get_entity_spawn_state_fn
+      kwargs:
+        subtype: 2
+        period: 1000
+        position_range: [0, 100, 0, 100]
+        orientation_range: [0, 0.0001]
+    spawn_preys:
+      factory: vivarium.environments.dynamics.existence.get_entity_spawn_state_fn
+      kwargs:
+        subtype: 0
+        period: 1000
+        position_range: [0, 100, 0, 100]
+        orientation_range: [0, 6.28]
+    preys_consume_resources:
+          factory: vivarium.environments.dynamics.existence.get_consumption_state_fn
+          kwargs:
+            source_subtype: 0
+            target_subtype: 2
+            range: 10.0
+    predators_consume_preys:
+          factory: vivarium.environments.dynamics.existence.get_consumption_state_fn
+          kwargs:
+            source_subtype: 1
+            target_subtype: 0
+            range: 10.0
+    step:
+      factory: vivarium.environments.physics_engine.step_state_fn
+      kwargs:
+        mask_fn:
+          _target_: vivarium.environments.environment.get_mask_fn
+          label: exists
 
 simulator:
   cls: vivarium.simulator.Simulator
@@ -19,6 +68,7 @@ subtypes:
 state:
   cls: vivarium.environments.state.BaseState
   kwargs:
+    time: 0
     dt: 0.1
     collision_alpha: 2.0
     collision_eps: 1.0
@@ -58,7 +108,8 @@ entities:
     cls: vivarium.environments.entities.objects.ObjectState
     simulator_controller_cls: vivarium.controllers.simulator_controller.ControllerObject
     kwargs:
-      n_exists: 10
+      n_max: 20
+      n_exists: 1
       mass:
         _all_values_: 1.0
       position: random
@@ -69,7 +120,7 @@ entities:
       friction:
         _all_values_: 1.0
       subtype_to_n:
-        - [10, 3]
+        - [2, 20]
 
 client:
   agents:
