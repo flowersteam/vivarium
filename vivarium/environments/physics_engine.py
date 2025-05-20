@@ -136,9 +136,23 @@ def collision_force_fn(displacement):
 
 
 class CollisionForce(DynamicsFunction):
-    def __init__(self, name, precedence, mask_fn):
+    def __init__(self, name, precedence, epsilon, alpha, mask_fn):
         super().__init__(name, precedence)
+        self.epsilon = epsilon
+        self.alpha = alpha
         self.mask_fn = mask_fn
+
+    def init_state_fn(self, env):
+        return env.state.set(
+            collision_eps=self.epsilon,
+            collision_alpha=self.alpha
+            )
+
+    def update_scene_configuration(self, scene_config):
+        scene_config.base_state_cls.__annotations__['collision_eps'] = f32
+        scene_config.base_state_cls.__annotations__['collision_alpha'] = f32
+        scene_config.base_state_cls.collision_eps = None
+        scene_config.base_state_cls.collision_alpha = None
 
     def get_state_function(self, env):
         self.displacement = env.neighbor_manager.displacement

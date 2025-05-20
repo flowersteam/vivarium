@@ -175,8 +175,6 @@ def field_accessors(cls):
 class BaseState:
     time: jnp.int32
     dt: jnp.float32
-    collision_alpha: jnp.float32
-    collision_eps: jnp.float32
 
     def e_cond(self, etype):
         if isinstance(etype, str):

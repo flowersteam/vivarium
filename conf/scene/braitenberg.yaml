@@ -16,6 +16,8 @@ environment:
     collision:
       _target_: vivarium.environments.physics_engine.CollisionForce
       precedence: 2
+      epsilon: 1.0
+      alpha: 2.0
       mask_fn:
         _target_: vivarium.environments.environment.get_mask_fn
         label: exists
@@ -86,8 +88,8 @@ state:
   kwargs:
     time: 0
     dt: 0.1
-    collision_alpha: 2.0
-    collision_eps: 1.0
+    # collision_alpha: 2.0
+    # collision_eps: 1.0
 
 entities:
   entity_state:
