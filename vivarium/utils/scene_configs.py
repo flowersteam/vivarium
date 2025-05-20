@@ -124,10 +124,13 @@ class EntityTypeClientConfiguration:
 class SceneConfiguration:
 
     def __init__(self, scene_name: str, seed=None):
+
         self.scene_name = scene_name
         self.config = load_scene_config(scene_name)
-        self._base_state_cls = import_class(self.config.state.cls)
+        self.base_state_cls = import_class(self.config.state.cls)
         self.entity_state_cls = import_class(self.config.entities.entity_state.cls)
+
+
         for etype in self.config.entities.entity_types:
             assert 'n_exists' in self.config.entities[etype].kwargs or 'n_max' in self.config.entities[etype].kwargs, f"Either n_max ot n_exists has to be defined for {etype}"
             if 'n_max' not in self.config.entities[etype].kwargs:
@@ -156,7 +159,13 @@ class SceneConfiguration:
         self.entity_types = self.config.entities.entity_types
         self.seed = seed
         self.generate_missing_params()
-        self.state = self.create_state()
+
+
+        self.dynamics_factories = self.create_dynamics_factories()
+        for f in self.dynamics_factories:
+            f.update_scene_configuration(self)
+            
+        self.state = None  # self.create_state()
 
     def generate_missing_params(self):
         for entity_type in self.config.entities.entity_types:
@@ -182,10 +191,10 @@ class SceneConfiguration:
         """
 
         State = create_state_cls(
-            base_state_cls=self._base_state_cls,
+            base_state_cls=self.base_state_cls,
             entity_types=self.entity_types,
             entity_state_cls=self.entity_state_cls,
-            entity_types_to_cls={etype: config.state_cls for etype, config in self.entity_type_configs.items()}
+            entity_types_to_cls={etype: config.state_cls for etype, config in self.entity_type_configs.items()},
         )
 
         return State
@@ -202,33 +211,37 @@ class SceneConfiguration:
 
         state_cls = self.create_state_cls()
         state = state_cls(**{attr: jnp.array(val) for attr, val in self.config.state.kwargs.items()},
-                        entity_state = self.entity_state_cls.create(self.entity_types, entity_types_kwargs),  #, etype_order), 
+                        entity_state = self.entity_state_cls.create(self.entity_types, entity_types_kwargs),
                         **etype_instance)
         if rigid_body:
             state = state.set(entity_state = to_rigid_body_state(state.entity_state))
         return state
     
     def create_environment(self, state=None):
-        state = state or self.state
+        state = state or self.state or self.create_state()
         env_cls = import_class(self.config.environment.cls)
         env = env_cls.init_neighbor_manager(state=state, **self.config.environment.kwargs)
-        state_fns = self.create_state_fns(env)
-        env.state_fns.extend(state_fns)
+        dynamics_functions, names_to_idx = self.create_dynamics_functions(env)
+        env.dynamics_functions.extend(dynamics_functions)
+        env.dynamics_function_names_to_idx.update(names_to_idx)
+        for f in self.dynamics_factories:
+            env.state = f.init_state_fn(env)
         return env
     
-    def create_state_fns(self, env):
-        state_fns = []
-        for name, data in self.config.environment.state_fns.items():
-            kwargs = data.kwargs if 'kwargs' in data else {}
-            kwargs = {kw: hydra.utils.instantiate(v) 
-                      if isinstance(v, DictConfig) and '_target_' in v 
-                      else v 
-                      for kw, v in kwargs.items()}
-            state_fns.append(import_class(data.factory)(env, **kwargs))
-        return state_fns
+    def create_dynamics_factories(self):
+        dynamics_factories = []
+        for k, v in self.config.environment.state_fns.items():
+            dynamics_factories.append(hydra.utils.instantiate(v, name=k))
+        dynamics_factories.sort(key=lambda x: x.precedence)
+        return dynamics_factories
+
+    def create_dynamics_functions(self, env):
+        names_to_idx = {f.name:i for i, f in enumerate(self.dynamics_factories)}
+        fns = [f.get_state_function(env) for f in self.dynamics_factories]
+        return fns, names_to_idx
 
     def create_simulator(self, state=None, env=None):
-        state = state or self.state
+        state = state or self.state or self.create_state()
         # What about the case where state is not None and env is None?
         env = env or self.create_environment(state=state)
         simulator_cls = import_class(self.config.simulator.cls)

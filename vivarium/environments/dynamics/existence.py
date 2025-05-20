@@ -1,116 +1,407 @@
-from jax import lax
+from omegaconf import OmegaConf
+from jax import lax, debug
 from jax import random
 import jax.numpy as jnp
 
 from jax_md import space
+from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environments.utils import generate_random_positions, generate_random_orientations, is_position_close
+from vivarium.environments.physics_engine import DynamicsFunction
 
-def get_entity_spawn_state_fn(env, subtype, period, position_range, orientation_range):
+
+
+def sample_true_index(key, x):
+    # Ensure at least one True exists (undefined behavior otherwise)
+    has_true = jnp.any(x)
+    key, subkey = random.split(key)
+    # Generate random values for all positions
+    random_values = random.uniform(subkey, x.shape)
+    # Mask non-True entries with -infinity to exclude them
+    masked = lax.cond(has_true, lambda: jnp.where(x, random_values, -jnp.inf), lambda: jnp.zeros_like(random_values))
+    # Return the index of the maximum (randomly chosen True index)
+    return has_true, jnp.argmax(masked)
+
+def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
+    mask_entity_type = lax.cond(
+        entity_type == -1,
+        lambda: entity_state.exists == exists,
+        lambda: jnp.logical_and(
+            entity_state.exists == exists,
+            entity_state.entity_type == entity_type
+            )
+    )
+    mask_subtype = lax.cond(
+        subtype == -1,
+        lambda: entity_state.exists == exists,
+        lambda: jnp.logical_and(
+            entity_state.exists == exists,
+            entity_state.entity_subtype == subtype
+        )
+    )
+    mask = jnp.logical_and(mask_entity_type, mask_subtype)
+    return mask
+
+
+def non_existing(key, entity_state, entity_type=-1, subtype=-1):
+
+    mask = type_mask(entity_state, exists=0, entity_type=entity_type, subtype=subtype)
+    return sample_true_index(key, mask)
+
+
+def set_random_pos_at(key, all_positions, idx, range, max_trial=100):
+    def cond_fun(val):
+        pos, idx, other_positions, key, init, trial = val
+        return jnp.logical_and(trial < max_trial,
+                               jnp.logical_or(init, is_position_close(pos, idx, other_positions, atol=6.))
+        )
+    def body_fun(val):
+        pos, idx, other_positions, key, init, trial = val
+        key, sub_key = random.split(key)
+        new_pos = generate_random_positions(1, range, sub_key)[0]
+
+        return (new_pos, idx, other_positions, key, False, trial + 1)
     
-    def state_fn(state, neighbors, key):
+    new_pos, _, _, _, _, trial = lax.while_loop(cond_fun, body_fun, (jnp.zeros(2), idx, all_positions, key, True, 0))
+    
+    fail = trial >= max_trial
+    
+    return fail, all_positions.at[idx].set(new_pos)
 
-        cond = (state.time % period) == 0
+def set_random_orientation_at(key, orientations, idx, range):
+    key, sub_key = random.split(key)
+    return orientations.at[idx].set(generate_random_orientations(1, range, sub_key)[0])
 
-        def non_existing(exists):
-            mask = jnp.logical_and(jnp.logical_not(exists), state.entity_state.entity_subtype == subtype)
-            has_false = jnp.any(mask)
-            first_false = jnp.argmax(mask)
-            return has_false, first_false
+
+def spawn_entity_at_idx(key, state, idx, position_range, orientation_range):
+
+    key, key_pos, key_orientation = random.split(key, 3)
+
+    exists = state.entity_state.exists.at[idx].set(1)
+
+    debug.print('Here = {exists}', exists=exists)
+
+    fail, position = set_random_pos_at(
+        key_pos,
+        state.entity_state.position,
+        idx,
+        position_range
+    )
+
+    debug.print('fail = {fail}', fail=fail)
+
+    orientation = set_random_orientation_at(
+        key_orientation,
+        state.entity_state.orientation,
+        idx,
+        orientation_range
+    )
+
+    return state.set(
+        entity_state=state.entity_state.set(
+            exists=lax.cond(
+                fail,
+                lambda: state.entity_state.exists,
+                lambda: exists
+            ),
+            position=lax.cond(
+                fail,
+                lambda: state.entity_state.position,
+                lambda: position
+            ),
+            orientation=lax.cond(
+                fail,
+                lambda: state.entity_state.orientation,
+                lambda: orientation
+            ),
+        )
+    )
+
+
+
+
+def spawn_entity(key, state, position_range, orientation_range, entity_type=-1, subtype=-1):
+
+    has_non_existing, idx = non_existing(key, state.entity_state, entity_type=entity_type, subtype=subtype)
+
+    return lax.cond(
+        has_non_existing,
+        lambda: spawn_entity_at_idx(key, state, idx, position_range, orientation_range),
+        lambda: state
+    )
+
+
+class SpawnDynamics(DynamicsFunction):
+    def __init__(self, name, precedence, subtype, period, position_range, orientation_range):
+        super().__init__(name, precedence)
+        self.subtype = subtype
+        self.period = period
+        self.position_range = position_range
+        self.orientation_range = orientation_range
+    
+    def get_state_function(self, env):
         
-        def update_exists(exists, has_non_existing, first_non_existing):
+        def state_fn(state, neighbors, key):
 
-            new_exists = exists.at[first_non_existing].set(1)
-            return lax.cond(has_non_existing, lambda: new_exists, lambda: exists)
+            cond = (state.time % self.period) == 0
 
-        def set_random_pos_at(all_positions, idx, key):
-            def cond_fun(val):
-                pos, idx, other_positions, key, init = val
-                return jnp.logical_or(init, is_position_close(pos, idx, other_positions, atol=6.))
-            def body_fun(val):
-                pos, idx, other_positions, key, init = val
-                key, sub_key = random.split(key)
-                new_pos = generate_random_positions(1, position_range, sub_key)[0]
-                return (new_pos, idx, other_positions, key, False)
+            return lax.cond(
+                cond,
+                lambda: spawn_entity(key, state, self.position_range, self.orientation_range, subtype=self.subtype),
+                lambda: state
+            )
+        
+        return state_fn
+
+
+class ConsumptionDynamics(DynamicsFunction):
+    def __init__(self, name, precedence, source_subtype, target_subtype, range):
+        super().__init__(name, precedence)
+        self.source_subtype = source_subtype
+        self.target_subtype = target_subtype
+        self.range = range
+
+    def update_scene_configuration(self, scene_config):
+        @md_dataclass
+        class EntityState(scene_config.entity_state_cls):
+            consuming: jnp.ndarray
+            consumed: jnp.ndarray
+        scene_config.entity_state_cls = EntityState
+        for etype in scene_config.entity_types:
+            OmegaConf.update(scene_config.entity_type_configs[etype].kwargs, 'consuming', [False] * scene_config.entity_type_configs[etype].kwargs['n_max'], force_add=True)
+            OmegaConf.update(scene_config.entity_type_configs[etype].kwargs, 'consumed', [False] * scene_config.entity_type_configs[etype].kwargs['n_max'], force_add=True)
+
+
+    def get_state_function(self, env):
+        self.displacement = env.neighbor_manager.displacement
+        def state_fn(state, neighbors, key):
+            sources, targets = neighbors.idx
+            d_r = state.distance_map
+            mask = jnp.logical_and(
+                state.entity_state.exists[sources] == 1,
+                state.entity_state.exists[targets] == 1
+            )
+            mask = jnp.logical_and(
+                mask,
+                state.entity_state.entity_subtype[sources] == self.source_subtype)
+            mask = jnp.logical_and(
+                mask,
+                state.entity_state.entity_subtype[targets] == self.target_subtype)
+            mask = jnp.logical_and(
+                mask,
+                d_r < self.range
+            )
+
+            consumed = jnp.isin(jnp.arange(state.entity_state.exists.shape[0]), 
+                                jnp.where(mask, targets, -1))
+            consuming = jnp.isin(jnp.arange(state.entity_state.exists.shape[0]), 
+                                jnp.where(mask, sources, -1))
+            new_exists = jnp.where(
+                consumed,
+                0,
+                state.entity_state.exists
+            )
+
+            return state.set(
+                entity_state=state.entity_state.set(
+                    exists=new_exists,
+                    consuming=consuming,
+                    consumed=consumed
+                )
+            )
+
+        return state_fn
+
+class EnergyDynamics(DynamicsFunction):
+    def __init__(self, name, precedence):
+        super().__init__(name, precedence)
+        self.init_energy = 0.5
+        self.max_energy = 1.0
+        self.decay = 0.0001
+        self.burst = 1.
+        self.entity_type = 'agents'
+        self.subtype = -1
+        
+
+    def get_state_function(self, env):
+        entity_type = env.state.entity_type_to_int(self.entity_type)
+        idxs = env.state.e_cond(self.entity_type)
+        def state_fn(state, neighbors, key):
+            entities = getattr(state, self.entity_type)
             
-            new_pos = lax.while_loop(cond_fun, body_fun, (jnp.zeros(2), idx, all_positions, key[0], True))[0]
-            return all_positions.at[idx].set(new_pos)
+            cur_energy = jnp.zeros(state.entity_state.exists.shape)
+            cur_energy = cur_energy.at[idxs].set(entities.energy)
+
+            mask = type_mask(state.entity_state, entity_type=entity_type, subtype=self.subtype)
+
+            energy = jnp.where(
+                jnp.logical_and(mask, 
+                                state.entity_state.consuming
+                                ),
+                cur_energy + self.burst,
+                cur_energy
+            )
+            energy = jnp.where(
+                mask,
+                energy - self.decay,
+                energy
+            )
+
+            energy = jnp.clip(energy, 0, self.max_energy)
+
+            # debug.print('energy = {energy}', energy=energy)
+            return state.set(**{
+                self.entity_type: entities.set(
+                    energy=energy[idxs]
+                )}
+            )
         
-        def set_random_orientation_at(orientations, idx, key):
-            key, sub_key = random.split(key[1])
-            return orientations.at[idx].set(generate_random_orientations(1, orientation_range, sub_key)[0])
-
-        has_non_existing, first_non_existing = non_existing(state.entity_state.exists)
-
-        new_exists = lax.cond(
-            cond,
-            lambda: update_exists(state.entity_state.exists, has_non_existing, first_non_existing),
-            lambda: state.entity_state.exists
-        )
-
-        key, key_pos, key_orientation = random.split(key, 3)
-        new_position = lax.cond(
-            jnp.logical_and(cond, has_non_existing),
-            set_random_pos_at,
-            lambda pos, i, key: state.entity_state.position,
-            state.entity_state.position,
-            first_non_existing,
-            (key_pos, key_orientation)
-        )
-
-        new_orientation = lax.cond(
-            jnp.logical_and(cond, has_non_existing),
-            set_random_orientation_at,
-            lambda pos, i, key: state.entity_state.orientation,
-            state.entity_state.orientation,
-            first_non_existing,
-            (key_pos, key_orientation)
-        )
-
-        return state.set(
-            entity_state=state.entity_state.set(
-                exists = new_exists,
-                position=new_position,
-                orientation=new_orientation
-            )
-        )
+        return state_fn
     
-    return state_fn
+    def update_scene_configuration(self, scene_config):
+        @md_dataclass
+        class AgentState(scene_config.entity_type_configs[self.entity_type].state_cls):
+            energy: jnp.ndarray
+        scene_config.entity_type_configs[self.entity_type].state_cls = AgentState
+        OmegaConf.update(scene_config.entity_type_configs[self.entity_type].kwargs, 'energy', [self.init_energy] * scene_config.entity_type_configs[self.entity_type].kwargs['n_max'], force_add=True)
 
 
-def get_consumption_state_fn(env, source_subtype, target_subtype, range):
-    displacement = env.neighbor_manager.displacement
-    def state_fn(state, neighbors, key):
-        sources, targets = neighbors.idx
-        pos_s = state.entity_state.position[sources]
-        pos_r = state.entity_state.position[targets]
-        d_r = -space.map_bond(displacement)(pos_s, pos_r)
-        d_r = jnp.linalg.norm(d_r, axis=-1)
-        mask = jnp.logical_and(
-            state.entity_state.entity_subtype[sources] == source_subtype,
-            state.entity_state.entity_subtype[targets] == target_subtype)
-        mask = jnp.logical_and(
-            mask,
-            state.entity_state.exists[sources] == 1)
-        mask = jnp.logical_and(
-            mask,
-            state.entity_state.exists[targets] == 1)
-        mask = jnp.logical_and(
-            mask,
-            d_r < range
-        )
 
-        are_consumed = jnp.where(mask, targets, -1)
-        new_exists = jnp.where(
-            jnp.isin(jnp.arange(state.entity_state.exists.shape[0]), are_consumed),
-            0,
-            state.entity_state.exists
-        )
+class ReproductionDynamics(DynamicsFunction):
+    def __init__(self, name, precedence):
+        super().__init__(name, precedence)
+        self.birth_energy_threshold = 0.8
+        self.death_energy_threshold = 0.
+        self.birth_recovery_time = 10000
+        self.birth_radius = 20  # actually a square
+        self.birth_energy = 1.0
+        self.entity_type = 'agents'
+        self.subtype = -1  
+        
 
-        return state.set(
-            entity_state=state.entity_state.set(
-                exists=new_exists
+    def get_state_function(self, env):
+        idxs = env.state.e_cond(self.entity_type)
+        entity_type = env.state.entity_type_to_int(self.entity_type)
+
+        def state_fn(state, neighbors, key):
+
+            entities = getattr(state, self.entity_type)
+
+            cur_energy = jnp.zeros(state.entity_state.exists.shape)
+            cur_energy = cur_energy.at[idxs].set(entities.energy)
+
+            death_mask = jnp.logical_and(
+                type_mask(state.entity_state, entity_type=entity_type, subtype=self.subtype),
+                cur_energy <= self.death_energy_threshold
             )
-        )
+            
+            new_exists = jnp.where(
+                death_mask,
+                0,
+                state.entity_state.exists
+            )
 
-    return state_fn
+            state = state.set(
+                entity_state=state.entity_state.set(
+                    exists=new_exists
+                )
+            )
+
+            cur_recover_time = jnp.zeros(state.entity_state.exists.shape)
+            cur_recover_time = cur_recover_time.at[idxs].set(entities.recover_time)
+
+            reproduce_mask = jnp.logical_and(
+                jnp.logical_and(
+                    type_mask(state.entity_state, entity_type=entity_type, subtype=self.subtype), 
+                    cur_energy > self.birth_energy_threshold),
+                cur_recover_time > self.birth_recovery_time
+            )
+
+            # To make it simpler, we can reproduce only a single agent per time step
+            key, sub_key = random.split(key)
+            does_reproduce, parent_idx = sample_true_index(sub_key, reproduce_mask)
+
+            key, sub_key = random.split(key)
+            can_be_born, offspring_idx = non_existing(sub_key, state.entity_state, entity_type=entity_type, subtype=state.entity_state.entity_subtype[parent_idx])
+
+            parent_position = state.entity_state.position[parent_idx]
+            offspring_min = parent_position - self.birth_radius
+            offspring_max = parent_position + self.birth_radius
+            
+            offspring_position_range = (offspring_min[0], offspring_max[0], offspring_min[1], offspring_max[1])
+            offspring_orientation_range = (0, 2 * jnp.pi)
+
+            reproduction_cond = jnp.logical_and(does_reproduce, can_be_born)
+
+            state = lax.cond(
+                reproduction_cond,
+                lambda: spawn_entity_at_idx(
+                    key,
+                    state,
+                    offspring_idx,
+                    offspring_position_range,
+                    offspring_orientation_range
+                ),
+                lambda: state
+            )
+
+
+            energy = lax.cond(
+                reproduction_cond,
+                lambda: entities.energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(self.birth_energy),
+                lambda: entities.energy
+            )
+
+
+            recover_time = entities.recover_time + 1
+            debug.print('pre recover_time = {recover_time}', recover_time=recover_time)
+
+            recover_time = lax.cond(
+                reproduction_cond,
+                lambda: recover_time.at[state.entity_state.entity_type_idx[offspring_idx]].set(0),
+                lambda: recover_time
+            )
+
+            recover_time = lax.cond(
+                reproduction_cond,
+                lambda: recover_time.at[state.entity_state.entity_type_idx[parent_idx]].set(0),
+                lambda: recover_time
+            )
+            
+            # debug.print('idxs = {idxs}\n' +
+            #             'reproduction_cond = {reproduction_cond}\n' +
+            #             'does_reproduce = {does_reproduce}\n' +
+            #             'can_be_born = {can_be_born}\n' +
+            #             'cur_energy = {cur_energy}\n' +
+            #             'entities.energy = {entities_energy}\n' +
+            #             'cur_recover_time = {cur_recover_time}\n' +
+            #             'recover_time = {recover_time}\n' +
+            #             'consuming = {consuming}\n' +
+            #             'consumed = {consumed}',
+            #             idxs=idxs,
+            #             reproduction_cond=reproduction_cond,
+            #             does_reproduce=does_reproduce,
+            #             can_be_born=can_be_born,
+            #             cur_energy=cur_energy,
+            #             entities_energy=entities.energy,
+            #             cur_recover_time=cur_recover_time,
+            #             recover_time=recover_time,
+            #             consuming=state.entity_state.consuming,
+            #             consumed=state.entity_state.consumed)
+            
+            return state.set(
+                **{self.entity_type: entities.set(
+                    recover_time=recover_time,
+                    energy=energy,
+                )}
+            )
+        
+
+        return state_fn
+
+    def update_scene_configuration(self, scene_config):
+        @md_dataclass
+        class AgentState(scene_config.entity_type_configs[self.entity_type].state_cls):
+            recover_time: jnp.ndarray
+        scene_config.entity_type_configs[self.entity_type].state_cls = AgentState
+        OmegaConf.update(scene_config.entity_type_configs[self.entity_type].kwargs, 'recover_time', [0] * scene_config.entity_type_configs[self.entity_type].kwargs['n_max'], force_add=True)

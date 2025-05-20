@@ -56,13 +56,14 @@ nested_fields_to_access = {
 class Environment:
     def __init__(self, state, 
                  neighbor_manager,
-                 state_fns=[], 
+                 dynamics_functions=[], 
                  num_scan_steps=1, to_jit=True, key=random.PRNGKey(42)):
 
         self.state = state
         self.key, sub_key = random.split(key)
-        self.init_fn = init_state_fn(sub_key)
-        self.state_fns = state_fns
+        # self.init_fn = init_state_fn(sub_key)
+        self.dynamics_functions = dynamics_functions
+        self.dynamics_function_names_to_idx = {fn.__name__: idx for idx, fn in enumerate(dynamics_functions)}
         self.neighbor_manager = neighbor_manager
         self.num_scan_steps = num_scan_steps
         self.to_jit = to_jit
@@ -74,6 +75,9 @@ class Environment:
         neighbor_manager = NeighborManager(box_size, neighbor_radius, state, space_fn)
         return cls(state, neighbor_manager, **kwargs)
 
+    def get_dynamics_function_by_name(self, name):
+        return self.dynamics_functions[self.dynamics_function_names_to_idx[name]]
+    
     def _step_env(
         self, state, neighbors, num_scan_steps=1
     ):
@@ -85,7 +89,7 @@ class Environment:
             :return: tuple of (carry, carry) with carry=(new_state, new_neighbors)
             """
             state, neighbors, key = carry
-            for fn in self.state_fns:
+            for fn in self.dynamics_functions:
                 key, sub_key = random.split(key)
                 state = fn(state, neighbors, sub_key) 
             neighbors = self.neighbor_manager.update(state.entity_state.unified_position)
@@ -98,8 +102,8 @@ class Environment:
 
     def step(self, state):
 
-        if state.entity_state.momentum is None:
-            state = self.init_fn(state)
+        # if state.entity_state.momentum is None:
+        #     state = self.init_fn(state)
 
         current_state = state
         neighbors = self.neighbor_manager.neighbors

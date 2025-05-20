@@ -1,3 +1,4 @@
+import math
 from functools import partial
 
 import jax
@@ -6,9 +7,26 @@ import jax.numpy as jnp
 from jax import vmap, lax
 from jax_md import rigid_body, util, simulate, energy, quantity
 
+from vivarium.environments.utils import proximity_map
+from omegaconf import OmegaConf
+
 f32 = util.f32
 
 SPACE_NDIMS = 2
+
+class DynamicsFunction:
+    def __init__(self, name, precedence):
+        self.name = name
+        self.precedence = precedence
+
+    def init_state_fn(self, env):
+        return env.state
+
+    def get_state_function(self, env):
+        raise NotImplementedError("DynamicFunction is an abstract class")
+    
+    def update_scene_configuration(self, scene_config):
+        pass
 
 
 def friction_state_fn(mask_fn):
@@ -117,19 +135,25 @@ def collision_force_fn(displacement):
     return force_fn
 
 
-def collision_state_fn(env, mask_fn):
-    coll_fn = collision_force_fn(env.neighbor_manager.displacement)
-    def state_fn(state, neighbor, key):
-        mask = mask_fn(state)
-        force = coll_fn(state, neighbor, mask)
-        if state.entity_state.is_rigid_body():
-            force = force.set(center=state.entity_state.force.center + force.center,
-                              orientation=state.entity_state.force.orientation + force.orientation)
-        else:
-            force = state.entity_state.force + force
-        entity_state=state.entity_state.set(force=force)
-        return state.set(entity_state=entity_state)
-    return state_fn
+class CollisionForce(DynamicsFunction):
+    def __init__(self, name, precedence, mask_fn):
+        super().__init__(name, precedence)
+        self.mask_fn = mask_fn
+
+    def get_state_function(self, env):
+        self.displacement = env.neighbor_manager.displacement
+        coll_fn = collision_force_fn(self.displacement)
+        def state_fn(state, neighbor, key):
+            mask = self.mask_fn(state)
+            force = coll_fn(state, neighbor, mask)
+            if state.entity_state.is_rigid_body():
+                force = force.set(center=state.entity_state.force.center + force.center,
+                                orientation=state.entity_state.force.orientation + force.orientation)
+            else:
+                force = state.entity_state.force + force
+            entity_state=state.entity_state.set(force=force)
+            return state.set(entity_state=entity_state)
+        return state_fn
 
 
 # Functions to compute the verlet force on the whole system
@@ -151,19 +175,23 @@ def friction_force(state, neighbor, exists_mask):
 def friction_force_fn(displacement):
     return friction_force
 
+class FrictionForce(DynamicsFunction):
+    def __init__(self, name, precedence, mask_fn):
+        super().__init__(name, precedence)
+        self.mask_fn = mask_fn
 
-def friction_state_fn(env, mask_fn):
-    def state_fn(state, neighbor, key):
-        mask = mask_fn(state)
-        force = friction_force(state, neighbor, mask)
-        if state.entity_state.is_rigid_body():
-            force = force.set(center=state.entity_state.force.center + force.center,
-                              orientation=state.entity_state.force.orientation + force.orientation)
-        else:
-            force = state.entity_state.force + force
-        entity_state=state.entity_state.set(force=force)
-        return state.set(entity_state=entity_state)
-    return state_fn
+    def get_state_function(self, env):
+        def state_fn(state, neighbor, key):
+            mask = self.mask_fn(state)
+            force = friction_force(state, neighbor, mask)
+            if state.entity_state.is_rigid_body():
+                force = force.set(center=state.entity_state.force.center + force.center,
+                                orientation=state.entity_state.force.orientation + force.orientation)
+            else:
+                force = state.entity_state.force + force
+            entity_state=state.entity_state.set(force=force)
+            return state.set(entity_state=entity_state)
+        return state_fn
 
 
 def sum_forces(force_list):
@@ -207,14 +235,16 @@ def mask_momentum(entity_state, exists_mask):
     return entity_state.set(momentum=momentum)
 
 
-def reset_force_state_fn(env):
-    def fn(state, neighbor, key):
-        if state.entity_state.is_rigid_body():
-            zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
-        else:
-            zeros = jnp.zeros_like(state.entity_state.force)
-        return state.set(entity_state=state.entity_state.set(force=zeros))
-    return fn
+class ResetForce(DynamicsFunction):
+
+    def get_state_function(self, env):
+        def fn(state, neighbor, key):
+            if state.entity_state.is_rigid_body():
+                zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
+            else:
+                zeros = jnp.zeros_like(state.entity_state.force)
+            return state.set(entity_state=state.entity_state.set(force=zeros))
+        return fn
 
 
 def init_state_fn(key, kT=0.0):
@@ -229,25 +259,64 @@ def init_state_fn(key, kT=0.0):
         
     return fn
 
+class Step(DynamicsFunction):
+    def __init__(self, name, precedence, mask_fn):
+        super().__init__(name, precedence)
+        self.mask_fn = mask_fn
+        
+    def init_state_fn(self, env):
+        if env.state.entity_state.momentum is None:
+            state = init_state_fn(env.key)(env.state)
+        return state
 
-def step_state_fn(env, mask_fn):
-    shift = env.neighbor_manager.shift
-    def state_fn(state, neighbor, key):
-        mask = mask_fn(state)
+    def get_state_function(self, env):
+        self.shift = env.neighbor_manager.shift
+        def state_fn(state, neighbor, key):
+            mask = self.mask_fn(state)
 
-        dt_2 = state.dt / 2.0
+            dt_2 = state.dt / 2.0
 
-        # Compute changes on entities
-        new_force = state.entity_state.force
-        entity_state=state.entity_state.set(force=state.entity_state.previous_force)
-        entity_state = simulate.momentum_step(entity_state, dt_2)
-        # TODO : why do we used dt and not dt/2 in the line below ?
-        entity_state = simulate.position_step(
-            entity_state, shift, dt_2, neighbor=neighbor
-        )
-        entity_state = entity_state.set(force=new_force)
-        entity_state = entity_state.set(previous_force=new_force)
-        entity_state = simulate.momentum_step(entity_state, dt_2)
-        entity_state = mask_momentum(entity_state, mask)
-        return state.set(entity_state=entity_state)
-    return state_fn
+            # Compute changes on entities
+            new_force = state.entity_state.force
+            entity_state=state.entity_state.set(force=state.entity_state.previous_force)
+            entity_state = simulate.momentum_step(entity_state, dt_2)
+            # TODO : why do we used dt and not dt/2 in the line below ?
+            entity_state = simulate.position_step(
+                entity_state, self.shift, dt_2, neighbor=neighbor
+            )
+            entity_state = entity_state.set(force=new_force)
+            entity_state = entity_state.set(previous_force=new_force)
+            entity_state = simulate.momentum_step(entity_state, dt_2)
+            entity_state = mask_momentum(entity_state, mask)
+            return state.set(entity_state=entity_state)
+        return state_fn
+
+
+class ProximityMap(DynamicsFunction):
+
+    def init_state_fn(self, env):
+        fn = self.get_state_function(env)
+        state = fn(env.state, env.neighbor_manager.neighbors, env.key)
+        return state
+        
+
+    def update_scene_configuration(self, scene_config):
+        scene_config.base_state_cls.__annotations__['distance_map'] = jnp.ndarray
+        scene_config.base_state_cls.__annotations__['orientation_map'] = jnp.ndarray
+        scene_config.base_state_cls.distance_map = None
+        scene_config.base_state_cls.orientation_map = None
+
+    def get_state_function(self, env):
+        def state_fn(state, neighbors, key):
+            sources, targets = neighbors.idx
+            dist, theta = proximity_map(env.neighbor_manager.displacement,
+                                         state.entity_state.position[sources],
+                                         state.entity_state.position[targets],
+                                         state.entity_state.orientation[sources]
+                                         )
+            return state.set(
+                distance_map = dist,
+                orientation_map = theta
+            )
+
+        return state_fn

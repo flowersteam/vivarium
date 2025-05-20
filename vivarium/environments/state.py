@@ -204,8 +204,10 @@ def create_state_cls(base_state_cls, entity_state_cls, entity_types, entity_type
         
     for field, cls in entity_types_to_cls.items():
         State.__annotations__[field] = cls
+        setattr(State, field, None)
 
     State.__annotations__['entity_state'] = entity_state_cls
+    State.entity_state = None
 
     def entity_type_to_int(self, name):
         if name not in entity_types:
@@ -219,14 +221,5 @@ def create_state_cls(base_state_cls, entity_state_cls, entity_types, entity_type
         return entity_types[idx]
     State.entity_type_to_str = entity_type_to_str
 
-    def state_fns(self, neighbor_manager=None):
-        fns = []
-        for field_name in self.__dataclass_fields__.keys():
-            field = getattr(self, field_name)
-            if isinstance(field, ParticleState):
-                for f in field.state_fns():
-                    fns.append(f(self, neighbor_manager))
-        return fns
-    State.state_fns = state_fns
 
     return md_dataclass(State)

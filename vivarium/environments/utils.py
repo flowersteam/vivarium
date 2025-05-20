@@ -3,6 +3,8 @@ from jax import vmap, random
 
 from jax_md.dataclasses import dataclass as md_dataclass, fields
 
+from jax_md import space
+
 
 @vmap
 def normal(theta):
@@ -41,6 +43,15 @@ def relative_position(displ, theta):
     relative_theta = theta_displ - theta
     return dist, relative_theta
 
+def proximity_map(displacement_fn, source_positions, target_positions, source_orientations):
+
+    d_r = -space.map_bond(displacement_fn)(
+        source_positions, target_positions
+    )  # Looks like it should be opposite, but don't understand why
+
+    dist, theta = vmap(relative_position, (0,0))(d_r, source_orientations)
+
+    return dist, theta
 
 def rigid_body_to_point_particle(module):
 

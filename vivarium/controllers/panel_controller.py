@@ -206,6 +206,8 @@ class Agent(ParamEntity):
     wheel_diameter = param.Number()
     proxs_dist_max = param.Number()
     proxs_cos_min = param.Number()
+    # energy = param.Number()
+    # recover_time = param.Number()
     visible_wheels = param.Boolean(True)
     visible_proxs = param.Boolean(True)
 
