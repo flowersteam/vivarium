@@ -1,14 +1,12 @@
-from omegaconf import OmegaConf
 from jax import lax, debug
 from jax import random
 import jax.numpy as jnp
 
-from jax_md import space
 from jax_md.dataclasses import dataclass as md_dataclass
 
+from vivarium.environments.state import BaseEntityState
 from vivarium.environments.utils import generate_random_positions, generate_random_orientations, is_position_close
-from vivarium.environments.physics_engine import DynamicsFunction
-
+from vivarium.environments.physics_engine import Component
 
 
 def sample_true_index(key, x):
@@ -21,6 +19,7 @@ def sample_true_index(key, x):
     masked = lax.cond(has_true, lambda: jnp.where(x, random_values, -jnp.inf), lambda: jnp.zeros_like(random_values))
     # Return the index of the maximum (randomly chosen True index)
     return has_true, jnp.argmax(masked)
+
 
 def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
     mask_entity_type = lax.cond(
@@ -68,6 +67,7 @@ def set_random_pos_at(key, all_positions, idx, range, max_trial=100):
     
     return fail, all_positions.at[idx].set(new_pos)
 
+
 def set_random_orientation_at(key, orientations, idx, range):
     key, sub_key = random.split(key)
     return orientations.at[idx].set(generate_random_orientations(1, range, sub_key)[0])
@@ -79,16 +79,12 @@ def spawn_entity_at_idx(key, state, idx, position_range, orientation_range):
 
     exists = state.entity_state.exists.at[idx].set(1)
 
-    debug.print('Here = {exists}', exists=exists)
-
     fail, position = set_random_pos_at(
         key_pos,
         state.entity_state.position,
         idx,
         position_range
     )
-
-    debug.print('fail = {fail}', fail=fail)
 
     orientation = set_random_orientation_at(
         key_orientation,
@@ -118,8 +114,6 @@ def spawn_entity_at_idx(key, state, idx, position_range, orientation_range):
     )
 
 
-
-
 def spawn_entity(key, state, position_range, orientation_range, entity_type=-1, subtype=-1):
 
     has_non_existing, idx = non_existing(key, state.entity_state, entity_type=entity_type, subtype=subtype)
@@ -131,7 +125,7 @@ def spawn_entity(key, state, position_range, orientation_range, entity_type=-1, 
     )
 
 
-class SpawnDynamics(DynamicsFunction):
+class SpawnComponent(Component):
     def __init__(self, name, precedence, subtype, period, position_range, orientation_range):
         super().__init__(name, precedence)
         self.subtype = subtype
@@ -139,7 +133,7 @@ class SpawnDynamics(DynamicsFunction):
         self.position_range = position_range
         self.orientation_range = orientation_range
     
-    def get_state_function(self, env):
+    def get_step_function(self, state, neighbor_manager, key):
         
         def state_fn(state, neighbors, key):
 
@@ -154,27 +148,33 @@ class SpawnDynamics(DynamicsFunction):
         return state_fn
 
 
-class ConsumptionDynamics(DynamicsFunction):
+class ConsumptionComponent(Component):
     def __init__(self, name, precedence, source_subtype, target_subtype, range):
         super().__init__(name, precedence)
         self.source_subtype = source_subtype
         self.target_subtype = target_subtype
         self.range = range
 
-    def update_scene_configuration(self, scene_config):
+    def init_state_fn(self, state, neighbor_manager, key):
+        return state.set(
+            entity_state=state.entity_state.set(
+                consuming=jnp.full(state.entity_state.exists.shape, False),
+                consumed=jnp.full(state.entity_state.exists.shape, False)
+            )
+        )
+        
+    def update_state_cls(self, state_cls):
+        base_cls = state_cls.__annotations__['entity_state'] if 'entity_state' in state_cls.__annotations__ else BaseEntityState
         @md_dataclass
-        class EntityState(scene_config.entity_state_cls):
-            consuming: jnp.ndarray
-            consumed: jnp.ndarray
-        scene_config.entity_state_cls = EntityState
-        for etype in scene_config.entity_types:
-            OmegaConf.update(scene_config.entity_type_configs[etype].kwargs, 'consuming', [False] * scene_config.entity_type_configs[etype].kwargs['n_max'], force_add=True)
-            OmegaConf.update(scene_config.entity_type_configs[etype].kwargs, 'consumed', [False] * scene_config.entity_type_configs[etype].kwargs['n_max'], force_add=True)
+        class EntityState(base_cls):
+            consuming: jnp.ndarray = None
+            consumed: jnp.ndarray = None
+        state_cls.__annotations__['entity_state'] = EntityState
+        return state_cls
 
-
-    def get_state_function(self, env):
-        self.displacement = env.neighbor_manager.displacement
-        def state_fn(state, neighbors, key):
+    def get_step_function(self, state, neighbor_manager, key):
+        self.displacement = neighbor_manager.displacement
+        def step_fn(state, neighbors, key):
             sources, targets = neighbors.idx
             d_r = state.distance_map
             mask = jnp.logical_and(
@@ -210,22 +210,24 @@ class ConsumptionDynamics(DynamicsFunction):
                 )
             )
 
-        return state_fn
+        return step_fn
 
-class EnergyDynamics(DynamicsFunction):
-    def __init__(self, name, precedence):
+
+class EnergyComponent(Component):
+    def __init__(self, name, precedence,
+                 entity_type, subtype,
+                 init_energy, max_energy, decay, burst):
         super().__init__(name, precedence)
-        self.init_energy = 0.5
-        self.max_energy = 1.0
-        self.decay = 0.0001
-        self.burst = 1.
-        self.entity_type = 'agents'
-        self.subtype = -1
-        
+        self.init_energy = init_energy  # 0.5
+        self.max_energy = max_energy  # 1.0
+        self.decay = decay  # 0.0001
+        self.burst = burst  # 1.
+        self.entity_type = entity_type  # 'agents'
+        self.subtype = subtype  # -1
 
-    def get_state_function(self, env):
-        entity_type = env.state.entity_type_to_int(self.entity_type)
-        idxs = env.state.e_cond(self.entity_type)
+    def get_step_function(self, state, neighbor_manager, key):
+        entity_type = state.entity_type_to_int(self.entity_type)
+        idxs = state.e_cond(self.entity_type)
         def state_fn(state, neighbors, key):
             entities = getattr(state, self.entity_type)
             
@@ -249,7 +251,6 @@ class EnergyDynamics(DynamicsFunction):
 
             energy = jnp.clip(energy, 0, self.max_energy)
 
-            # debug.print('energy = {energy}', energy=energy)
             return state.set(**{
                 self.entity_type: entities.set(
                     energy=energy[idxs]
@@ -258,28 +259,44 @@ class EnergyDynamics(DynamicsFunction):
         
         return state_fn
     
-    def update_scene_configuration(self, scene_config):
-        @md_dataclass
-        class AgentState(scene_config.entity_type_configs[self.entity_type].state_cls):
-            energy: jnp.ndarray
-        scene_config.entity_type_configs[self.entity_type].state_cls = AgentState
-        OmegaConf.update(scene_config.entity_type_configs[self.entity_type].kwargs, 'energy', [self.init_energy] * scene_config.entity_type_configs[self.entity_type].kwargs['n_max'], force_add=True)
+    def update_state_cls(self, state_cls):
+        assert 'entity_state' in state_cls.__annotations__, 'no entity_state in state class'
+        assert 'consuming' in state_cls.__annotations__['entity_state'].__annotations__, 'consuming not in entity_state'
+        if self.entity_type in state_cls.__annotations__:
+            @md_dataclass
+            class AgentState(state_cls.__annotations__[self.entity_type]):
+                energy: jnp.ndarray = None
+        else:
+            @md_dataclass
+            class AgentState:
+                energy: jnp.ndarray = None
+        state_cls.__annotations__[self.entity_type] = AgentState
+        return state_cls
+
+    def init_state_fn(self, state, neighbor_manager, key):
+        return state.set(
+            **{self.entity_type: getattr(state, self.entity_type).set(
+                energy=jnp.full(getattr(state, self.entity_type).count(), self.init_energy)
+            )}
+        )
 
 
-
-class ReproductionDynamics(DynamicsFunction):
-    def __init__(self, name, precedence):
+class ReproductionComponent(Component):
+    def __init__(self, name, precedence,
+                 entity_type, subtype,
+                 birth_energy_threshold, death_energy_threshold,
+                 birth_recovery_time, birth_radius, birth_energy):
         super().__init__(name, precedence)
-        self.birth_energy_threshold = 0.8
-        self.death_energy_threshold = 0.
-        self.birth_recovery_time = 10000
-        self.birth_radius = 20  # actually a square
-        self.birth_energy = 1.0
-        self.entity_type = 'agents'
-        self.subtype = -1  
+        self.entity_type = entity_type  # 'agents'
+        self.subtype = subtype  # -1  
+        self.birth_energy_threshold = birth_energy_threshold  # 0.8
+        self.death_energy_threshold = death_energy_threshold  # 0.
+        self.birth_recovery_time = birth_recovery_time  # 10000
+        self.birth_radius = birth_radius  # 20  # actually a square
+        self.birth_energy = birth_energy  # 1.0
         
 
-    def get_state_function(self, env):
+    def get_step_function(self, env):
         idxs = env.state.e_cond(self.entity_type)
         entity_type = env.state.entity_type_to_int(self.entity_type)
 
@@ -354,7 +371,7 @@ class ReproductionDynamics(DynamicsFunction):
 
 
             recover_time = entities.recover_time + 1
-            debug.print('pre recover_time = {recover_time}', recover_time=recover_time)
+            # debug.print('pre recover_time = {recover_time}', recover_time=recover_time)
 
             recover_time = lax.cond(
                 reproduction_cond,
@@ -396,12 +413,20 @@ class ReproductionDynamics(DynamicsFunction):
                 )}
             )
         
-
         return state_fn
 
-    def update_scene_configuration(self, scene_config):
+    def update_state_cls(self, state_cls):
         @md_dataclass
-        class AgentState(scene_config.entity_type_configs[self.entity_type].state_cls):
-            recover_time: jnp.ndarray
-        scene_config.entity_type_configs[self.entity_type].state_cls = AgentState
-        OmegaConf.update(scene_config.entity_type_configs[self.entity_type].kwargs, 'recover_time', [0] * scene_config.entity_type_configs[self.entity_type].kwargs['n_max'], force_add=True)
+        class AgentState(state_cls.__annotations__[self.entity_type]):
+            recover_time: jnp.ndarray = None
+        state_cls.__annotations__[self.entity_type] = AgentState
+        return state_cls
+
+    def init_state_fn(self, state, neighbor_manager, key):
+        n_max = getattr(state, self.entity_type).position.shape[0]
+        recover_time = jnp.zeros(n_max, dtype=int)
+        return state.set(
+            **{self.entity_type: getattr(state, self.entity_type).set(
+                recover_time=recover_time
+            )}
+        )

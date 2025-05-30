@@ -6,31 +6,23 @@ from jax import vmap
 from jax_md import quantity
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.state import ParticleState
+from vivarium.environments.state import BaseParticleState
+from vivarium.environments.entities import EntityComponent
+
 
 from_mask_fn = lambda state: jnp.array(range(len(state.entity_state.entity_type_idx)))
 
 to_mask_fn = lambda state: state.field(ParticleLeniaState).entity_idx
 
 
-def get_state_function(state, neighbor_manager):
-    return particle_lenia_state_fn(neighbor_manager.displacement, state.field_name(ParticleLeniaState), from_mask_fn, to_mask_fn)
-
-
 @md_dataclass
-class ParticleLeniaState(ParticleState):
+class ParticleLeniaState(BaseParticleState):
     mu_k: jnp.array
     sigma_k: jnp.array
     w_k: jnp.array
     mu_g: jnp.array
     sigma_g: jnp.array
     c_rep: jnp.array
-    @classmethod
-    def create(cls, entity_idx_offset, entity_types_kwargs, entity_type):
-        return cls._create(entity_idx_offset, entity_types_kwargs, entity_type)
-    
-    def state_fns(self):
-        return [get_state_function]
     
 
 def disp(displacement, position, other_positions):
@@ -54,7 +46,7 @@ def lenia_energy_fn(displacement):
 
 def particle_lenia_state_fn(displacement, particle_lenia_state_field, from_mask_fn, to_mask_fn):
     
-    def state_fn(state, neighbor):
+    def state_fn(state, neighbor, key):
         from_mask = from_mask_fn(state)
         to_mask = to_mask_fn(state)
         force = quantity.force(
@@ -68,3 +60,59 @@ def particle_lenia_state_fn(displacement, particle_lenia_state_field, from_mask_
             entity_state=state.entity_state.set(force=all + state.entity_state.force)
         )
     return state_fn
+
+
+class ParticleLeniaComponent(EntityComponent):
+    def __init__(self, name, precedence, entity_type, subtype,
+                 position, orientation, mass, diameter, friction, exists,
+                 mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep
+                 ):
+        super().__init__(name=name, precedence=precedence, 
+                         entity_type=entity_type, subtype=subtype,
+                         position=position, orientation=orientation,
+                         mass=mass, diameter=diameter, 
+                         friction=friction, exists=exists)  
+
+        self.mu_k = jnp.array(mu_k)
+        self.sigma_k = jnp.array(sigma_k)
+        self.w_k = jnp.array(w_k)
+        self.mu_g = jnp.array(mu_g)
+        self.sigma_g = jnp.array(sigma_g)
+        self.c_rep = jnp.array(c_rep)
+
+    @classmethod
+    def from_config(cls, name, scene_config, config_node):
+        kwargs = cls.get_kwargs(name, scene_config, config_node) 
+        return cls(
+            name=name,
+            **kwargs
+        )
+
+    def update_state_cls(self, state_cls):
+        state_cls.__annotations__[self.entity_type] = ParticleLeniaState
+        setattr(state_cls, self.entity_type, None)
+        return state_cls
+    
+
+    def init_state_fn(self, state, neighbor_manager, key):
+        entity_idx = jnp.arange(self.offset, self.offset + self.n_max, dtype=int)
+        particle_state = state.__annotations__[self.entity_type](
+                           entity_type=self.entity_type_int,
+                           entity_idx=entity_idx,
+                           mu_k=self.mu_k,
+                           sigma_k=self.sigma_k,
+                           w_k=self.w_k,
+                           mu_g=self.mu_g,
+                           sigma_g=self.sigma_g,
+                           c_rep=self.c_rep,
+        )
+
+        return state.set(
+            **{self.entity_type: particle_state}
+        )
+
+    def get_step_function(self, state, neighbor_manager, key):
+        return particle_lenia_state_fn(neighbor_manager.displacement, 
+                                       self.entity_type, 
+                                       from_mask_fn, to_mask_fn)
+      

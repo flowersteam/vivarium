@@ -1,1 +1,1 @@
-from vivarium.environments.entities.braitenberg.selective_sensing.state import AgentState, BraitenbergDynamics
+from vivarium.environments.entities.braitenberg.selective_sensing.state import BraitenbergComponent

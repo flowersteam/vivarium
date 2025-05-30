@@ -1,5 +1,7 @@
-import math
 from functools import partial
+
+import hydra
+import omegaconf
 
 import jax
 import jax.numpy as jnp
@@ -8,33 +10,49 @@ from jax import vmap, lax
 from jax_md import rigid_body, util, simulate, energy, quantity
 
 from vivarium.environments.utils import proximity_map
-from omegaconf import OmegaConf
+
 
 f32 = util.f32
 
 SPACE_NDIMS = 2
 
-class DynamicsFunction:
+class Component:
     def __init__(self, name, precedence):
         self.name = name
         self.precedence = precedence
 
-    def init_state_fn(self, env):
-        return env.state
+    @classmethod
+    def from_config(cls, name, scene_config, config_node):
+        kwargs = {}
+        for k, v in config_node.items():
+            if k == '_target_':
+                pass
+            elif isinstance(v, (dict, omegaconf.dictconfig.DictConfig)) and '_target_' in v:
+                    kwargs[k] = hydra.utils.instantiate(v)
+            else:
+                kwargs[k] = v
+        return cls(name=name, **kwargs)
 
-    def get_state_function(self, env):
+    def init_base_entity(self, entity_state):
+        return entity_state
+
+    def init_state_fn(self, state, neighbor_manager, key):
+        return state
+
+    def get_step_function(self, state, neighbor_manager, key):
         raise NotImplementedError("DynamicFunction is an abstract class")
+        # Or could return an identity function?
     
-    def update_scene_configuration(self, scene_config):
-        pass
+    def update_state_cls(self, state_cls):
+        return state_cls
 
 
-def friction_state_fn(mask_fn):
-    def state_fn(state, neighbor):
-        mask = mask_fn(state)
-        # Issue : We need to sum the forces, here we just set them (so previous force functions in the env actually not used)
-        return state.set(entity_state=state.entity_state.set(force=friction_force(state, neighbor, mask)))
-    return state_fn
+# def friction_state_fn(mask_fn):
+#     def state_fn(state, neighbor):
+#         mask = mask_fn(state)
+#         # Issue : We need to sum the forces, here we just set them (so previous force functions in the env actually not used)
+#         return state.set(entity_state=state.entity_state.set(force=friction_force(state, neighbor, mask)))
+#     return state_fn
 
 
 def to_rigid_body(position):
@@ -135,27 +153,28 @@ def collision_force_fn(displacement):
     return force_fn
 
 
-class CollisionForce(DynamicsFunction):
+class CollisionComponent(Component):
     def __init__(self, name, precedence, epsilon, alpha, mask_fn):
         super().__init__(name, precedence)
         self.epsilon = epsilon
         self.alpha = alpha
         self.mask_fn = mask_fn
 
-    def init_state_fn(self, env):
-        return env.state.set(
+    def init_state_fn(self, state, neighbor_manager, key):
+        return state.set(
             collision_eps=self.epsilon,
             collision_alpha=self.alpha
             )
 
-    def update_scene_configuration(self, scene_config):
-        scene_config.base_state_cls.__annotations__['collision_eps'] = f32
-        scene_config.base_state_cls.__annotations__['collision_alpha'] = f32
-        scene_config.base_state_cls.collision_eps = None
-        scene_config.base_state_cls.collision_alpha = None
+    def update_state_cls(self, state_cls):
+        state_cls.__annotations__['collision_eps'] = f32
+        state_cls.__annotations__['collision_alpha'] = f32
+        state_cls.collision_eps = None
+        state_cls.collision_alpha = None
+        return state_cls
 
-    def get_state_function(self, env):
-        self.displacement = env.neighbor_manager.displacement
+    def get_step_function(self, state, neighbor_manager, key):
+        self.displacement = neighbor_manager.displacement
         coll_fn = collision_force_fn(self.displacement)
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
@@ -186,15 +205,15 @@ def friction_force(state, neighbor, exists_mask):
     return -jnp.tile(state.entity_state.friction, (SPACE_NDIMS, 1)).T * cur_vel
     
 
-def friction_force_fn(displacement):
-    return friction_force
+# def friction_force_fn(displacement):
+#     return friction_force
 
-class FrictionForce(DynamicsFunction):
+class FrictionComponent(Component):
     def __init__(self, name, precedence, mask_fn):
         super().__init__(name, precedence)
         self.mask_fn = mask_fn
 
-    def get_state_function(self, env):
+    def get_step_function(self, state, neighbor_manager, key):
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
             force = friction_force(state, neighbor, mask)
@@ -249,9 +268,9 @@ def mask_momentum(entity_state, exists_mask):
     return entity_state.set(momentum=momentum)
 
 
-class ResetForce(DynamicsFunction):
+class ResetForceComponent(Component):
 
-    def get_state_function(self, env):
+    def get_step_function(self, state, neighbor_manager, key):
         def fn(state, neighbor, key):
             if state.entity_state.is_rigid_body():
                 zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
@@ -273,18 +292,20 @@ def init_state_fn(key, kT=0.0):
         
     return fn
 
-class Step(DynamicsFunction):
+class StepComponent(Component):
     def __init__(self, name, precedence, mask_fn):
         super().__init__(name, precedence)
         self.mask_fn = mask_fn
+
         
-    def init_state_fn(self, env):
-        if env.state.entity_state.momentum is None:
-            state = init_state_fn(env.key)(env.state)
+    def init_state_fn(self, state, neighbor_manager, key):
+        if state.entity_state.momentum is None:
+            key, sub_key = jax.random.split(key)
+            state = init_state_fn(sub_key)(state)
         return state
 
-    def get_state_function(self, env):
-        self.shift = env.neighbor_manager.shift
+    def get_step_function(self, state, neighbor_manager, key):
+        self.shift = neighbor_manager.shift
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
 
@@ -306,24 +327,25 @@ class Step(DynamicsFunction):
         return state_fn
 
 
-class ProximityMap(DynamicsFunction):
+class ProximityMapComponent(Component):
 
-    def init_state_fn(self, env):
-        fn = self.get_state_function(env)
-        state = fn(env.state, env.neighbor_manager.neighbors, env.key)
+    def init_state_fn(self, state, neighbor_manager, key):
+        fn = self.get_step_function(state, neighbor_manager, key)
+        state = fn(state, neighbor_manager.neighbors, key)
         return state
         
 
-    def update_scene_configuration(self, scene_config):
-        scene_config.base_state_cls.__annotations__['distance_map'] = jnp.ndarray
-        scene_config.base_state_cls.__annotations__['orientation_map'] = jnp.ndarray
-        scene_config.base_state_cls.distance_map = None
-        scene_config.base_state_cls.orientation_map = None
+    def update_state_cls(self, state_cls):
+        state_cls.__annotations__['distance_map'] = jnp.ndarray
+        state_cls.__annotations__['orientation_map'] = jnp.ndarray
+        state_cls.distance_map = None
+        state_cls.orientation_map = None
+        return state_cls
 
-    def get_state_function(self, env):
-        def state_fn(state, neighbors, key):
+    def get_step_function(self, state, neighbor_manager, key):
+        def step_fn(state, neighbors, key):
             sources, targets = neighbors.idx
-            dist, theta = proximity_map(env.neighbor_manager.displacement,
+            dist, theta = proximity_map(neighbor_manager.displacement,
                                          state.entity_state.position[sources],
                                          state.entity_state.position[targets],
                                          state.entity_state.orientation[sources]
@@ -333,4 +355,4 @@ class ProximityMap(DynamicsFunction):
                 orientation_map = theta
             )
 
-        return state_fn
+        return step_fn

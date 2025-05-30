@@ -23,34 +23,30 @@ def to_rigid_body_state(entity_state):
 
 @md_dataclass
 class BaseEntityState(simulate.NVEState):
+    orientation: jnp.array
     entity_type: jnp.array
     entity_type_idx: jnp.array
     exists: jnp.array
+    entity_subtype: jnp.array
     previous_force: jnp.array
+    diameter: jnp.array
+    friction: jnp.array
 
-    @classmethod
-    def create(cls, entity_types, entity_types_kwargs, **kwargs):
-        entity_type = []
-        entity_type_idx = []
-        exists = []
-        fields = [field.name for field in cls.__dataclass_fields__.values()
-                  if field.name not in ['entity_type', 'entity_type_idx', 'exists', 'momentum', 'force', 'previous_force']]
-        for i, t in enumerate(entity_types):
-            entity_params = entity_types_kwargs[t]
-            n = entity_params['n_max']
-            entity_type.extend([i] * n)
-            entity_type_idx.extend(range(n))
-            exists.extend([1] * entity_params['n_exists'] + [0] * (n - entity_params['n_exists']))
-
-        kwargs['mass'] = [[m] for m in kwargs['mass']]
-        return cls(entity_type=jnp.array(entity_type), 
-                   entity_type_idx=jnp.array(entity_type_idx),
-                   exists=jnp.array(exists),
-                   momentum=None,
-                   force=jnp.zeros_like(jnp.array(kwargs['position'])),
-                   previous_force=jnp.zeros_like(jnp.array(kwargs['position'])),
-                   **{attr: jnp.array(values) for attr, values in kwargs.items() if attr in fields},
-                   )
+    def add_new_entities(self, positions, orientations, mass, diameter, friction, exists, entity_type, entity_subtype, entity_type_idx):
+        return self.set(
+            position = jnp.vstack([self.position, positions]),
+            orientation = jnp.hstack([self.orientation, orientations]),
+            mass = jnp.vstack([self.mass, mass.reshape((-1, 1))]),
+            diameter = jnp.hstack([self.diameter, diameter]),
+            friction = jnp.hstack([self.friction, friction]),
+            force = jnp.vstack([self.force, jnp.zeros_like(positions)]),
+            previous_force = jnp.vstack([self.previous_force, jnp.zeros_like(positions)]),
+            exists = jnp.hstack([self.exists, exists]),
+            entity_subtype = jnp.hstack([self.entity_subtype, entity_subtype]),
+            entity_type = jnp.hstack([self.entity_type, entity_type]),
+            entity_type_idx = jnp.hstack([self.entity_type_idx, entity_type_idx])
+        )
+        
 
     def is_rigid_body(self):
         return hasattr(self.position, 'center')
@@ -79,61 +75,13 @@ class BaseEntityState(simulate.NVEState):
           
 
 @md_dataclass
-class EntityState(BaseEntityState):
-    entity_subtype: jnp.array
-    diameter: jnp.array
-    friction: jnp.array
-    orientation: jnp.array
-
-    @classmethod
-    def create(cls, entity_types, entity_types_kwargs):
-        # order = params['state_data']['entity_state']['entity_types']
-        ent_subtype = []
-        fields = [field.name for field in cls.__dataclass_fields__.values()]
-        kwargs = {}
-        for entity_type in entity_types:
-            attributes = entity_types_kwargs[entity_type]
-            for f in fields:
-                if f in attributes:
-                    if f not in kwargs:
-                        kwargs[f] = []
-                    kwargs[f].extend(attributes[f])
-            for st, n in attributes['subtype_to_n']:
-                ent_subtype.extend([st] * n)
-        base_instance = BaseEntityState.create(entity_types, entity_types_kwargs, **kwargs)
-        return cls(entity_subtype=jnp.array(ent_subtype), **base_instance.__dict__,
-                   **{attr: jnp.array(val) for attr, val in kwargs.items() if attr not in base_instance.__dict__})
-
-
-@md_dataclass
 class BaseParticleState:
+    entity_type: jnp.array
     entity_idx: jnp.array
 
-    @classmethod
-    def create(cls, entity_idx_offset, n_entities):
-        return cls(entity_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + n_entities)))
-    
     def count(self):
         return self.entity_idx.shape[0]
     
-
-@md_dataclass
-class ParticleState(BaseParticleState):
-
-    @classmethod
-    def create(cls, entity_idx_offset, n_entities):
-        return cls(entity_idx=jnp.array(range(entity_idx_offset, entity_idx_offset + n_entities)))
-
-    @classmethod
-    def _create(cls, entity_idx_offset, entity_types_kwargs, entity_type, **kwargs):
-        etype_kwargs = entity_types_kwargs[entity_type]
-        fields = [field.name for field in cls.__dataclass_fields__.values()]
-        cls_kwargs = {attr: jnp.array(val) for attr, val in etype_kwargs.items() if attr in fields}
-        base_instance = BaseParticleState.create(entity_idx_offset, etype_kwargs['n_max'])
-        return cls(**cls_kwargs, **base_instance.__dict__, **kwargs)
-    
-    def state_fns(self):
-        return []
 
 def field_accessors(cls):
     """
@@ -176,6 +124,9 @@ class BaseState:
     time: jnp.int32
     dt: jnp.float32
 
+    def entity_type_to_int(self, entity_type):
+        return getattr(self, entity_type).entity_type
+
     def e_cond(self, etype):
         if isinstance(etype, str):
             etype = self.entity_type_to_int(etype)
@@ -194,7 +145,7 @@ class BaseState:
 
         return wrapper
 
-
+#TODO: To remove?
 def create_state_cls(base_state_cls, entity_state_cls, entity_types, entity_types_to_cls):  
     # First make a "copy" of the base class. This is just for pytest, otherwise modify base_state_cls in a test function will have side effect on others. 
     class State(base_state_cls):

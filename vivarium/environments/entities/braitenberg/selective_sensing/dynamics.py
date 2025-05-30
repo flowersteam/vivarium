@@ -371,10 +371,10 @@ def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_
         # Update agents state
         braitenberg_state = braitenberg_state.set(
             prox=agent_proxs,
-            prox_sensed_ent_type=prox_sensed_ent_type,
-            prox_sensed_ent_idx=prox_sensed_ent_idx,
-            proximity_map_dist=proximity_dist_map,
-            proximity_map_theta=proximity_dist_theta,
+            # prox_sensed_ent_type=prox_sensed_ent_type,
+            # prox_sensed_ent_idx=prox_sensed_ent_idx,
+            # proximity_map_dist=proximity_dist_map,
+            # proximity_map_theta=proximity_dist_theta,
             motor=mean_agent_motors,
         )
 
