@@ -1,3 +1,4 @@
+from enum import Enum
 import logging
 import panel as pn
 from contextlib import contextmanager
@@ -23,6 +24,11 @@ from vivarium.utils.scene_configs import SceneConfiguration
 lg = logging.getLogger(__name__)
 
 
+class Shape(Enum):
+    CIRCLE = 0
+    RECTANGLE = 1
+
+
 def normal(array):
     normals = np.zeros((array.shape[0], 2))
     normals[:, 0] = np.cos(array)
@@ -36,13 +42,15 @@ class EntityManager:
         entities,
         selected_param_entity,
         param_simulator_state,
-        selected, etype, state
+        selected, etype, state,
+        shape
     ):
         self.entities = entities
         self.selected_param_entity = selected_param_entity
         self.param_simulator_state = param_simulator_state
         self.selected = selected
         self.etype = etype
+        self.shape = getattr(Shape, shape.upper()) if isinstance(shape, str) else shape
         self.cds = ColumnDataSource(data=self.get_cds_data(state))
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
@@ -86,7 +94,17 @@ class EntityManager:
         :param state: The state coming from the server
         :return: Data dictionary for the ColumnDataSource
         """
-        raise NotImplementedError()
+        pos = state.position_center(self.etype)
+        x, y = pos[:, 0], pos[:, 1]
+        o = state.position_orientation(self.etype)
+        d = state.diameter(self.etype)
+        
+        colors = [e.color for e in self.entities]
+
+        data = dict(x=x, y=y, diameter=d, orientation=o, fill_color=colors)
+        if self.shape == Shape.CIRCLE:
+            data["radius"] = d / 2.0
+        return data
 
     def update_cds(self, state):
         """Updates the ColumnDataSource with new data from server
@@ -175,39 +193,42 @@ class EntityManager:
         :param fig: A bokeh figure
         :return: The figure with the objects plotted
         """
-        raise NotImplementedError()
-
-
-class ObjectManager(EntityManager):
-    def get_cds_data(self, state):
-        pos = state.position_center(self.etype)
-        x, y = pos[:, 0], pos[:, 1]
-        thetas = state.position_orientation(self.etype)
-        d = state.diameter(self.etype)
-        colors = [e.color for e in self.entities]
-
-        data = dict(x=x, y=y, width=d, height=d, angle=thetas, fill_color=colors)
-        return data
-
-    def plot(self, fig: figure):
         src = {"source": self.cds}
-        return fig.rect(
-            # objects body plotting
-            x="x",
-            y="y",
-            width="width",
-            height="height",
-            angle="angle",
-            fill_color="fill_color",
-            fill_alpha=0.6,
-            line_color="white",
-            line_width=1,
-            hover_fill_color="black",
-            hover_fill_alpha=0.7,
-            hover_line_color=None,
-            view=self.cds_view["visible"],
-            **src,
-        )
+        
+        if self.shape == Shape.CIRCLE:
+            return fig.circle(
+                "x",
+                "y",
+                radius="radius",
+                fill_color="fill_color",
+                fill_alpha=0.6,
+                line_color="white",
+                line_width=1,
+                hover_fill_color="black",
+                hover_fill_alpha=0.7,
+                hover_line_color=None,
+                view=self.cds_view["visible"],
+                **src,
+            )
+        elif self.shape == Shape.RECTANGLE:
+            return fig.rect(
+                x="x",
+                y="y",
+                width="diameter",
+                height="diameter",
+                angle="orientation",
+                fill_color="fill_color",
+                fill_alpha=0.6,
+                line_color="white",
+                line_width=1,
+                hover_fill_color="black",
+                hover_fill_alpha=0.7,
+                hover_line_color=None,
+                view=self.cds_view["visible"],
+                **src,
+            )
+        else:
+            raise AttributeError('self.shape should be an instance of Shape')
 
 
 class WindowManager(Parameterized):
@@ -251,6 +272,7 @@ class WindowManager(Parameterized):
                 selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
+                shape=self.scene_config.config.client[etype].renderer_kwargs.shape
             )
             for etype, manager_class in self.entity_manager_classes.items()
         }

@@ -72,11 +72,10 @@ class ParamAgent(ParamEntity):
 class AgentManager(EntityManager):
 
     def get_cds_data(self, state):
-        pos = state.position_center(self.etype)
-        x, y = pos[:, 0], pos[:, 1]
-        thetas = state.position_orientation(self.etype)
-        radii = state.diameter(self.etype) / 2.0
-        colors = [e.color for e in self.entities]
+
+        data = super().get_cds_data(state)
+
+        radii = data['diameter'] / 2.0
         motors = getattr(state, self.etype).motor
         proxs = getattr(state, self.etype).prox
         max_prox = getattr(state, self.etype).proxs_dist_max
@@ -84,7 +83,7 @@ class AgentManager(EntityManager):
         wheel_diameter = getattr(state, self.etype).wheel_diameter
 
         # line direction
-        angles = np.array(thetas)
+        angles = np.array(data['orientation'])
         normals = normal(angles)
 
         # wheels directions
@@ -100,7 +99,7 @@ class AgentManager(EntityManager):
         orientation_lines_x, orientation_lines_y = [], []
 
         for xx, yy, n, nrw, nlw, nrp, nlp, r in zip(
-            x, y, normals, normals_rw, normals_lw, normals_rp, normals_lp, radii
+            data['x'], data['y'], normals, normals_rw, normals_lw, normals_rp, normals_lp, radii
         ):
             r_wheel_x.append(xx + r * nrw[0])
             r_wheel_y.append(yy + r * nrw[1])
@@ -115,17 +114,12 @@ class AgentManager(EntityManager):
             orientation_lines_x.append([xx, xx + r * n[0]])
             orientation_lines_y.append([yy, yy + r * n[1]])
 
-        max_angle_r = thetas - angle_min
-        max_angle_l = thetas + angle_min
+        max_angle_r = data['orientation'] - angle_min
+        max_angle_l = data['orientation'] + angle_min
 
-        data = dict(
-            x=x,
-            y=y,
+        data.update(
             ox=orientation_lines_x,
             oy=orientation_lines_y,
-            r=radii,
-            fc=colors,
-            angle=thetas,
             pr=0.2 * radii,
             rwx=r_wheel_x,
             rwy=r_wheel_y,
@@ -148,6 +142,7 @@ class AgentManager(EntityManager):
         return data
 
     def plot(self, fig: figure):
+        
         src = {"source": self.cds}
         # wheels plotting
         fig.rect(
@@ -155,7 +150,7 @@ class AgentManager(EntityManager):
             "rwy",
             width="wd",
             height=1,
-            angle="angle",
+            angle="orientation",
             fill_color="black",
             fill_alpha="rwi",
             line_color=None,
@@ -167,7 +162,7 @@ class AgentManager(EntityManager):
             "lwy",
             width="wd",
             height=1,
-            angle="angle",
+            angle="orientation",
             fill_color="black",
             fill_alpha="lwi",
             line_color=None,
@@ -199,7 +194,7 @@ class AgentManager(EntityManager):
             "x",
             "y",
             radius="mpr",
-            start_angle="angle",
+            start_angle="orientation",
             end_angle="mar",
             color="firebrick",
             alpha=0.1,
@@ -211,7 +206,7 @@ class AgentManager(EntityManager):
             "x",
             "y",
             radius="mpr",
-            start_angle="angle",
+            start_angle="orientation",
             end_angle="mal",
             color="firebrick",
             alpha=0.1,
@@ -221,18 +216,5 @@ class AgentManager(EntityManager):
         )
         # direction lines plotting
         fig.multi_line("ox", "oy", color="white", view=self.cds_view["visible"], **src)
-        # agents body plotting
-        return fig.circle(
-            "x",
-            "y",
-            radius="r",
-            fill_color="fc",
-            fill_alpha=0.6,
-            line_color="white",
-            line_width=1,
-            hover_fill_color="black",
-            hover_fill_alpha=0.7,
-            hover_line_color=None,
-            view=self.cds_view["visible"],
-            **src,
-        )
+        # Plot agent bodies
+        return super().plot(fig)
