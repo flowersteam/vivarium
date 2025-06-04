@@ -46,7 +46,6 @@ class BaseEntityState(simulate.NVEState):
             entity_type = jnp.hstack([self.entity_type, entity_type]),
             entity_type_idx = jnp.hstack([self.entity_type_idx, entity_type_idx])
         )
-        
 
     def is_rigid_body(self):
         return hasattr(self.position, 'center')
@@ -121,8 +120,8 @@ def field_accessors(cls):
 
 @field_accessors
 class BaseState:
-    time: jnp.int32
-    dt: jnp.float32
+    time: jnp.ndarray
+    # dt: jnp.ndarray
 
     def entity_type_to_int(self, entity_type):
         return getattr(self, entity_type).entity_type
@@ -145,30 +144,10 @@ class BaseState:
 
         return wrapper
 
-#TODO: To remove?
-def create_state_cls(base_state_cls, entity_state_cls, entity_types, entity_types_to_cls):  
-    # First make a "copy" of the base class. This is just for pytest, otherwise modify base_state_cls in a test function will have side effect on others. 
-    class State(base_state_cls):
-        __annotations__ = base_state_cls.__annotations__.copy()
-        
-    for field, cls in entity_types_to_cls.items():
-        State.__annotations__[field] = cls
-        setattr(State, field, None)
-
-    State.__annotations__['entity_state'] = entity_state_cls
-    State.entity_state = None
-
-    def entity_type_to_int(self, name):
-        if name not in entity_types:
-            raise ValueError(f"Entity type '{name}' not found in entity_types.")
-        return entity_types.index(name)
-    State.entity_type_to_int = entity_type_to_int
-    
-    def entity_type_to_str(self, idx):
-        if idx < 0 or idx >= len(entity_types):
-            raise ValueError(f"Entity type index '{idx}' out of range.")
-        return entity_types[idx]
-    State.entity_type_to_str = entity_type_to_str
-
-
-    return md_dataclass(State)
+def create_state_cls(base_state_cls, update_fns):
+    state_cls = base_state_cls
+    state_cls.__annotations__['entity_state'] = BaseEntityState
+    for fn in update_fns:
+        state_cls = fn(state_cls)
+    state_cls = md_dataclass(state_cls)
+    return state_cls

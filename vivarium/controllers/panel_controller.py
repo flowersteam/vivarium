@@ -1,13 +1,11 @@
 import param
 import logging
-from functools import partial
 
 import jax.numpy as jnp
 
 from vivarium.controllers.simulator_controller import (
-    SimulatorController, ControllerAgent, ControllerObject
+    SimulatorController, ControllerObject
 )
-from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 
 
@@ -32,23 +30,7 @@ class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
         else:
             super().__setattr__(attr, val)
 
-
-class PanelControllerAgent(ControllerAgent):
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, controller_parameters)
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return object.__getattr__(self, attr)
-        return super().__getattr__(attr)
-    
-    def __setattr__(self, attr, val):
-        if attr in self.__dict__:
-            object.__setattr__(self, attr, val)
-        else:
-            super().__setattr__(attr, val)
-
-
+# TODO: What's the purpose of this?
 class PanelControllerObject(ControllerObject):
     def __init__(self, state, ent_idx, entity_type, controller_parameters):
         super().__init__(state, ent_idx, entity_type, controller_parameters)
@@ -198,64 +180,6 @@ def behavior_param_name(b_idx):
 def sensed_param_name(label, b_idx):
     return f'sensed_{label}_{b_idx}'
 
-class Agent(ParamEntity):
-    left_motor = param.Number()
-    right_motor = param.Number()
-    left_prox = param.Number()
-    right_prox = param.Number()
-    wheel_diameter = param.Number()
-    proxs_dist_max = param.Number()
-    proxs_cos_min = param.Number()
-    # energy = param.Number()
-    # recover_time = param.Number()
-    visible_wheels = param.Boolean(True)
-    visible_proxs = param.Boolean(True)
-
-    def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
-        self.subtype_labels = subtype_labels
-        for i in range(self.selected_entity_data.behavior_params.shape[0]):
-            behavior = behavior_param_name(i)
-            self.panel_parameters.append(behavior)
-            # self.param_to_jax[behavior] = ParameterMapping(behavior)
-            # self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
-            self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
-            self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=None), behavior, onlychanged=True)
-            for idx, label in subtype_labels.items():
-                sensed = sensed_param_name(label, i)
-                self.panel_parameters.append(sensed)
-                self.param.add_parameter(sensed, param.Boolean())
-                self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=idx), sensed, onlychanged=True)
-
-        self.update_parameter_list()
-        for p in self.panel_parameters:
-            if p in self.param_to_jax:
-                del self.param_to_jax[p]
-
-    @param.depends('update_from_server', watch=True)
-    def update_from(self):
-        super().update_from()
-        self.allow_update_to = False
-        for i in range(self.selected_entity_data.behavior_params.shape[0]):
-            setattr(self, behavior_param_name(i), Behaviors(self.selected_entity_data.behavior[i]).name)
-            for idx, label in self.subtype_labels.items():
-                sensed = self.selected_entity_data.sensed[i][idx]
-                setattr(self, sensed_param_name(label, i), bool(sensed))
-        self.allow_update_to = True
-
-    def update_behavior(self, event, slot_idx, label_idx):
-        for ag_idx in self.selection:
-            behavior = Behaviors[event.new].value if event.name.startswith('behavior_') else self.data[ag_idx].behavior[slot_idx]
-            behavior = int(behavior)
-            sensed = self.data[ag_idx].sensed[slot_idx]
-            sensed_indexes = [i for i, s in enumerate(sensed) if s == 1]
-            if event.name.startswith('sensed_'):
-                if event.new and label_idx not in sensed_indexes:
-                    sensed_indexes.append(label_idx)
-                elif not event.new and label_idx in sensed_indexes:
-                    sensed_indexes.remove(label_idx)
-            self.data[ag_idx].set_behavior(slot_idx, behavior, sensed_indexes)
-
 class Object(ParamEntity):
     def __init__(self, entities, subtype_labels, **params):
         super().__init__(entities, **params)
@@ -272,15 +196,15 @@ class Selected(param.Parameterized):
 
 class PanelController(SimulatorController):
     """Controller for the panel interface"""
-    config_field = 'panel_controller'
-    def __init__(self, **params):
+    # config_field = 'panel_controller'
+    def __init__(self, client=None, subtypes=[], **controllers):
         
-        super().__init__(**params)
+        super().__init__(client=client, subtypes=subtypes, **controllers)
 
-        self.selected = {etype: Selected() for etype in self.scene_config.entity_types}
+        self.selected = {etype: Selected() for etype in controllers.keys()}
         
-        self.selected_entities = {etype: config.param.cls(self.entity_lists[etype], self.subtype_labels) 
-                                  for etype, config in self.scene_config.entity_type_client_configs.items()}
+        self.selected_entities = {etype: controller.param_cls(self.entity_lists[etype], self.subtype_labels) 
+                                  for etype, controller in controllers.items()}
 
         self.param_simulator = ParamSimulator(self.simulator_parameters)
         

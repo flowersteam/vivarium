@@ -1,3 +1,4 @@
+from dataclasses import dataclass, fields
 import os
 import time
 import math
@@ -11,7 +12,7 @@ from contextlib import contextmanager
 from vivarium.utils.converters import access_nested_fields
 
 from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list
-from vivarium.utils.scene_configs import SimulatorConfiguration, SceneConfiguration
+# from vivarium.utils.scene_configs import SceneConfiguration
 
 
 lg = logging.getLogger(__name__)
@@ -26,14 +27,31 @@ nested_fields_to_access = {
     ]
 }
 
+
+@dataclass
+class SimulatorConfiguration:
+    freq: float
+    box_size: float
+    num_scan_steps: int
+    neighbor_radius: float
+    to_jit: bool
+
+    @classmethod
+    def from_simulator(cls, simulator):
+        field_names = [field.name for field in fields(cls)]
+        return cls(**{
+            field_name: getattr(simulator, field_name)
+            for field_name in field_names})
+
+
 @access_nested_fields(nested_fields_to_access)
 class Simulator:
-    def __init__( self, env, controller_parameters=None, scene_name=None, freq=-1):
+    def __init__(self, env, state=None, controller_parameters=None, scene_name=None, freq=-1):
         
         self.env = env
         self.controller_parameters = controller_parameters
         self.scene_name = scene_name
-        self.state = env.state
+        self.state = state or env.init_state()
         self.freq = freq
         self._is_started = False
         self._to_stop = False
@@ -45,20 +63,20 @@ class Simulator:
 
         lg.info("Simulator initialized")
 
-    def load_scene(self, scene_name):
-        """Load a scene in the simulator
+    # def load_scene(self, scene_name):
+    #     """Load a scene in the simulator
 
-        :param scene_name: scene to load
-        """
-        lg.info("Loading a new scene\n")
+    #     :param scene_name: scene to load
+    #     """
+    #     lg.info("Loading a new scene\n")
 
-        if self.is_started():
-            self.stop(blocking=True)
-        scene_config = SceneConfiguration(scene_name=scene_name)
-        self.freq = scene_config.config.simulator.kwargs.freq
-        del self.env
-        self.env = scene_config.create_environment()
-        self.state = self.env.state
+    #     if self.is_started():
+    #         self.stop(blocking=True)
+    #     scene_config = SceneConfiguration(scene_name=scene_name)
+    #     self.freq = scene_config.config.simulator.kwargs.freq
+    #     del self.env
+    #     self.env = scene_config.create_environment()
+    #     self.state = self.env.state
 
     def init_state(self):
         if self.state.entity_state.momentum is None:

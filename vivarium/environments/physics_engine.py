@@ -20,6 +20,7 @@ class Component:
     def __init__(self, name, precedence):
         self.name = name
         self.precedence = precedence
+        self.is_entity_component = False
 
     @classmethod
     def from_config(cls, name, scene_config, config_node):
@@ -242,14 +243,14 @@ def sum_force_fns(displacement, force_fns):
     return force_fn
 
 
-def verlet_force_fn(displacement):
-    """Compute the verlet force on the whole system
+# def verlet_force_fn(displacement):
+#     """Compute the verlet force on the whole system
 
-    :param displacement: displacement function of jax_md
-    :return: force function of the system
-    """
+#     :param displacement: displacement function of jax_md
+#     :return: force function of the system
+#     """
 
-    return sum_force_fns(displacement, [collision_force_fn, friction_force_fn])
+#     return sum_force_fns(displacement, [collision_force_fn, friction_force_fn])
 
 
 def mask_momentum(entity_state, exists_mask):
@@ -293,16 +294,22 @@ def init_state_fn(key, kT=0.0):
     return fn
 
 class StepComponent(Component):
-    def __init__(self, name, precedence, mask_fn):
+    def __init__(self, name, precedence, dt, mask_fn):
         super().__init__(name, precedence)
+        self.dt = dt
         self.mask_fn = mask_fn
 
         
+    def update_state_cls(self, state_cls):
+        state_cls.__annotations__['dt'] = jnp.float32
+        state_cls.dt = None
+        return state_cls
+    
     def init_state_fn(self, state, neighbor_manager, key):
         if state.entity_state.momentum is None:
             key, sub_key = jax.random.split(key)
             state = init_state_fn(sub_key)(state)
-        return state
+        return state.set(dt=self.dt)
 
     def get_step_function(self, state, neighbor_manager, key):
         self.shift = neighbor_manager.shift

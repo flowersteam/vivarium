@@ -2,7 +2,6 @@ import os
 import random
 import logging
 from math import pi
-from dataclasses import dataclass, fields
 from collections.abc import Iterable
 
 from omegaconf import OmegaConf, DictConfig
@@ -16,12 +15,7 @@ import jax.numpy as jnp
 from vivarium.environments.state import create_state_cls, to_rigid_body_state
 from vivarium.controllers.dataclass_wrapper import create_dataclass_from_dict
 from vivarium.utils.converters import import_class
-
-
-# from vivarium.controllers.simulator_controller import ControllerEntity
-# from vivarium.controllers.panel_controller import ParamEntity
-# from vivarium.controllers.simulator_controller import ControllerEntity
-# from vivarium.controllers.panel_controller import  PanelControllerEntity
+from vivarium.simulator import Simulator
 
 
 abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
@@ -82,46 +76,118 @@ def extend_kwargs(kwargs, n):
     return kwargs
 
 
-@dataclass
-class ConstructorConfiguration:
-    cls: Type
-    kwargs: dict
+def get_n_max(config_node):
+    return config_node.n_max if 'n_max' in config_node else config_node.n_exists
 
 
-@dataclass
-class SimulatorConfiguration:
-    freq: float
-    box_size: float
-    num_scan_steps: int
-    neighbor_radius: float
-    to_jit: bool
-
-    @classmethod
-    def from_simulator(cls, simulator):
-        field_names = [field.name for field in fields(cls)]
-        return cls(**{
-            field_name: getattr(simulator, field_name)
-            for field_name in field_names})
+# @dataclass
+# class ConstructorConfiguration:
+#     cls: Type
+#     kwargs: dict
 
 
-@dataclass
-class EntityTypeConfiguration:
-    name: str
-    idx: int
-    kwargs: dict
-    state_cls: Type
+# @dataclass
+# class EntityTypeConfiguration:
+#     name: str
+#     idx: int
+#     kwargs: dict
+#     state_cls: Type
 
 
-@dataclass
-class EntityTypeClientConfiguration:
-    param: ConstructorConfiguration
-    simulator_controller: ConstructorConfiguration
-    notebook_controller: ConstructorConfiguration
-    panel_controller: ConstructorConfiguration
-    panel_interface: ConstructorConfiguration
+# @dataclass
+# class EntityTypeClientConfiguration:
+#     param: ConstructorConfiguration
+#     simulator_controller: ConstructorConfiguration
+#     notebook_controller: ConstructorConfiguration
+#     panel_controller: ConstructorConfiguration
+#     panel_interface: ConstructorConfiguration
 
 
 class SceneConfiguration:
+    def __init__(self, scene_name: str, seed=None):
+
+        self.scene_name = scene_name
+        self.config = load_scene_config(scene_name)
+        self.base_state_cls = import_class(self.config.state.cls)
+        self.seed = seed
+        
+    def compute_parameters(self, name, params):
+        assert 'n_exists' in params or 'n_max' in params, f"Either n_max ot n_exists has to be defined"
+        n_max = get_n_max(params)
+        n_exists = params.n_exists if 'n_exists' in params else n_max
+        OmegaConf.update(self.config.environment, 'state_fns[' + name + ']', {'n_max': n_max}, force_add=True)
+        OmegaConf.update(self.config.environment, 'state_fns[' + name + ']', {'n_exists': n_exists}, force_add=True)
+        n = params.n_max
+        if params.position == '_random_':
+            # Generate random positions if not provided
+            pos_range = [0, self.config.environment.kwargs.box_size,
+                            0, self.config.environment.kwargs.box_size]
+            params.position = generate_random_positions(n, pos_range, self.seed)
+        elif '_range_' in params.position:
+            # Generate random positions within a specified range
+            params.position = generate_random_positions(n, params.position['_range_'], self.seed)
+        if params.orientation == '_random_':
+            # Generate random orientations if not provided
+            params.orientation = generate_random_orientations(n, self.seed)
+
+        params = extend_kwargs(params, n)
+
+        return params
+
+    def create_state_cls(self):
+        base_state_cls = hydra.utils.get_class(self.config.environment.kwargs.base_state_cls)
+        update_fns = [f.update_state_cls for f in self.create_component_factories()]
+        return create_state_cls(
+            base_state_cls=base_state_cls,
+            update_fns=update_fns
+        )
+
+    def create_component_factories(self):
+        component_factories = []
+        for k, v in self.config.environment.state_fns.items():
+            f = hydra.utils.get_class(v._target_).from_config(name=k, scene_config=self, config_node=v)
+            component_factories.append(f)
+        return component_factories
+
+    def create_environment(self):
+        env_cls = import_class(self.config.environment.cls)
+        kwargs = {}
+        for k, v in self.config.environment.kwargs.items():
+            if k == 'base_state_cls':
+                kwargs['base_state_cls'] = hydra.utils.get_class(v)
+            else:
+                kwargs[k] = v
+        env = env_cls.init_neighbor_manager(**kwargs, factories=self.create_component_factories())
+        return env
+    
+    def create_simulator(self, env=None):
+        env = env or self.create_environment()
+        cp = self.create_controller_parameters()
+        return Simulator(env=env, scene_name=self.scene_name, 
+                         controller_parameters=cp,
+                         freq=self.config.simulator.kwargs.freq)
+
+    def create_controller_parameters(self):
+        kwargs = {}
+        for etype, config in self.config.client.items():
+            n_max = get_n_max(self.config.environment.state_fns[etype])
+            controller_kwargs = extend_kwargs(config.kwargs, n_max)
+            kwargs[etype] = controller_kwargs
+        # kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_max) for entity_type, config in self.config.client.items()}
+        return create_dataclass_from_dict('ControllerParameters', kwargs)
+
+    def create_controllers(self):
+        controllers = {}
+        for etype, config in self.config.client.items():
+            component_config = self.config.environment.state_fns[etype]
+            n_max = get_n_max(component_config)
+            cls = hydra.utils.get_class(config.cls)
+            kwargs = extend_kwargs(config.kwargs, n_max)
+            controllers[etype] = cls(etype, **kwargs)
+        return controllers
+
+
+class OldSceneConfiguration:
 
     def __init__(self, scene_name: str, seed=None):
 
@@ -137,15 +203,15 @@ class SceneConfiguration:
                 OmegaConf.update(self.config, 'entities[' + etype + '].kwargs', {'n_max': self.config.entities[etype].kwargs.n_exists}, force_add=True)
             if 'n_exists' not in self.config.entities[etype].kwargs:
                 OmegaConf.update(self.config, 'entities[' + etype + '].kwargs', {'n_exists': self.config.entities[etype].kwargs.n_max}, force_add=True)
-        self.entity_type_configs = {
-            entity_type: EntityTypeConfiguration(
-                name=entity_type,
-                idx=idx,
-                kwargs=extend_kwargs(self.config.entities[entity_type].kwargs,
-                                     self.config.entities[entity_type].kwargs.n_max),
-                state_cls=import_class(self.config.entities[entity_type].cls)
-            )
-            for idx, entity_type in enumerate(self.config.entities.entity_types)}
+        # self.entity_type_configs = {
+        #     entity_type: EntityTypeConfiguration(
+        #         name=entity_type,
+        #         idx=idx,
+        #         kwargs=extend_kwargs(self.config.entities[entity_type].kwargs,
+        #                              self.config.entities[entity_type].kwargs.n_max),
+        #         state_cls=import_class(self.config.entities[entity_type].cls)
+        #     )
+        #     for idx, entity_type in enumerate(self.config.entities.entity_types)}
         if self.config.client != 'None':
             controller_parameters = self.create_controller_parameters()
             self.entity_type_client_configs = {
@@ -161,9 +227,9 @@ class SceneConfiguration:
         self.generate_missing_params()
 
 
-        self.dynamics_factories = self.create_dynamics_factories()
-        for f in self.dynamics_factories:
-            f.update_scene_configuration(self)
+        # self.dynamics_factories = self.create_dynamics_factories()
+        # for f in self.dynamics_factories:
+        #     self.base_state_cls = f.update_state_cls(self.base_state_cls)
             
         self.state = None  # self.create_state()
 
@@ -231,7 +297,9 @@ class SceneConfiguration:
     def create_dynamics_factories(self):
         dynamics_factories = []
         for k, v in self.config.environment.state_fns.items():
-            dynamics_factories.append(hydra.utils.instantiate(v, name=k))
+            f = hydra.utils.get_class(v._target_).from_config(name=k, scene_config=self, config_node=v)
+            dynamics_factories.append(f)
+            # dynamics_factories.append(hydra.utils.instantiate(v, name=k))
         dynamics_factories.sort(key=lambda x: x.precedence)
         return dynamics_factories
 
@@ -254,3 +322,5 @@ class SceneConfiguration:
             return None
         kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_max) for entity_type, config in self.config.client.items()}
         return create_dataclass_from_dict('ControllerParameters', kwargs)
+
+

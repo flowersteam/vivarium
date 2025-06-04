@@ -1,7 +1,12 @@
 import jax.numpy as jnp
+from vivarium.controllers.simulator_controller import ControllerEntity
 from vivarium.environments.physics_engine import Component
 
+
 class EntityComponent(Component):
+
+    controller_cls = ControllerEntity
+
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction, exists
                  ):
@@ -15,6 +20,8 @@ class EntityComponent(Component):
         self.diameter = jnp.array(diameter)
         self.friction = jnp.array(friction)
         self.exists = jnp.array(exists)
+
+        self.is_entity_component = True
 
     @classmethod
     def get_kwargs(cls, name, scene_config, config_node, exclude=[]):

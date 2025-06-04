@@ -12,7 +12,7 @@ import grpc
 from numproto.numproto import proto_to_ndarray
 
 from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, proto_to_changes
-from vivarium.utils.scene_configs import SimulatorConfiguration
+from vivarium.simulator.simulator import SimulatorConfiguration
 
 
 lg = logging.getLogger(__name__)

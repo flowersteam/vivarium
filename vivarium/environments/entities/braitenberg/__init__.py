@@ -1,1 +1,2 @@
-from vivarium.environments.entities.braitenberg.selective_sensing.state import BraitenbergComponent
+from vivarium.environments.entities.braitenberg.component import BraitenbergComponent
+from vivarium.environments.entities.braitenberg.controller import BraitenbergController

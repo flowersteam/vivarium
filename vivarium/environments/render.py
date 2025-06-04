@@ -1,41 +1,37 @@
 import time
-from IPython.display import display, clear_output
 
 import jax.numpy as jnp
-import numpy as np
+
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+import matplotlib.animation as animation
+from IPython.display import display, clear_output
 
 from vivarium.environments.utils import normal
 
-import matplotlib.animation as animation
-
-
-def plot_particles(ax, state, type, size_scale=30):
+def plot_particles(ax, state, type, color, size_scale=30):
     entities = getattr(state, type)
-    idx = entities.ent_idx
+    idx = entities.entity_idx
     
     exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
     pos = state.entity_state.position_center[idx][exists]
-
     diameter = state.entity_state.diameter[idx][exists][exists]
     x, y = pos[:, 0], pos[:, 1]
-    colors_rgba = [
-        colors.to_rgba(np.array(c), alpha=1.0) for c in entities.color[exists]
-    ]
+
+    colors = [color] * state.entity_state.exists[state.e_cond(type)].sum().item()
 
     ax.scatter(
         x,
         y,
-        c=colors_rgba,
+        c=colors,
         s=diameter * size_scale,
         label=type
     )
 
-def plot_orientation(ax, state, type, arrow_length):
+
+def plot_orientation(ax, state, type, color, arrow_length):
     entities = getattr(state, type)
-    idx = entities.ent_idx
+    idx = entities.entity_idx
     exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
 
@@ -49,15 +45,13 @@ def plot_orientation(ax, state, type, arrow_length):
     
     dx = arrow_length * n[:, 0]
     dy = arrow_length * n[:, 1]
-    colors_rgba = [
-        colors.to_rgba(np.array(c), alpha=1.0) for c in entities.color[exists]
-    ]
+    colors = [color] * state.entity_state.exists[state.e_cond(type)].sum().item()
     ax.quiver(
         x,
         y,
         dx,
         dy,
-        color=colors_rgba,
+        color=colors,
         scale=1,
         scale_units="xy",
         headwidth=0.8,
@@ -66,23 +60,20 @@ def plot_orientation(ax, state, type, arrow_length):
     )
 
 # Functions to render the current state
-def render(state):
-    box_size = state.box_size
-    max_agents = state.max_agents
-
+def render(state, box_size, agent_field='agents', object_field='objects', colors={'agents': 'red', 'objects': 'blue'}):
+    
     plt.figure(figsize=(6, 6))
     plt.xlim(0, box_size)
     plt.xlim(0, box_size)
 
     arrow_length = 3
-    # size_scale = 30
 
-    if hasattr(state, 'agent_state'):
-        plot_particles(plt, state, 'agent_state')
-        plot_orientation(plt, state, 'agent_state', arrow_length)
+    if agent_field in state.__dataclass_fields__:
+        plot_particles(plt, state, agent_field, colors[agent_field])
+        plot_orientation(plt, state, agent_field, colors[agent_field], arrow_length)
 
-    if hasattr(state, 'object_state'):
-        plot_particles(plt, state, 'object_state')
+    if object_field in  state.__dataclass_fields__:
+        plot_particles(plt, state, object_field, colors[object_field])
 
     plt.title("State")
     plt.xlabel("X Position")
@@ -92,8 +83,8 @@ def render(state):
     plt.show()
 
 # Function to render a state history
-def render_history(state_history, fps=10, skip_frames=1, arrow_length=3, filename=None):
-    box_size = state_history[0].box_size
+def render_history(state_history, box_size, agent_field='agents', object_field='objects', colors={'agents': 'red', 'objects': 'blue'}, fps=10, skip_frames=1, arrow_length=3, filename=None):
+    
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_xlim(0, box_size)
     ax.set_ylim(0, box_size)
@@ -103,12 +94,12 @@ def render_history(state_history, fps=10, skip_frames=1, arrow_length=3, filenam
         ax.set_xlim(0, box_size)
         ax.set_ylim(0, box_size)
 
-        if hasattr(state_history[t], 'agent_state'):
-            plot_particles(ax, state_history[t], 'agent_state')
-            plot_orientation(ax, state_history[t], 'agent_state', arrow_length)
+        if agent_field in state_history[t].__dataclass_fields__:
+            plot_particles(ax, state_history[t], agent_field, color=colors[agent_field])
+            plot_orientation(ax, state_history[t], agent_field, color=colors[agent_field], arrow_length=arrow_length)
 
-        if hasattr(state_history[t], 'object_state'):
-            plot_particles(ax, state_history[t], 'object_state')
+        if object_field in state_history[t].__dataclass_fields__:
+            plot_particles(ax, state_history[t], object_field, color=colors[object_field])
 
         ax.set_title(f"Timestep: {t}")
         # ax.set_xlabel("X Position")

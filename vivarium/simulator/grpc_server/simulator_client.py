@@ -6,7 +6,8 @@ from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
 from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 
 from vivarium.utils.scene_configs import SceneConfiguration
-from vivarium.utils.scene_configs import SimulatorConfiguration
+from vivarium.simulator.simulator import SimulatorConfiguration
+
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
 

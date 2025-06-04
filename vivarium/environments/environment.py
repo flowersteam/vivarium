@@ -4,9 +4,8 @@ from jax import jit, lax, random
 import jax.numpy as jnp
 
 from jax_md import partition, space
-from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.state import BaseState, BaseEntityState
+from vivarium.environments.state import BaseState, create_state_cls
 
 from vivarium.utils.converters import access_nested_fields
 
@@ -57,7 +56,7 @@ nested_fields_to_access = {
 class Environment:
     def __init__(self,
                  neighbor_manager,
-                 dt,
+                #  dt,
                  base_state_cls=BaseState,
                  factories=[], 
                  num_scan_steps=1, to_jit=True, key=random.PRNGKey(42)):
@@ -67,7 +66,7 @@ class Environment:
         self.factories = factories
         self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(factories)}
         self.neighbor_manager = neighbor_manager
-        self.dt = dt
+        # self.dt = dt
         self.num_scan_steps = num_scan_steps
         self.to_jit = to_jit
         if to_jit:
@@ -79,12 +78,8 @@ class Environment:
         return cls(neighbor_manager, **kwargs)
     
     def init_state_cls(self):
-        state_cls = self.base_state_cls
-        state_cls.__annotations__['entity_state'] = BaseEntityState
-        for factory in self.factories:
-            state_cls = factory.update_state_cls(state_cls)
-        state_cls = md_dataclass(state_cls)
-        return state_cls
+        update_fns = [f.update_state_cls for f in self.factories]
+        return create_state_cls(base_state_cls=self.base_state_cls, update_fns=update_fns)
     
     def init_state(self, init_step_functions=True):
         state_cls = self.init_state_cls()
@@ -106,7 +101,7 @@ class Environment:
         for factory in self.factories:
             entity_state = factory.init_base_entity(entity_state)
         self.neighbor_manager.allocate(entity_state.unified_position)
-        state = state_cls(time=0, dt=self.dt, entity_state=entity_state)
+        state = state_cls(time=0, entity_state=entity_state)
         for factory in self.factories:
             state = factory.init_state_fn(state, self.neighbor_manager, self.key)
         if init_step_functions:
