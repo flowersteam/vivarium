@@ -24,7 +24,7 @@ class ParamAgent(ParamEntity):
     visible_proxs = param.Boolean(True)
 
     def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
+        super().__init__(entities, subtype_labels, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
         self.subtype_labels = subtype_labels
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)

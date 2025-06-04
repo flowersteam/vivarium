@@ -163,12 +163,14 @@ class ParamEntity(ParameterizedData):
     color = param.Color()
     visible = param.Boolean()
 
-    def __init__(self, entities, panel_parameters=[], **params):
+    def __init__(self, entities, subtype_labels, panel_parameters=[], **params):
         super().__init__(entities, 
                          parameter_mapping=entity_parameter_mapping,
                          panel_parameters=panel_parameters + ['visible', 'color'],
                          **params)
         self.selection = [0]
+        #Note: subtype labels are not used yet but should (to set in the interface the subtype of entities)
+        # But should they be part of panel_parameters?
 
     @property
     def selected_entity_data(self):
@@ -179,11 +181,6 @@ def behavior_param_name(b_idx):
 
 def sensed_param_name(label, b_idx):
     return f'sensed_{label}_{b_idx}'
-
-class Object(ParamEntity):
-    def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, **params)
-
 
 class Selected(param.Parameterized):
     """Class to store the selected entities in the interface"""

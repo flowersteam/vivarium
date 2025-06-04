@@ -1,1 +1,2 @@
-from vivarium.environments.entities.objects.state import ObjectState
+from vivarium.environments.entities.objects.component import ObjectComponent
+from vivarium.environments.entities.objects.controller import ObjectController

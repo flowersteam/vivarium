@@ -1,3 +1,4 @@
+import logging as lg
 from functools import partial
 
 import hydra
@@ -41,8 +42,10 @@ class Component:
         return state
 
     def get_step_function(self, state, neighbor_manager, key):
-        raise NotImplementedError("DynamicFunction is an abstract class")
-        # Or could return an identity function?
+        lg.debug('Component {} has no step function'.format(self.name))
+        def step_fn(state, neighbors, key):
+            return state
+        return step_fn
     
     def update_state_cls(self, state_cls):
         return state_cls

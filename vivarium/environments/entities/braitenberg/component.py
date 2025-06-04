@@ -1,11 +1,10 @@
+import jax.numpy as jnp
+from jax_md.dataclasses import dataclass as md_dataclass
+
 from vivarium.environments.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
 from vivarium.environments.entities.component import EntityComponent
 from vivarium.environments.environment import get_mask_fn
 from vivarium.environments.state import BaseParticleState
-
-
-import jax.numpy as jnp
-from jax_md.dataclasses import dataclass as md_dataclass
 
 
 @md_dataclass
@@ -44,15 +43,10 @@ class BraitenbergComponent(EntityComponent):
         self.controller_kwargs = controller_kwargs
 
     @classmethod
-    def from_config(cls, name, scene_config, config_node):
-
-        kwargs = cls.get_kwargs(name, scene_config, config_node)
+    def get_kwargs(cls, name, scene_config, config_node, exclude=[]):
+        kwargs = super().get_kwargs(name, scene_config, config_node, exclude)
         kwargs['n_subtypes'] = len(scene_config.config.subtypes)
-
-        return cls(
-            name=name,
-            **kwargs
-        )
+        return kwargs
 
     def update_state_cls(self, state_cls):
         state_cls.__annotations__[self.entity_type] = AgentState

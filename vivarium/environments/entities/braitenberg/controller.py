@@ -1,12 +1,10 @@
-from vivarium.controllers.dataclass_wrapper import EntityList, create_dataclass_from_dict
-from vivarium.controllers.simulator_controller import ControllerEntity
-from vivarium.environments.entities.braitenberg.behaviors import Behaviors, behavior_to_params
-
-
 import numpy as np
 
+from vivarium.environments.entities.controller import EntityController
+from vivarium.controllers.simulator_controller import ControllerEntity
 from vivarium.environments.entities.braitenberg.interface import ParamAgent
 from vivarium.environments.entities.braitenberg.interface import AgentManager
+from vivarium.environments.entities.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
 class ControllerAgent(ControllerEntity):
@@ -43,25 +41,16 @@ class PanelControllerAgent(ControllerAgent):
             super().__setattr__(attr, val)
 
 
-class BraitenbergController:
-    def __init__(self, entity_type, **kwargs):
-        self.entity_type = entity_type
-        self.controller_parameters = create_dataclass_from_dict(
-            'ControllerParameters',
-            kwargs)
-        self.param_cls = ParamAgent
-        self.render_cls = AgentManager
-
-    def controller(self, state):  #, state):
-        etype_int = getattr(state, self.entity_type).entity_type
-        return EntityList(
-            state=state, entity_type=self.entity_type, entity_type_idx=etype_int,
-            entity_wrapper_list=[
-                ControllerAgent(state, idx, self.entity_type,
-                                controller_parameters=self.controller_parameters[int(state.entity_state.entity_type_idx[idx])])
-                    #    **{attr: val[int(state.entity_state.entity_type_idx[idx])]
-                    #       for attr, val in etype_to_kwargs[etype].items()}
-                    #    ) 
-                for idx, type in enumerate(state.entity_state.entity_type)
-                if type == etype_int]
+class BraitenbergController(EntityController):
+    def __init__(self, entity_type, 
+                 controller_cls=ControllerAgent, 
+                 param_cls=ParamAgent,
+                 render_cls=AgentManager,
+                 **kwargs):
+        super().__init__(
+            entity_type=entity_type,
+            controller_cls=controller_cls,
+            param_cls=param_cls,
+            render_cls=render_cls,
+            **kwargs
         )

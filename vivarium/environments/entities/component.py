@@ -24,6 +24,16 @@ class EntityComponent(Component):
         self.is_entity_component = True
 
     @classmethod
+    def from_config(cls, name, scene_config, config_node):
+
+        kwargs = cls.get_kwargs(name, scene_config, config_node)
+
+        return cls(
+            name=name,
+            **kwargs
+        )
+
+    @classmethod
     def get_kwargs(cls, name, scene_config, config_node, exclude=[]):
         kwargs = scene_config.compute_parameters(name, config_node)
         n_max = len(config_node.position)
