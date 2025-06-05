@@ -214,7 +214,9 @@ class AgentManager(EntityManager):
             view=self.cds_view["visible_proxs"],
             **src,
         )
-        # direction lines plotting
+
+        # Plot direction lines
         fig.multi_line("ox", "oy", color="white", view=self.cds_view["visible"], **src)
+        
         # Plot agent bodies
         return super().plot(fig)
