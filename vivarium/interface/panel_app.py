@@ -26,7 +26,7 @@ lg = logging.getLogger(__name__)
 
 class Shape(Enum):
     CIRCLE = 0
-    RECTANGLE = 1
+    SQUARE = 1
 
 
 def normal(array):
@@ -210,7 +210,7 @@ class EntityManager:
                 view=self.cds_view["visible"],
                 **src,
             )
-        elif self.shape == Shape.RECTANGLE:
+        elif self.shape == Shape.SQUARE:
             return fig.rect(
                 x="x",
                 y="y",
