@@ -1,4 +1,4 @@
-import logging as lg
+import logging
 from functools import partial
 
 import hydra
@@ -12,6 +12,7 @@ from jax_md import rigid_body, util, simulate, energy, quantity
 
 from vivarium.environments.utils import proximity_map
 
+lg = logging.getLogger(__name__)
 
 f32 = util.f32
 
