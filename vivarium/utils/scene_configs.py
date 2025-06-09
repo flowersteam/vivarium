@@ -21,6 +21,7 @@ from vivarium.simulator import Simulator
 abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
 
+# OmegaConf.register_new_resolver("class", lambda cls: hydra.utils.get_class(cls))
 
 def generate_random_positions(n, position_range, seed=None):
     """
@@ -171,7 +172,7 @@ class SceneConfiguration:
         kwargs = {}
         for etype, config in self.config.client.items():
             n_max = get_n_max(self.config.environment.state_fns[etype])
-            controller_kwargs = extend_kwargs(config.kwargs, n_max)
+            controller_kwargs = extend_kwargs(config.controller_kwargs, n_max)
             kwargs[etype] = controller_kwargs
         # kwargs = {entity_type: extend_kwargs(config.kwargs, self.config.entities[entity_type].kwargs.n_max) for entity_type, config in self.config.client.items()}
         return create_dataclass_from_dict('ControllerParameters', kwargs)
@@ -182,7 +183,7 @@ class SceneConfiguration:
             component_config = self.config.environment.state_fns[etype]
             n_max = get_n_max(component_config)
             cls = hydra.utils.get_class(config.cls)
-            kwargs = extend_kwargs(config.kwargs, n_max)
+            kwargs = extend_kwargs(config.controller_kwargs, n_max)
             controllers[etype] = cls(etype, **kwargs)
         return controllers
 
