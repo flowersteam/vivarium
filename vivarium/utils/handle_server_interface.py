@@ -133,7 +133,7 @@ def start_process(process_command):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    scene_name: str, notebook_mode: bool = True, wait_time: int = 7, safe_mode=True
+    cmd_args, notebook_mode: bool = True, wait_time: int = 7, safe_mode=True
 ):
     """Start the server and interface for the given scene
 
@@ -166,7 +166,7 @@ def start_server_and_interface(
     server_script = os.path.join(project_root, SERVER_PROCESS_NAME)
     interface_script = os.path.join(project_root, INTERFACE_PROCESS_NAME)
 
-    server_command = ["python3", server_script, f"scene={scene_name}"]
+    server_command = ["python3", server_script, *cmd_args]
 
     print("\nSTARTING SERVER")
     server_process = multiprocessing.Process(
