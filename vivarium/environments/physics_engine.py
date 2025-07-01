@@ -1,22 +1,26 @@
-import logging
-from functools import partial
-
 import hydra
+import logging
 import omegaconf
 
-import jax
-import jax.numpy as jnp
-
 from jax import vmap, lax
-from jax_md import rigid_body, util, simulate, energy, quantity
+import jax.numpy as jnp
+import jax
 
-from vivarium.environments.utils import proximity_map
+from jax_md import rigid_body, util, simulate, energy, quantity, smap, space, partition
+
+from vivarium.environments.utils import neighbors_entity_mask, get_relative_displacement
+
 
 lg = logging.getLogger(__name__)
 
 f32 = util.f32
 
 SPACE_NDIMS = 2
+
+#TODO: exists masks are currently handled manually and quite on a case-by-case basis.
+# However, jax_md.partition.neighbor_list has a custom_mask_function argument. 
+# Should we use it to simplify the code and make it less error prone?
+
 
 class Component:
     def __init__(self, name, precedence):
@@ -50,14 +54,6 @@ class Component:
     
     def update_state_cls(self, state_cls):
         return state_cls
-
-
-# def friction_state_fn(mask_fn):
-#     def state_fn(state, neighbor):
-#         mask = mask_fn(state)
-#         # Issue : We need to sum the forces, here we just set them (so previous force functions in the env actually not used)
-#         return state.set(entity_state=state.entity_state.set(force=friction_force(state, neighbor, mask)))
-#     return state_fn
 
 
 def to_rigid_body(position):
@@ -133,9 +129,25 @@ def total_collision_energy(
 
 
 def collision_force_fn(displacement):
-    coll_force_fn = quantity.force(
-        partial(total_collision_energy, displacement=displacement)
-    )
+    
+    def coll_force_fn(sigma, epsilon, alpha):
+        """Compute the collision force on the system
+
+        :param positions: positions of all the particles
+        :param sigma: diameters of all the particles
+        :param epsilon: interaction energy scale between two particles
+        :param alpha: interaction stiffness between two particles
+        :return: collision force on the system
+        """
+        return quantity.force(
+            smap.pair_neighbor_list(
+                energy.soft_sphere,
+                space.canonicalize_displacement_or_metric(displacement),
+                sigma=sigma,
+                epsilon=epsilon,
+                alpha=alpha
+            )
+        )
     
     @handle_rigid_body
     def force_fn(state, neighbor, exists_mask):
@@ -146,14 +158,34 @@ def collision_force_fn(displacement):
         :param exists_mask: mask on existing entities
         :return: collision force function
         """
-        return coll_force_fn(
-            state.entity_state.unified_position,
-            neighbor=neighbor,
-            exists_mask=exists_mask,
-            diameter=state.entity_state.diameter,
+
+        #TODO: filter sources and targets based on their existence
+        fn = coll_force_fn(
+            sigma=(state.entity_state.diameter[:, jnp.newaxis] + state.entity_state.diameter[neighbor.idx]), # / 2,
             epsilon=state.collision_eps,
-            alpha=state.collision_alpha,
+            alpha=state.collision_alpha
         )
+        
+        
+        force = fn(
+            state.entity_state.position,
+            neighbor.set(
+                idx = jnp.where(
+                    neighbors_entity_mask(
+                        neighbor.idx, 
+                        state.entity_state.exists, 
+                        state.entity_state.exists, 
+                        partition.neighbor_list_mask(neighbor, mask_self=True)
+                    ),
+                    neighbor.idx,
+                    state.entity_state.exists.shape[0]
+                )
+            )
+        )
+    
+        force = jnp.where(exists_mask[:, jnp.newaxis], force, jnp.array([0., 0.]))
+
+        return force
         
     return force_fn
 
@@ -194,7 +226,6 @@ class CollisionComponent(Component):
         return state_fn
 
 
-# Functions to compute the verlet force on the whole system
 @handle_rigid_body
 def friction_force(state, neighbor, exists_mask):
     """Compute the friction force on the system
@@ -209,9 +240,6 @@ def friction_force(state, neighbor, exists_mask):
     cur_vel = jnp.where(mask, cur_vel, 0.0)
     return -jnp.tile(state.entity_state.friction, (SPACE_NDIMS, 1)).T * cur_vel
     
-
-# def friction_force_fn(displacement):
-#     return friction_force
 
 class FrictionComponent(Component):
     def __init__(self, name, precedence, mask_fn):
@@ -247,14 +275,16 @@ def sum_force_fns(displacement, force_fns):
     return force_fn
 
 
-# def verlet_force_fn(displacement):
-#     """Compute the verlet force on the whole system
+class ResetForceComponent(Component):
 
-#     :param displacement: displacement function of jax_md
-#     :return: force function of the system
-#     """
-
-#     return sum_force_fns(displacement, [collision_force_fn, friction_force_fn])
+    def get_step_function(self, state, neighbor_manager, key):
+        def fn(state, neighbor, key):
+            if state.entity_state.is_rigid_body():
+                zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
+            else:
+                zeros = jnp.zeros_like(state.entity_state.force)
+            return state.set(entity_state=state.entity_state.set(force=zeros))
+        return fn
 
 
 def mask_momentum(entity_state, exists_mask):
@@ -273,18 +303,6 @@ def mask_momentum(entity_state, exists_mask):
     return entity_state.set(momentum=momentum)
 
 
-class ResetForceComponent(Component):
-
-    def get_step_function(self, state, neighbor_manager, key):
-        def fn(state, neighbor, key):
-            if state.entity_state.is_rigid_body():
-                zeros = to_rigid_body(jnp.zeros_like(state.entity_state.force.center))
-            else:
-                zeros = jnp.zeros_like(state.entity_state.force)
-            return state.set(entity_state=state.entity_state.set(force=zeros))
-        return fn
-
-
 def init_state_fn(key, kT=0.0):
     key_cpy = key
     def fn(state):
@@ -297,13 +315,13 @@ def init_state_fn(key, kT=0.0):
         
     return fn
 
+
 class StepComponent(Component):
     def __init__(self, name, precedence, dt, mask_fn):
         super().__init__(name, precedence)
         self.dt = dt
         self.mask_fn = mask_fn
 
-        
     def update_state_cls(self, state_cls):
         state_cls.__annotations__['dt'] = jnp.float32
         state_cls.dt = None
@@ -344,7 +362,6 @@ class ProximityMapComponent(Component):
         fn = self.get_step_function(state, neighbor_manager, key)
         state = fn(state, neighbor_manager.neighbors, key)
         return state
-        
 
     def update_state_cls(self, state_cls):
         state_cls.__annotations__['distance_map'] = jnp.ndarray
@@ -354,16 +371,22 @@ class ProximityMapComponent(Component):
         return state_cls
 
     def get_step_function(self, state, neighbor_manager, key):
+        source_mask = jnp.full(state.entity_state.exists.shape, True, dtype=bool)
         def step_fn(state, neighbors, key):
-            sources, targets = neighbors.idx
-            dist, theta = proximity_map(neighbor_manager.displacement,
-                                         state.entity_state.position[sources],
-                                         state.entity_state.position[targets],
-                                         state.entity_state.orientation[sources]
-                                         )
+
+            all_dist, all_relative_theta = (
+                get_relative_displacement(
+                    state.entity_state.position,
+                    state.entity_state.orientation, 
+                    source_mask,
+                    neighbors.idx, 
+                    displacement_fn=neighbor_manager.displacement
+                )
+            )
+
             return state.set(
-                distance_map = dist,
-                orientation_map = theta
+                distance_map = all_dist,
+                orientation_map = all_relative_theta
             )
 
         return step_fn
