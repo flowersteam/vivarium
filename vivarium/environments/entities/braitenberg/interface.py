@@ -5,10 +5,18 @@ import numpy as np
 
 from bokeh.plotting import figure
 
-from vivarium.controllers.panel_controller import ParamEntity, behavior_param_name, sensed_param_name
+from vivarium.controllers.panel_controller import ParamEntity, ParameterMapping, behavior_param_name, sensed_param_name
 from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 from vivarium.interface.panel_app import EntityManager, normal
 
+
+parameter_mapping = {
+    'prox_per_subtype': ParameterMapping(
+        'prox_per_subtype',
+        jax_to_param_fn=lambda x: np.array(x),
+        param_to_jax_fn=lambda x: x
+    ),
+}
 
 class ParamAgent(ParamEntity):
     left_motor = param.Number()
@@ -18,14 +26,12 @@ class ParamAgent(ParamEntity):
     wheel_diameter = param.Number()
     proxs_dist_max = param.Number()
     proxs_cos_min = param.Number()
-    # energy = param.Number()
-    # recover_time = param.Number()
+    prox_per_subtype = param.Array()
     visible_wheels = param.Boolean(True)
     visible_proxs = param.Boolean(True)
 
     def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, subtype_labels, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
-        self.subtype_labels = subtype_labels
+        super().__init__(entities, subtype_labels, parameter_mapping=parameter_mapping, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)
             self.panel_parameters.append(behavior)
@@ -54,6 +60,7 @@ class ParamAgent(ParamEntity):
                 sensed = self.selected_entity_data.sensed[i][idx]
                 setattr(self, sensed_param_name(label, i), bool(sensed))
         self.allow_update_to = True
+
 
     def update_behavior(self, event, slot_idx, label_idx):
         for ag_idx in self.selection:
