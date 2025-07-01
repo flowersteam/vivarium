@@ -1,4 +1,4 @@
-import logging as lg
+import logging
 
 from jax import jit, lax, random
 import jax.numpy as jnp
@@ -6,8 +6,10 @@ import jax.numpy as jnp
 from jax_md import partition, space
 
 from vivarium.environments.state import BaseState, create_state_cls
-
 from vivarium.utils.converters import access_nested_fields
+
+
+lg = logging.getLogger(__name__)
 
 
 # Generic mask function factory
@@ -17,15 +19,16 @@ def get_mask_fn(label):
 
 
 class NeighborManager:
-    def __init__(self, box_size, neighbor_radius, space_fn=space.periodic):
+    def __init__(self, box_size, neighbor_radius, dr_threshold, space_fn=space.periodic):
         self.displacement, self.shift = space_fn(box_size)
         self.neighbor_fn = partition.neighbor_list(
             self.displacement,
             box_size,
             r_cutoff=neighbor_radius,
-            dr_threshold=10.0,
+            dr_threshold=dr_threshold,
             capacity_multiplier=1.5,
-            format=partition.Sparse,
+            mask_self=True,
+            format=partition.Dense,
         )
         self.box_size = box_size
         self.neighbor_radius = neighbor_radius
@@ -37,14 +40,18 @@ class NeighborManager:
         self.neighbors = self.neighbors.update(positions)
         return self.neighbors
     
+    # No longer use, now in Environment.step. No strong opinion on what's the best option
     def reallocate_if_overflow(self, positions):
+       
         if self.neighbors.did_buffer_overflow:
             # reallocate neighbors and run the simulation from current_state
-            lg.warning(
+            lg.info(
                 f"NEIGHBORS BUFFER OVERFLOW: rebuilding neighbors"
             )
             self.allocate(positions)
-            assert not self.neighbors.did_buffer_overflow
+            # assert not self.neighbors.did_buffer_overflow
+            return True
+        return False
 
 
 nested_fields_to_access = {
@@ -56,7 +63,6 @@ nested_fields_to_access = {
 class Environment:
     def __init__(self,
                  neighbor_manager,
-                #  dt,
                  base_state_cls=BaseState,
                  factories=[], 
                  num_scan_steps=1, to_jit=True, key=random.PRNGKey(42)):
@@ -66,15 +72,14 @@ class Environment:
         self.factories = factories
         self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(factories)}
         self.neighbor_manager = neighbor_manager
-        # self.dt = dt
         self.num_scan_steps = num_scan_steps
         self.to_jit = to_jit
         if to_jit:
             self._step_env = jit(self._step_env, static_argnums=(2,))
 
     @classmethod
-    def init_neighbor_manager(cls, box_size, neighbor_radius, space_fn=space.periodic, **kwargs):
-        neighbor_manager = NeighborManager(box_size, neighbor_radius, space_fn)
+    def init_neighbor_manager(cls, box_size, neighbor_radius, dr_threshold, space_fn=space.periodic, **kwargs):
+        neighbor_manager = NeighborManager(box_size, neighbor_radius, dr_threshold, space_fn)
         return cls(neighbor_manager, **kwargs)
     
     def init_state_cls(self):
@@ -111,6 +116,7 @@ class Environment:
     def init_step_functions(self, state):
         self.step_functions = []
         self.factories.sort(key=lambda f: f.precedence)
+        self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(self.factories)}
         for factory in self.factories:
             self.step_functions.append(factory.get_step_function(state, self.neighbor_manager, self.key))
 
@@ -131,7 +137,7 @@ class Environment:
             for fn in self.step_functions:
                 key, sub_key = random.split(key)
                 state = fn(state, neighbors, sub_key) 
-            neighbors = self.neighbor_manager.update(state.entity_state.unified_position)
+            neighbors = neighbors.update(state.entity_state.position)
             state = state.set(time=state.time + 1)
             carry = (state, neighbors, key)
             return carry, carry
@@ -141,19 +147,28 @@ class Environment:
 
     def step(self, state, scan=True):
 
-        current_state = state
         neighbors = self.neighbor_manager.neighbors
+
         if scan:
-            state, neighbors, self.key = self._step_env(current_state, neighbors, self.num_scan_steps)
-        else:
+            new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps)
+        else:  # For debugging purpose
+            new_state = state
             for fn in self.step_functions:
                 self.key, sub_key = random.split(self.key)
-                state = fn(state, neighbors, sub_key) 
-            neighbors = self.neighbor_manager.update(state.entity_state.unified_position)
-            state = state.set(time=state.time + 1)
+                new_state = fn(new_state, neighbors, sub_key) 
+            neighbors = self.neighbor_manager.update(new_state.entity_state.position)
+            if not self.neighbor_manager.reallocate_if_overflow(new_state.entity_state.unified_position):
+                new_state = new_state.set(time=state.time + 1)
+                state = new_state
+
+        if neighbors.did_buffer_overflow:
+            lg.info(
+                f"NEIGHBORS BUFFER OVERFLOW: rebuilding neighbors"
+            )
+            neighbors = self.neighbor_manager.neighbor_fn.allocate(state.entity_state.position)
+        else:
+            state = new_state
 
         self.neighbor_manager.neighbors = neighbors
-
-        self.neighbor_manager.reallocate_if_overflow(state)
 
         return state
