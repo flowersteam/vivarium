@@ -10,8 +10,7 @@ from vivarium.environments.state import BaseParticleState
 @md_dataclass
 class AgentState(BaseParticleState):
     prox: jnp.array
-    # prox_sensed_ent_type: jnp.array
-    # prox_sensed_ent_idx: jnp.array
+    prox_per_subtype: jnp.array
     motor: jnp.array
     behavior: jnp.array
     behavior_params: jnp.array
@@ -59,6 +58,7 @@ class BraitenbergComponent(EntityComponent):
                            entity_type=self.entity_type_int,
                            entity_idx=self.entity_idx,
                            prox=jnp.zeros((self.n_max, 2)),
+                           prox_per_subtype=jnp.zeros((self.n_max, 2, self.n_subtypes)),
                            motor=jnp.zeros((self.n_max, 2)),
                            behavior=jnp.full((self.n_max, self.n_behaviors), 4, dtype=int),
                            behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 3)),
@@ -72,21 +72,5 @@ class BraitenbergComponent(EntityComponent):
         )
 
     def get_step_function(self, state, neighbor_manager, key):
-        ag_idx = state.entity_state.entity_type[neighbor_manager.neighbors.idx[0]] == self.entity_type_int
-        agents_neighs_idx = neighbor_manager.neighbors.idx[:, ag_idx]
-
-        # Give the idx of the agents in sparse representation, under a dense representation (used to get the raw proxs in compute motors function)
-        agents_idx_dense_senders = jnp.array(
-            [
-                jnp.argwhere(jnp.equal(agents_neighs_idx[0, :], idx)).flatten()
-                for idx in jnp.arange(getattr(state, self.entity_type).count())
-            ]
-        )
-        # Note: jnp.argwhere(jnp.equal(self.agents_neighs_idx[0, :], idx)).flatten() ~ jnp.where(agents_idx[0, :] == idx)
-
-        # Give the idx of the agent neighbors in dense representation
-        agents_idx_dense_receivers = agents_neighs_idx[1, :][agents_idx_dense_senders]
-        agents_idx_dense = agents_idx_dense_senders, agents_idx_dense_receivers
-        return  braitenberg_state_fn(self.entity_type, neighbor_manager.displacement, get_mask_fn('exists'),
-                                        agents_neighs_idx,
-                                        agents_idx_dense, occlusion=True)
+        braitenberg_mask = state.entity_state.entity_type == getattr(state, self.entity_type).entity_type
+        return  braitenberg_state_fn(self.entity_type, braitenberg_mask, neighbor_manager.displacement, get_mask_fn('exists'))
