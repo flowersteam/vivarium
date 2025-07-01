@@ -1,8 +1,7 @@
 import jax.numpy as jnp
-from jax import vmap, random
+from jax import lax, vmap, random
 
 from jax_md.dataclasses import dataclass as md_dataclass, fields
-
 from jax_md import space
 
 
@@ -43,16 +42,11 @@ def relative_position(displ, theta):
     relative_theta = theta_displ - theta
     return dist, relative_theta
 
-def proximity_map(displacement_fn, source_positions, target_positions, source_orientations):
 
-    d_r = -space.map_bond(displacement_fn)(
-        source_positions, target_positions
-    )  # Looks like it should be opposite, but don't understand why
+proximity_map = vmap(vmap(relative_position, (0, None)), (0, 0))
 
-    dist, theta = vmap(relative_position, (0,0))(d_r, source_orientations)
 
-    return dist, theta
-
+# Deprecated?
 def rigid_body_to_point_particle(module):
 
     @md_dataclass
@@ -122,6 +116,7 @@ def generate_random_orientations(n, orientation_range, key=random.PRNGKey(0)):
     min, max = orientation_range
     return random.uniform(key, shape=(n,), minval=min, maxval=max)
 
+
 def are_two_positions_close(position1, position2, atol):
     """
     Check if two positions are close to each other
@@ -137,3 +132,59 @@ def is_position_close(position, idx, other_positions, atol):
     closes = vmap(are_two_positions_close, (None, 0, None))(position, other_positions, atol)
     closes = closes.at[idx].set(False)
     return jnp.any(closes, axis=-1)
+
+
+def neighbors_entity_mask(neighbors_idx, source_mask, target_mask, neighbor_mask):
+    target_idx = jnp.where(
+        target_mask,
+        jnp.arange(target_mask.shape[0], dtype=int),
+        -1
+    )
+    neighbor_mask = jnp.where(
+        source_mask[:, jnp.newaxis],
+        neighbor_mask,
+        False
+    )
+    return neighbor_mask & jnp.isin(neighbors_idx, target_idx)
+
+
+def masked_apply(fn, arr, mask, default=0.):
+    """
+    Note: This was done to potentially speed up jnp.where(mask, fn(arr), arr), hoping it would avoid computing fn(arr) where mask is False.
+    However, quick timing tests show that this is not faster than the jnp.where approach.
+
+    Apply a function to elements of an array where the mask is True,
+    and return the original value where the mask is False.
+    Args:
+        fn: Function to apply to the elements of arr.
+        arr: Input array.
+        mask: Boolean mask array of the same shape as arr.
+        default: Default value to return where mask is False.
+    Returns:
+        jnp.array: Array with fn applied where mask is True, and original values where mask is False.
+    """
+    def apply_if_masked(x, m):
+        # Apply fn if m is True, else return x unchanged
+        return lax.cond(m, fn, lambda _: default, x)
+
+    # Vectorize over the array
+    return vmap(apply_if_masked)(arr, mask)
+
+
+def get_relative_displacement(all_positions, source_orientations, source_mask, neighbors, displacement_fn):
+    """Get all infos relative to distance and orientation between all agents and their neighbors
+
+    :param state: state
+    :param braitenberg_state: braitenberg agents' state
+    :param agents_neighs_idx: idx all agents neighbors
+    :param displacement_fn: jax md function enabling to know the distance between points
+    :return: distance array, angles array, distance map for all agents, angles map for all agents
+    """
+
+    dR = space.map_neighbor(displacement_fn)(
+        all_positions[source_mask], all_positions[neighbors]
+    )
+
+    dist, theta = proximity_map(dR, source_orientations)
+
+    return dist, theta
