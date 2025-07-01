@@ -1,29 +1,25 @@
 import pytest
-from dataclasses import dataclass
 from typing import List
-from jax import random
+from dataclasses import dataclass
+
 import jax.numpy as jnp
 
-from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, changes_to_proto, proto_to_changes
 from vivarium.controllers.dataclass_wrapper import DataclassWrapper
-from vivarium.environments.physics_engine import init_state_fn
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, changes_to_proto, proto_to_changes
+
+
+scene_name = 'braitenberg'
 
 
 @pytest.fixture
-def scene_config():
-    return SceneConfiguration('braitenberg')
+def state(environment_from_config):
+    env = environment_from_config(scene_name)
+    return env.init_state()
 
 
 @pytest.fixture
-def state(scene_config):
-    state = scene_config.create_state()
-    return init_state_fn(random.PRNGKey(0))(state)
-
-
-@pytest.fixture
-def simulator(scene_config):
-    return scene_config.create_simulator()
+def simulator(simulator_from_config):
+    return simulator_from_config(scene_name)
 
 
 def test_state_de_serialization(state):
@@ -85,6 +81,7 @@ def test_simulator_grpc(simulator):
     simulator = dw.update_dataclass(simulator, changes_2)
     assert jnp.equal(jnp.array(42), simulator.state.entity_state.friction).all()
 
+
 def test_index_grpc():
     @dataclass
     class Test:
@@ -99,4 +96,5 @@ def test_index_grpc():
     p_changes = changes_to_proto(changes)
     changes_2 = proto_to_changes(p_changes)
     dw.update_dataclass(test, changes_2)
-    # assert changes_2.agents[0].visible_wheels == False
+    assert test.visible_wheels == [False, True]
+    

@@ -1,25 +1,16 @@
-import pytest
 import jax.numpy as jnp
 
-from vivarium.controllers.simulator_controller import SimulatorController, ControllerEntity
-from vivarium.environments.entities.braitenberg import AgentState
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.environments.entities.braitenberg.controller import BraitenbergController
 
 NUM_STEPS = 10
 
-@pytest.fixture
-def scene_config(request):
-    scene_name = request.param
-    return SceneConfiguration(scene_name)
 
-@pytest.mark.parametrize("scene_config", ['braitenberg', 'particle_lenia'], indirect=True)
-def test_base_entity(scene_config):
-    state = scene_config.create_state()
-    entity_type = scene_config.entity_types[0]
+def test_base_entity(environment_and_state, braitenberg):
+    env, state = environment_and_state(braitenberg)
+    entity_type = 'agents'
+    braitenberg_controller = BraitenbergController(entity_type, color=('red',) * state.agents.count())
     idx = 0
-    entity = ControllerEntity(state, idx, entity_type, 
-                              getattr(scene_config.create_controller_parameters(), entity_type)[idx]
-                              )
+    entity = braitenberg_controller.controller(state)[idx]
     
     entity.x_position = 10
     state = entity.apply_to_state(state)
@@ -31,10 +22,8 @@ def test_base_entity(scene_config):
     assert changes['color'][0]['__value'] == 'pink'
 
 
-@pytest.mark.parametrize("scene_config", ['braitenberg'], indirect=True)
-def test_simulator_controller(scene_config):
-    simulator = scene_config.create_simulator()
-    controller = SimulatorController(simulator)
+def test_simulator_controller(simulator_controller_from_config):
+    controller = simulator_controller_from_config('braitenberg')
     controller.step()
 
     idx = 0
@@ -47,7 +36,7 @@ def test_simulator_controller(scene_config):
     controller.apply_changes()
     controller.update_state()
 
-    assert jnp.equal(jnp.array([3, 2, 1, 5]), controller.state.field(AgentState).behavior[idx]).all()
+    assert jnp.equal(jnp.array([3, 2, 1, 5]), controller.state.agents.behavior[idx]).all()
 
     for ag in controller.agents:
         ag.behavior = 5

@@ -1,21 +1,17 @@
-import pytest
 import jax.numpy as jnp
-from vivarium.environments.physics_engine import ProximityMap
-from vivarium.utils.scene_configs import SceneConfiguration
+
 from vivarium.environments.dynamics.existence import type_mask
+from vivarium.utils.scene_configs import SceneConfiguration
 
-@pytest.fixture
-def scene_config():
-    scene_name = 'braitenberg'
-    return SceneConfiguration(scene_name)
-@pytest.fixture
-def state(scene_config):
-    return scene_config.create_state()
-@pytest.fixture
-def env(scene_config):
-    return scene_config.create_environment()
 
-def test_type_mask(state):
+def test_instantiate():
+    scene_config = SceneConfiguration('braitenberg')
+    df = scene_config.create_component_factories()
+    pass
+
+
+def test_type_mask(environment_and_state, braitenberg):
+    _, state = environment_and_state(braitenberg)
     entity_state = state.entity_state
     exists = jnp.zeros_like(entity_state.exists)
     idx = 3
@@ -71,92 +67,83 @@ def test_type_mask(state):
                          )
                      ).all()
 
-def test_proximity_map(scene_config):
-    map = ProximityMap('test', 0)
-    map.update_scene_configuration(scene_config)
-    env = scene_config.create_environment()
-    env.dynamics_functions = [map.get_state_function(env)]
-    state = env.dynamics_functions[0](env.state, env.neighbor_manager.neighbors, env.key)
-    state
 
-def test_consumption(env):
-    # env = SceneConfiguration('braitenberg').create_environment()
-    state = env.state
-    idx = 0
-    etype_idx = state.entity_state.entity_type_idx[idx]
-    # state = state.set(
-    #     entity_state=state.entity_state.set(
-    #         consuming=state.entity_state.consuming.at[idx].set(True),
-    #     )
-    # )
-    pos_resource = state.entity_state.position_center[idx] + jnp.ones(2)
+def test_proximity_map(environment_and_state, proximity_map):
+    env, state = environment_and_state(proximity_map)
+    state = env.step(state)
+
+
+def test_consumption(environment_and_state, consumption):
+
+    env, state = environment_and_state(consumption)
+
+    consumer_idx = 0
+    consumee_idx = 3
+
+    pos_consumee = state.entity_state.position_center[consumer_idx] + jnp.ones(2)
     state = state.set(
         entity_state=state.entity_state.set(
-            position=state.entity_state.position.at[-1].set(pos_resource)
+            position=state.entity_state.position.at[consumee_idx].set(pos_consumee)
         )
     )
-    proximity_map_fn = env.get_dynamics_function_by_name('proximity_map')
-    state = proximity_map_fn(state, env.neighbor_manager.neighbors, env.key)
-    consumption_fn = env.get_dynamics_function_by_name('preys_consume_resources')
-    state = consumption_fn(state, env.neighbor_manager.neighbors, env.key)
-    # energy_fn = env.dynamics_functions[-5]
-    # state = energy_fn(state, env.neighbor_manager.neighbors, env.key)
-    # reproduction_fn = env.dynamics_functions[-4]
-    # state = reproduction_fn(state, env.neighbor_manager.neighbors, env.key)
-    state
+    
+    assert not state.entity_state.consuming[consumer_idx]
+    assert not state.entity_state.consumed[consumee_idx]
+    assert state.entity_state.exists[consumee_idx]
+
+    state = env.step(state, scan=False)
+
+    assert state.entity_state.consuming[consumer_idx]
+    assert state.entity_state.consumed[consumee_idx]
+    assert not state.entity_state.exists[consumee_idx]
 
 
-def test_energy_routine(env):
-    # env = SceneConfiguration('braitenberg').create_environment()
-    state = env.state
+
+def test_energy(environment_and_state, energy):
+    env, state = environment_and_state(energy)
     idx = 0
     etype_idx = state.entity_state.entity_type_idx[idx]
-    cur_energy = state.agents.energy[etype_idx]
     state = state.set(
         entity_state=state.entity_state.set(
             consuming=state.entity_state.consuming.at[idx].set(True),
         )
     )
-    energy_fn = env.get_dynamics_function_by_name('energy_preys')
-    state = energy_fn(state, env.neighbor_manager.neighbors, env.key)
+    state = env.step(state, scan=False)
     new_energy = state.agents.energy[etype_idx]
     assert new_energy == 1
 
 
-def test_death(env):
-    # env = SceneConfiguration('braitenberg').create_environment()
-    state = env.state
+def test_death(environment_and_state, reproduction):
+    env, state = environment_and_state(reproduction)
     idx = 0
     etype_idx = state.entity_state.entity_type_idx[idx]
-    reproduction_fn = env.get_dynamics_function_by_name('reproduction')
+    state = env.step(state)
     state = state.set(
         agents=state.agents.set(
             energy=state.agents.energy.at[etype_idx].set(1.),
         )
     )
-    state = reproduction_fn(state, env.neighbor_manager.neighbors, env.key)
+    state = env.step(state)
     assert state.entity_state.exists[idx] == 1
     state = state.set(
         agents=state.agents.set(
             energy=state.agents.energy.at[etype_idx].set(0.),
         )
     )
-    state = reproduction_fn(state, env.neighbor_manager.neighbors, env.key)
+    state = env.step(state)
     assert state.entity_state.exists[idx] == 0
 
-def test_reproduction(env):
-    # env = SceneConfiguration('braitenberg').create_environment()
-    state = env.state
+def test_reproduction(environment_and_state, reproduction):
+    env, state = environment_and_state(reproduction)
     idx = 0
     etype_idx = state.entity_state.entity_type_idx[idx]
-    reproduction_fn = env.get_dynamics_function_by_name('reproduction')
     state = state.set(
         entity_state=state.entity_state.set(
             exists=state.entity_state.exists.at[idx+1].set(0),
         )
     )
     n_exists = state.entity_state.exists.sum()
-    state = reproduction_fn(state, env.neighbor_manager.neighbors, env.key)
+    state = env.step(state, scan=False)
     assert state.entity_state.exists.sum() == n_exists
     state = state.set(
         agents=state.agents.set(
@@ -164,5 +151,11 @@ def test_reproduction(env):
             recover_time=state.agents.recover_time.at[etype_idx].set(1e5),
         )
     )
-    state = reproduction_fn(state, env.neighbor_manager.neighbors, env.key)
+    state = state = env.step(state)
     assert state.entity_state.exists.sum() == n_exists + 1
+
+
+def test_braitenberg(environment_and_state, braitenberg):
+    env, state = environment_and_state(braitenberg)
+    state = env.step(state)
+    pass

@@ -2,46 +2,23 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.controllers.dataclass_wrapper import *
-from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.environments.state import to_rigid_body_state
-from vivarium.environments.entities.objects import ObjectState
-from vivarium.environments.entities.braitenberg import AgentState
+
+
+scene_name = 'braitenberg'
 
 
 @pytest.fixture
-def scene_config():
-    return SceneConfiguration('braitenberg')
-
-
-@pytest.fixture
-def tmp_state(scene_config):
-    return scene_config.create_state()
-
-
-@pytest.fixture
-def agent_field(tmp_state):
-    return tmp_state.field_name(AgentState)
-
-
-@pytest.fixture
-def object_field(tmp_state):
-    return tmp_state.field_name(ObjectState)
-
-
-@pytest.fixture
-def get_point_particle_state(scene_config):
-    def _get_state():
-        return scene_config.create_state()
-    return _get_state
+def get_point_particle_state(environment_from_config):
+    env = environment_from_config(scene_name)
+    return env.init_state()
 
 
 @pytest.fixture
 def get_rigid_body_state(get_point_particle_state):
-    def _get_state():
-        state = get_point_particle_state()
-        state = state.set(entity_state=to_rigid_body_state(state.entity_state))
-        return state
-    return _get_state
+    state = get_point_particle_state
+    state = state.set(entity_state=to_rigid_body_state(state.entity_state))
+    return state
 
 
 def generate_changes(wheel_diameter_idx, wheel_diameter_value, exists_idx, exists_value, friction_idx, friction_value, agent_field):
@@ -57,7 +34,7 @@ def generate_changes(wheel_diameter_idx, wheel_diameter_value, exists_idx, exist
 
 def generate_expected(wheel_diameter_idx, wheel_diameter_value, exists_idx, exists_value, friction_idx, friction_value, agent_field):
     return {
-        agent_field: {'wheel_diameter': lambda state: state.field(AgentState).wheel_diameter.at[wheel_diameter_idx].set(wheel_diameter_value)},
+        agent_field: {'wheel_diameter': lambda state: getattr(state, agent_field).wheel_diameter.at[wheel_diameter_idx].set(wheel_diameter_value)},
         'entity_state': {
             'exists': lambda state: state.entity_state.exists.at[exists_idx].set(exists_value),
             'friction': lambda state: state.entity_state.friction.at[friction_idx].set(friction_value).at[friction_idx:friction_idx+2].set(friction_value + 1)
@@ -71,15 +48,14 @@ def generate_changes_and_expected(wheel_diameter_idx, wheel_diameter_value, exis
     return changes, expected
 
 
-@pytest.mark.parametrize("changes_and_expected, state_fn", [
+@pytest.mark.parametrize("changes_and_expected, state", [
     (lambda agent_field: generate_changes_and_expected(0, 0, 7, 0, 6, 0, agent_field), "get_rigid_body_state"),
     (lambda agent_field: generate_changes_and_expected(1, 1, 8, 1, 7, 1, agent_field), "get_point_particle_state"),
 ])
-def test_change_recorder(changes_and_expected, state_fn, request, agent_field):
-    state_fn = request.getfixturevalue(state_fn)
-    state = state_fn()
+def test_change_recorder(changes_and_expected, state, request):
+    state = request.getfixturevalue(state)
 
-    changes, expected = changes_and_expected(agent_field)
+    changes, expected = changes_and_expected('agents')
 
     c = ChangeRecorder()
 
@@ -110,43 +86,39 @@ def test_change_recorder(changes_and_expected, state_fn, request, agent_field):
 
 
 def test_dataclass_wrapper(get_rigid_body_state):
-    state = get_rigid_body_state()
+    state = get_rigid_body_state
     idx = 3
     val = [0.2, 0.3]
-    agent_field = state.field_name(AgentState)
-    cur_val = state.field(AgentState).motor[idx]
+    cur_val = state.agents.motor[idx]
     assert (not jnp.equal(jnp.array(cur_val), jnp.array(val)).all())
 
-    state = getattr(DataclassWrapper(), agent_field).motor[idx].set(val).apply(state)
+    state = DataclassWrapper().agents.motor[idx].set(val).apply(state)
 
-    assert (jnp.equal(jnp.array(state.field(AgentState).motor[idx]), jnp.array(val)).all())
+    assert (jnp.equal(jnp.array(state.agents.motor[idx]), jnp.array(val)).all())
 
 
 def test_dataclass_wrapper_with_state(get_rigid_body_state):
-    state = get_rigid_body_state()
-    agent_field = state.field_name(AgentState)
+    state = get_rigid_body_state
     dw = DataclassWrapper(state)
     
     assert jnp.equal(state.entity_state.position.center, dw.entity_state.position.center).all()
 
-    getattr(dw, agent_field).motor = 100 * jnp.ones_like(state.field(AgentState).motor)
+    dw.agents.motor = 100 * jnp.ones_like(state.agents.motor)
     
     dw.apply()
 
-    assert jnp.equal(getattr(dw, agent_field).motor, 100 * jnp.ones_like(state.field(AgentState).motor)).all()  
+    assert jnp.equal(dw.agents.motor, 100 * jnp.ones_like(state.agents.motor)).all()  
     
     assert jnp.equal(state.entity_state.position.center[1, 2], dw.entity_state.position.center[1, 2]).all()
 
 
 @pytest.mark.parametrize("idx, position_center, position_orientation, init_state_fn, entity_type", [
-    (2, [7, 8], 2.0, "get_rigid_body_state", "agent_field"),
-    (3, [5, 6], 1.5, "get_point_particle_state", "object_field"),
-    (4, [9, 10], 3.0, "get_rigid_body_state", "agent_field"),
+    (2, [7, 8], 2.0, "get_rigid_body_state", "agents"),
+    (3, [5, 6], 1.5, "get_point_particle_state", "objects"),
+    (4, [9, 10], 3.0, "get_rigid_body_state", "agents"),
 ])
 def test_entity_wrapper(idx, position_center, position_orientation, init_state_fn, entity_type, request):
-    state_fn = request.getfixturevalue(init_state_fn)
-    entity_type = request.getfixturevalue(entity_type)
-    state = state_fn()
+    state = request.getfixturevalue(init_state_fn)
 
     entity = EntityWrapper(state, idx, entity_type)
 
@@ -164,16 +136,13 @@ def test_entity_wrapper(idx, position_center, position_orientation, init_state_f
 
 
 @pytest.mark.parametrize("idx, position_center, entity_type, state_fn", [
-    (4, [7, 8], "agent_field", "get_rigid_body_state"),
-    (2, [9, 10], "object_field", "get_point_particle_state"),
+    (4, [7, 8], "agents", "get_rigid_body_state"),
+    (2, [9, 10], "objects", "get_point_particle_state"),
 ])
 def test_entity_list(idx, position_center, entity_type, state_fn, request):
-    state_fn = request.getfixturevalue(state_fn)
-    entity_type = request.getfixturevalue(entity_type)
-    scene_config = request.getfixturevalue("scene_config")
-    state = state_fn()
+    state = request.getfixturevalue(state_fn)
     
-    objects = EntityList(state, entity_type, scene_config.entity_type_configs[entity_type].idx)
+    objects = EntityList(state, entity_type, getattr(state, entity_type).entity_type)
 
     obj = objects[idx]
     obj.position_center = position_center
@@ -189,8 +158,8 @@ def test_entity_list(idx, position_center, entity_type, state_fn, request):
     assert (jnp.equal(state.entity_state.position_center, expected_position)).all()
 
 
-def test_on_simulator_instance(scene_config):
-    simulator = scene_config.create_simulator()
+def test_on_simulator_instance(simulator_from_config):
+    simulator = simulator_from_config(scene_name)
     dw = DataclassWrapper()
     dw.freq = 42
     simulator = dw.apply(simulator)
@@ -202,8 +171,8 @@ def test_on_simulator_instance(scene_config):
     assert simulator.env.num_scan_steps == 42
 
 
-def test_simulator_apply_change(scene_config):
-    simulator = scene_config.create_simulator()
+def test_simulator_apply_change(simulator_from_config):
+    simulator = simulator_from_config(scene_name)
     dw = DataclassWrapper()
     dw.box_size = 42.
     dw.freq = -10.

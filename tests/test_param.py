@@ -1,26 +1,20 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.controllers.panel_controller import ParamSimulator
-from vivarium.controllers.simulator_controller import SimulatorController
 
 
 @pytest.mark.parametrize("scene_name, entity_type", 
                          [('braitenberg', 'agents'), 
                           ('braitenberg', 'objects'),
                           ('particle_lenia', 'particles')])
-@pytest.mark.parametrize('rigid_body', [False, True])
 @pytest.mark.parametrize("idx", [0, 2])
-def test_param_entity(scene_name, entity_type, rigid_body, idx):
-    scene_config = SceneConfiguration(scene_name)
-    state = scene_config.create_state(rigid_body=rigid_body)
-    simulator = scene_config.create_simulator(state=state)
-    controller = SimulatorController(simulator)
+def test_param_entity(scene_name, entity_type, idx, simulator_controller_from_config):
+    controller = simulator_controller_from_config(scene_name)
 
     controller_entities = getattr(controller, entity_type)
     
-    entity_cls = scene_config.entity_type_client_configs[entity_type].param.cls
+    entity_cls = controller.controllers[entity_type].param_cls
     entity = entity_cls(controller_entities, controller.subtype_labels)
     entity.selection = [idx]
     entity.update_from_server = True
@@ -68,9 +62,9 @@ def test_param_entity(scene_name, entity_type, rigid_body, idx):
         assert entity.left_motor == 4.
 
 
-def test_simulator_state_param():
-    simulator = SceneConfiguration('braitenberg').create_simulator()
-    controller = SimulatorController(simulator)
+def test_simulator_state_param(simulator_controller_from_config):
+
+    controller = simulator_controller_from_config('braitenberg')
 
     simulator_param = ParamSimulator(controller.client)
     simulator_param.update_from_server = True
@@ -83,9 +77,8 @@ def test_simulator_state_param():
     assert controller.client.box_size == simulator_param.box_size
 
 
-def test_controller_parameters():
-    simulator = SceneConfiguration('lenia_braitenberg').create_simulator()
-    controller = SimulatorController(simulator)
+def test_controller_parameters(simulator_controller_from_config):
+    controller = simulator_controller_from_config('lenia_braitenberg')
     controller.agents[0].visible_wheels = False
     controller.apply_changes()
     controller.update_state()
