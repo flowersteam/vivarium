@@ -28,6 +28,9 @@ class EntityComponent(Component):
 
         kwargs = cls.get_kwargs(name, scene_config, config_node)
 
+        if 'entity_type' not in kwargs:
+            kwargs['entity_type'] = name
+
         return cls(
             name=name,
             **kwargs
