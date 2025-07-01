@@ -326,11 +326,12 @@ class Object(NotebookControllerEntity):
 
 
 class NotebookController(SimulatorController):
-    """NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook
     """
-    config_field = 'notebook_controller'
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook
+    """
+    def __init__(self, client=None, subtypes=[], **controllers):
+        
+        super().__init__(client=client, subtypes=subtypes, **controllers)
         self.time = 0
 
         self._is_running = False
