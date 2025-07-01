@@ -3,9 +3,7 @@ import logging
 
 import jax.numpy as jnp
 
-from vivarium.controllers.simulator_controller import (
-    SimulatorController, ControllerObject
-)
+from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 
 
@@ -29,11 +27,6 @@ class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
             object.__setattr__(self, attr, val)
         else:
             super().__setattr__(attr, val)
-
-# TODO: What's the purpose of this?
-class PanelControllerObject(ControllerObject):
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, controller_parameters)
 
 
 class ParameterizedData(param.Parameterized):
@@ -163,24 +156,35 @@ class ParamEntity(ParameterizedData):
     color = param.Color()
     visible = param.Boolean()
 
-    def __init__(self, entities, subtype_labels, panel_parameters=[], **params):
+    def __init__(self, entities, subtype_labels, parameter_mapping={}, panel_parameters=[], **params):
+        
+        self.subtype_labels = subtype_labels
+        self.subtype_label_list = [self.subtype_labels[i] for i in sorted(self.subtype_labels)]
+        self.param.add_parameter('subtype', param.Selector(objects=self.subtype_label_list))
+        parameter_mapping.update(entity_parameter_mapping)
+        parameter_mapping['subtype'] = ParameterMapping(
+            'entity_subtype',
+            jax_to_param_fn=lambda x: self.subtype_label_list[x.item()],
+            param_to_jax_fn=lambda x: jnp.array(self.subtype_label_list.index(x), dtype=int)
+        )
         super().__init__(entities, 
-                         parameter_mapping=entity_parameter_mapping,
+                         parameter_mapping=parameter_mapping,
                          panel_parameters=panel_parameters + ['visible', 'color'],
                          **params)
         self.selection = [0]
-        #Note: subtype labels are not used yet but should (to set in the interface the subtype of entities)
-        # But should they be part of panel_parameters?
 
     @property
     def selected_entity_data(self):
         return self.data[self.selection[0]]
 
+
 def behavior_param_name(b_idx):
     return f'behavior_{b_idx}'
 
+
 def sensed_param_name(label, b_idx):
     return f'sensed_{label}_{b_idx}'
+
 
 class Selected(param.Parameterized):
     """Class to store the selected entities in the interface"""
@@ -193,7 +197,6 @@ class Selected(param.Parameterized):
 
 class PanelController(SimulatorController):
     """Controller for the panel interface"""
-    # config_field = 'panel_controller'
     def __init__(self, client=None, subtypes=[], **controllers):
         
         super().__init__(client=client, subtypes=subtypes, **controllers)
