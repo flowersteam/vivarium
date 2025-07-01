@@ -1,9 +1,7 @@
-import logging as lg
-
 import jax.numpy as jnp
 from jax import vmap
 
-from jax_md import quantity
+from jax_md import quantity, partition
 from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environments.state import BaseParticleState
@@ -25,20 +23,26 @@ class ParticleLeniaState(BaseParticleState):
     c_rep: jnp.array
     
 
-def disp(displacement, position, other_positions):
-    return vmap(displacement, (None, 0))(position, other_positions)
-
-
 def peak_f(x, mu, sigma):
   return jnp.exp(-((x - mu)/sigma)**2)
 
 
 def lenia_energy_fn(displacement):
-    def lenia_energy(positions, x_position, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep):
-        r = jnp.sqrt(jnp.square(disp(displacement, x_position, positions)).sum(-1).clip(1e-10))
-        U = peak_f(r, mu_k, sigma_k).sum() * w_k
+    def lenia_energy(x, positions, neighbors, neigh_mask, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep):
+        target_positions = positions[neighbors]
+        d_r = jnp.where(
+            jnp.tile(neigh_mask, (2, 1)).T,
+            vmap(displacement, (None, 0))(x, target_positions),
+            0.)
+        r = jnp.linalg.norm(d_r, axis=-1).clip(1e-10)
+        p = jnp.where(neigh_mask, peak_f(r, mu_k, sigma_k), 0.0)
+        s = p.sum()
+        U = s * w_k
         G = peak_f(U, mu_g, sigma_g)
-        R = c_rep/2 * ((1.0 - r).clip(0.0) ** 2).sum()
+        R = jnp.where(neigh_mask,
+                      c_rep/2 * ((1.0 - r).clip(0.0) ** 2),
+                      0.0)
+        R = R.sum()
         E = R - G
         return E
     return lenia_energy
@@ -47,13 +51,22 @@ def lenia_energy_fn(displacement):
 def particle_lenia_state_fn(displacement, particle_lenia_state_field, from_mask_fn, to_mask_fn):
     
     def state_fn(state, neighbor, key):
-        from_mask = from_mask_fn(state)
+
         to_mask = to_mask_fn(state)
-        force = quantity.force(
-            lambda x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep : lenia_energy_fn(displacement)(state.entity_state.position[from_mask], x, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep)
-            )
+
         particle_state = getattr(state, particle_lenia_state_field)
-        res = vmap(force)(state.entity_state.position[to_mask], particle_state.mu_k, particle_state.sigma_k, particle_state.w_k, particle_state.mu_g, particle_state.sigma_g, particle_state.c_rep)
+        neigh_mask = partition.neighbor_list_mask(neighbor, mask_self=True)
+        force = quantity.force(
+            lambda x, neigh, neigh_mask, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep: lenia_energy_fn(displacement)(
+                x, state.entity_state.position, neigh, neigh_mask, mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep
+                )
+            )
+        res = vmap(force)(
+            state.entity_state.position[to_mask], 
+            neighbor.idx[to_mask], neigh_mask[to_mask], 
+            particle_state.mu_k, particle_state.sigma_k, particle_state.w_k, 
+            particle_state.mu_g, particle_state.sigma_g, 
+            particle_state.c_rep)
         all = jnp.zeros_like(state.entity_state.force)
         all = all.at[to_mask].set(res)
         return state.set(
@@ -79,14 +92,6 @@ class ParticleLeniaComponent(EntityComponent):
         self.mu_g = jnp.array(mu_g)
         self.sigma_g = jnp.array(sigma_g)
         self.c_rep = jnp.array(c_rep)
-
-    @classmethod
-    def from_config(cls, name, scene_config, config_node):
-        kwargs = cls.get_kwargs(name, scene_config, config_node) 
-        return cls(
-            name=name,
-            **kwargs
-        )
 
     def update_state_cls(self, state_cls):
         state_cls.__annotations__[self.entity_type] = ParticleLeniaState
