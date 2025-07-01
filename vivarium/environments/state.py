@@ -121,7 +121,6 @@ def field_accessors(cls):
 @field_accessors
 class BaseState:
     time: jnp.ndarray
-    # dt: jnp.ndarray
 
     def entity_type_to_int(self, entity_type):
         return getattr(self, entity_type).entity_type
@@ -144,10 +143,13 @@ class BaseState:
 
         return wrapper
 
+
 def create_state_cls(base_state_cls, update_fns):
-    state_cls = base_state_cls
-    state_cls.__annotations__['entity_state'] = BaseEntityState
+    # First make a "copy" of the base class. This is just for pytest, otherwise modify base_state_cls in a test function will have side effect on others. 
+    class State(base_state_cls):
+        __annotations__ = base_state_cls.__annotations__.copy()
+    State.__annotations__['entity_state'] = BaseEntityState
     for fn in update_fns:
-        state_cls = fn(state_cls)
-    state_cls = md_dataclass(state_cls)
-    return state_cls
+        State = fn(State)
+    State = md_dataclass(State)
+    return State
