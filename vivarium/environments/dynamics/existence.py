@@ -1,11 +1,12 @@
-from jax import lax, debug
+from jax import lax
 from jax import random
 import jax.numpy as jnp
 
 from jax_md.dataclasses import dataclass as md_dataclass
+from jax_md import partition
 
 from vivarium.environments.state import BaseEntityState
-from vivarium.environments.utils import generate_random_positions, generate_random_orientations, is_position_close
+from vivarium.environments.utils import generate_random_positions, generate_random_orientations, is_position_close, neighbors_entity_mask
 from vivarium.environments.physics_engine import Component
 
 
@@ -175,27 +176,23 @@ class ConsumptionComponent(Component):
     def get_step_function(self, state, neighbor_manager, key):
         self.displacement = neighbor_manager.displacement
         def step_fn(state, neighbors, key):
-            sources, targets = neighbors.idx
             d_r = state.distance_map
-            mask = jnp.logical_and(
-                state.entity_state.exists[sources] == 1,
-                state.entity_state.exists[targets] == 1
-            )
-            mask = jnp.logical_and(
-                mask,
-                state.entity_state.entity_subtype[sources] == self.source_subtype)
-            mask = jnp.logical_and(
-                mask,
-                state.entity_state.entity_subtype[targets] == self.target_subtype)
-            mask = jnp.logical_and(
-                mask,
-                d_r < self.range
-            )
 
-            consumed = jnp.isin(jnp.arange(state.entity_state.exists.shape[0]), 
-                                jnp.where(mask, targets, -1))
-            consuming = jnp.isin(jnp.arange(state.entity_state.exists.shape[0]), 
-                                jnp.where(mask, sources, -1))
+            mask = neighbors_entity_mask(
+                neighbors_idx=neighbors.idx, 
+                source_mask=jnp.logical_and(state.entity_state.exists == 1, state.entity_state.entity_subtype == self.source_subtype),
+                target_mask=jnp.logical_and(state.entity_state.exists == 1, state.entity_state.entity_subtype == self.target_subtype),
+                neighbor_mask=partition.neighbor_list_mask(neighbors, mask_self=True)
+            )
+            mask &= d_r < self.range
+
+            consuming = mask.any(axis=1)
+            consumed = jnp.full(state.entity_state.exists.shape, False)
+
+            neigh_flat = neighbors.idx.ravel()
+            mask_flat = mask.ravel()
+            consumed = consumed.at[neigh_flat].max(mask_flat)
+
             new_exists = jnp.where(
                 consumed,
                 0,
@@ -218,16 +215,18 @@ class EnergyComponent(Component):
                  entity_type, subtype,
                  init_energy, max_energy, decay, burst):
         super().__init__(name, precedence)
-        self.init_energy = init_energy  # 0.5
-        self.max_energy = max_energy  # 1.0
-        self.decay = decay  # 0.0001
-        self.burst = burst  # 1.
-        self.entity_type = entity_type  # 'agents'
-        self.subtype = subtype  # -1
+        self.init_energy = init_energy
+        self.max_energy = max_energy
+        self.decay = decay
+        self.burst = burst
+        self.entity_type = entity_type
+        self.subtype = subtype
 
     def get_step_function(self, state, neighbor_manager, key):
+
         entity_type = state.entity_type_to_int(self.entity_type)
         idxs = state.e_cond(self.entity_type)
+
         def state_fn(state, neighbors, key):
             entities = getattr(state, self.entity_type)
             
@@ -261,7 +260,7 @@ class EnergyComponent(Component):
     
     def update_state_cls(self, state_cls):
         assert 'entity_state' in state_cls.__annotations__, 'no entity_state in state class'
-        assert 'consuming' in state_cls.__annotations__['entity_state'].__annotations__, 'consuming not in entity_state'
+        # assert 'consuming' in state_cls.__annotations__['entity_state'].__annotations__, 'consuming not in entity_state'
         if self.entity_type in state_cls.__annotations__:
             @md_dataclass
             class AgentState(state_cls.__annotations__[self.entity_type]):
@@ -285,20 +284,22 @@ class ReproductionComponent(Component):
     def __init__(self, name, precedence,
                  entity_type, subtype,
                  birth_energy_threshold, death_energy_threshold,
-                 birth_recovery_time, birth_radius, birth_energy):
+                 birth_recovery_time, 
+                 birth_radius,  # actually a square 
+                 birth_energy):
         super().__init__(name, precedence)
-        self.entity_type = entity_type  # 'agents'
-        self.subtype = subtype  # -1  
-        self.birth_energy_threshold = birth_energy_threshold  # 0.8
-        self.death_energy_threshold = death_energy_threshold  # 0.
-        self.birth_recovery_time = birth_recovery_time  # 10000
-        self.birth_radius = birth_radius  # 20  # actually a square
-        self.birth_energy = birth_energy  # 1.0
+        self.entity_type = entity_type
+        self.subtype = subtype
+        self.birth_energy_threshold = birth_energy_threshold
+        self.death_energy_threshold = death_energy_threshold
+        self.birth_recovery_time = birth_recovery_time
+        self.birth_radius = birth_radius
+        self.birth_energy = birth_energy
         
 
-    def get_step_function(self, env):
-        idxs = env.state.e_cond(self.entity_type)
-        entity_type = env.state.entity_type_to_int(self.entity_type)
+    def get_step_function(self, state, neighbor_manager, key):
+        idxs = state.e_cond(self.entity_type)
+        entity_type = state.entity_type_to_int(self.entity_type)
 
         def state_fn(state, neighbors, key):
 
@@ -334,7 +335,7 @@ class ReproductionComponent(Component):
                 cur_recover_time > self.birth_recovery_time
             )
 
-            # To make it simpler, we can reproduce only a single agent per time step
+            # Workaround to make it simpler, we reproduce only a single agent per time step
             key, sub_key = random.split(key)
             does_reproduce, parent_idx = sample_true_index(sub_key, reproduce_mask)
 
@@ -371,7 +372,6 @@ class ReproductionComponent(Component):
 
 
             recover_time = entities.recover_time + 1
-            # debug.print('pre recover_time = {recover_time}', recover_time=recover_time)
 
             recover_time = lax.cond(
                 reproduction_cond,
@@ -384,27 +384,6 @@ class ReproductionComponent(Component):
                 lambda: recover_time.at[state.entity_state.entity_type_idx[parent_idx]].set(0),
                 lambda: recover_time
             )
-            
-            # debug.print('idxs = {idxs}\n' +
-            #             'reproduction_cond = {reproduction_cond}\n' +
-            #             'does_reproduce = {does_reproduce}\n' +
-            #             'can_be_born = {can_be_born}\n' +
-            #             'cur_energy = {cur_energy}\n' +
-            #             'entities.energy = {entities_energy}\n' +
-            #             'cur_recover_time = {cur_recover_time}\n' +
-            #             'recover_time = {recover_time}\n' +
-            #             'consuming = {consuming}\n' +
-            #             'consumed = {consumed}',
-            #             idxs=idxs,
-            #             reproduction_cond=reproduction_cond,
-            #             does_reproduce=does_reproduce,
-            #             can_be_born=can_be_born,
-            #             cur_energy=cur_energy,
-            #             entities_energy=entities.energy,
-            #             cur_recover_time=cur_recover_time,
-            #             recover_time=recover_time,
-            #             consuming=state.entity_state.consuming,
-            #             consumed=state.entity_state.consumed)
             
             return state.set(
                 **{self.entity_type: entities.set(
@@ -423,10 +402,10 @@ class ReproductionComponent(Component):
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
-        n_max = getattr(state, self.entity_type).position.shape[0]
-        recover_time = jnp.zeros(n_max, dtype=int)
+        recover_time = jnp.full(state.entity_state.exists.shape, 0, dtype=int)
         return state.set(
             **{self.entity_type: getattr(state, self.entity_type).set(
                 recover_time=recover_time
             )}
         )
+    
