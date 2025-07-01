@@ -43,7 +43,8 @@ class EntityManager:
         selected_param_entity,
         param_simulator_state,
         selected, etype, state,
-        shape
+        shape,
+        line_width=1.0,
     ):
         self.entities = entities
         self.selected_param_entity = selected_param_entity
@@ -51,6 +52,7 @@ class EntityManager:
         self.selected = selected
         self.etype = etype
         self.shape = getattr(Shape, shape.upper()) if isinstance(shape, str) else shape
+        self.line_width = line_width
         self.cds = ColumnDataSource(data=self.get_cds_data(state))
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
@@ -203,7 +205,7 @@ class EntityManager:
                 fill_color="fill_color",
                 fill_alpha=0.6,
                 line_color="white",
-                line_width=1,
+                line_width=self.line_width,
                 hover_fill_color="black",
                 hover_fill_alpha=0.7,
                 hover_line_color=None,
@@ -220,7 +222,7 @@ class EntityManager:
                 fill_color="fill_color",
                 fill_alpha=0.6,
                 line_color="white",
-                line_width=1,
+                line_width=self.line_width,
                 hover_fill_color="black",
                 hover_fill_alpha=0.7,
                 hover_line_color=None,
@@ -272,7 +274,7 @@ class WindowManager(Parameterized):
                 selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
-                shape=self.scene_config.config.client[etype].renderer_kwargs.shape
+                ** self.scene_config.config.client[etype].renderer_kwargs
             )
             for etype, manager_class in self.entity_manager_classes.items()
         }
