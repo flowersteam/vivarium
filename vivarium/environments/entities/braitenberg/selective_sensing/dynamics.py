@@ -1,51 +1,19 @@
 import logging as lg
 
-import jax
 import jax.numpy as jnp
-from jax import lax, vmap
+from jax import vmap
 
-from jax_md import space
+from jax_md import partition
 
 from vivarium.environments.entities.braitenberg.behaviors import Behaviors
 
 from vivarium.environments.entities.braitenberg.simple.dynamics import (
-    proximity_map,
-    sensor_fn,
     linear_behavior,
     motor_force,
     sum_force_to_entities
 )
-
-
-# TODO : Should refactor the function to split the returns
-def get_relative_displacement(state, braitenberg_state, agents_neighs_idx, displacement_fn):
-    """Get all infos relative to distance and orientation between all agents and their neighbors
-
-    :param state: state
-    :param braitenberg_state: braitenberg agents' state
-    :param agents_neighs_idx: idx all agents neighbors
-    :param displacement_fn: jax md function enabling to know the distance between points
-    :return: distance array, angles array, distance map for all agents, angles map for all agents
-    """
-    position = state.entity_state.unified_position
-    orientation = state.entity_state.unified_orientation
-    senders, receivers = agents_neighs_idx
-    Ra = position[senders]
-    Rb = position[receivers]
-    dR = -space.map_bond(displacement_fn)(
-        Ra, Rb
-    )  # Looks like it should be opposite, but don't understand why
-
-    dist, theta = proximity_map(dR, orientation[senders])
-    proximity_map_dist = jnp.zeros(
-        (braitenberg_state.count(), state.entity_state.count())
-    )
-    proximity_map_dist = proximity_map_dist.at[senders, receivers].set(dist)
-    proximity_map_theta = jnp.zeros(
-        (braitenberg_state.count(), state.entity_state.count())
-    )
-    proximity_map_theta = proximity_map_theta.at[senders, receivers].set(theta)
-    return dist, theta, proximity_map_dist, proximity_map_theta
+from vivarium.environments.utils import neighbors_entity_mask
+from vivarium.environments.utils import get_relative_displacement
 
 
 def compute_motor(proxs, params, behaviors, motors):
@@ -63,322 +31,119 @@ def compute_motor(proxs, params, behaviors, motors):
     motor_values = linear_motor_values * (1 - manual_mask) + motors * manual_mask
     return motor_values
 
-# Functions for selective sensing with occlusion
 
-def update_mask(mask, left_n_right_types, subtype):
-    """Update a mask of
-
-    :param mask: mask that will be applied on sensors of agents
-    :param left_n_right_types: types of left adn right sensed entities
-    :param subtype: entity subtype (e.g 1 for predators)
-    :return: mask
-    """
-    cur = jnp.where(left_n_right_types == subtype, 0, 1)
-    mask *= cur
-    return mask
+def compute_motor_selective(prox_per_subtype, sensed, params, behaviors, motors):
+    prox = jnp.max(prox_per_subtype * sensed[jnp.newaxis, :], axis=1)
+    return compute_motor(prox, params, behaviors, motors)
 
 
-def keep_mask(mask, left_n_right_types, subtype):
-    """Return the mask unchanged
+def left_or_right_prox(mask, dist, relative_theta, dist_max, cos_min, agent_neighbors):
 
-    :param mask: mask
-    :param left_n_right_types: left_n_right_types
-    :param subtype: subtype
-    :return: mask
-    """
-    return mask
-
-
-def mask_proxs_occlusion(proxs, left_n_right_types, ent_sensed_arr):
-    """Mask the proximeters of agents with occlusion
-
-    :param proxs: proxiemters of agents without occlusion (shape = (2,))
-    :param e_sensed_types: types of both entities sensed at left and right (shape=(2,))
-    :param ent_sensed_arr: mask of sensed subtypes by the agent (e.g jnp.array([0, 1, 0, 1]) if sense only entities of subtype 1 and 4)
-    :return: updated proximeters according to sensed_subtypes
-    """
-    mask = jnp.array([1, 1])
-    # Iterate on the array of sensed entities mask
-    for ent_type, sensed in enumerate(ent_sensed_arr):
-        # If an entity is sensed, update the mask, else keep it as it is
-        mask = jax.lax.cond(
-            sensed, update_mask, keep_mask, mask, left_n_right_types, ent_type
-        )
-    # Update the mask with 0s where the mask is, else keep the prox value
-    proxs = jnp.where(mask, 0, proxs)
-    return proxs
-
-
-# Example :
-# ent_sensed_arr = jnp.array([0, 1, 0, 0, 1])
-# proxs = jnp.array([0.8, 0.2])
-# e_sensed_types = jnp.array([4, 4]) # Modify these values to check it works
-# print(mask_proxs_occlusion(proxs, e_sensed_types, ent_sensed_arr))
-
-
-def compute_behavior_motors(
-    state, params, sensed_mask, behavior, motor, agent_proxs, sensed_ent_idx
-):
-    """Compute the motor values for a specific behavior
-
-    :param state: state
-    :param params: behavior params params
-    :param sensed_mask: sensed_mask for this behavior
-    :param behavior: behavior
-    :param motor: motor values
-    :param agent_proxs: agent proximeters (unmasked)
-    :param sensed_ent_idx: idx of left and right entities sensed
-    :return: right motor values for this behavior
-    """
-    left_n_right_types = state.entity_state.entity_subtype[sensed_ent_idx]
-    behavior_proxs = mask_proxs_occlusion(agent_proxs, left_n_right_types, sensed_mask)
-    motors = compute_motor(behavior_proxs, params, behaviors=behavior, motors=motor)
-    return motors
-
-
-# See for the vectorizing idx because already in a vmapped function here
-compute_all_behavior_motors = vmap(
-    compute_behavior_motors, in_axes=(None, 0, 0, 0, None, None, None)
-)
-
-
-def compute_occlusion_proxs_motors(
-    state,
-    agent_idx,
-    params,
-    sensed,
-    behaviors,
-    motor,
-    raw_proxs,
-    ag_idx_dense_senders,
-    ag_idx_dense_receivers,
-):
-    """_summary_
-
-    :param state: state
-    :param agent_idx: agent idx in entities
-    :param params: params arrays for all agent's behaviors
-    :param sensed: sensed mask arrays for all agent's behaviors
-    :param behaviors: agent behaviors array
-    :param motor: agent motors
-    :param raw_proxs: raw_proximeters for all agents (shape=(n_agents * (n_entities - 1), 2))
-    :param ag_idx_dense_senders: ag_idx_dense_senders to get the idx of raw proxs (shape=(2, n_agents * (n_entities - 1))
-    :param ag_idx_dense_receivers: ag_idx_dense_receivers (shape=(n_agents, n_entities - 1))
-    :return: _description_
-    """
-    behavior = jnp.expand_dims(behaviors, axis=1)
-    # Compute the neighbors idx of the agent and get its raw proximeters (of shape (n_entities -1 , 2))
-    ent_ag_neighs_idx = ag_idx_dense_senders[agent_idx]
-    agent_raw_proxs = raw_proxs[ent_ag_neighs_idx]
-
-    # Get the max and arg max of these proximeters on axis 0, gives results of shape (2,)
-    agent_proxs = jnp.max(agent_raw_proxs, axis=0)
-    argmax = jnp.argmax(agent_raw_proxs, axis=0)
-    # Get the real entity idx of the left and right sensed entities from dense neighborhoods
-    sensed_ent_idx = ag_idx_dense_receivers[agent_idx][argmax]
-    prox_sensed_ent_types = state.entity_state.entity_subtype[sensed_ent_idx]
-
-    # Compute the motor values for all behaviors and do a mean on it
-    motor_values = compute_all_behavior_motors(
-        state, params, sensed, behavior, motor, agent_proxs, sensed_ent_idx
+    sensed = mask & (jnp.cos(relative_theta) > jnp.tile(cos_min, (relative_theta.shape[1], 1)).T)
+    dist = jnp.where(sensed, dist, jnp.inf)
+    min_dist_neigbor = jnp.argmin(dist, axis=1)
+    distance_to_target = dist[jnp.arange(dist.shape[0]), min_dist_neigbor]
+    prox = jnp.where(
+        distance_to_target < dist_max,
+        1. - distance_to_target / dist_max,
+        0.
     )
-    motors = jnp.mean(motor_values, axis=0)
 
-    return agent_proxs, (sensed_ent_idx, prox_sensed_ent_types), motors
+    prox_idx = agent_neighbors[jnp.arange(agent_neighbors.shape[0]), jnp.argmin(dist, axis=1)]
 
-
-compute_all_agents_proxs_motors_occl = vmap(
-    compute_occlusion_proxs_motors, in_axes=(None, 0, 0, 0, 0, 0, None, None, None)
-)
+    return prox, prox_idx
 
 
-# Functions for selective sensing without occlusion
+def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, proxs_dist_max, proxs_cos_min):
 
-
-def mask_sensors(state, agent_raw_proxs, ent_type_id, ent_neighbors_idx):
-    """Mask the raw proximeters of agents for a specific entity type
-
-    :param state: state
-    :param agent_raw_proxs: raw_proximeters of agent (shape=(n_entities - 1), 2)
-    :param ent_type_id: entity subtype id (e.g 0 for PREYS)
-    :param ent_neighbors_idx: idx of agent neighbors in entities arrays
-    :return: updated agent raw proximeters
-    """
-    mask = jnp.where(state.entities.ent_subtype[ent_neighbors_idx] == ent_type_id, 0, 1)
-    mask = jnp.expand_dims(mask, 1)
-    mask = jnp.broadcast_to(mask, agent_raw_proxs.shape)
-    return agent_raw_proxs * mask
-
-
-def dont_change(state, agent_raw_proxs, ent_type_id, ent_neighbors_idx):
-    """Leave the agent raw_proximeters unchanged
-
-    :param state: state
-    :param agent_raw_proxs: agent_raw_proxs
-    :param ent_type_id: ent_type_id
-    :param ent_neighbors_idx: ent_neighbors_idx
-    :return: agent_raw_proxs
-    """
-    return agent_raw_proxs
-
-
-def compute_behavior_prox(state, agent_raw_proxs, ent_neighbors_idx, sensed_entities):
-    """Compute the proximeters for a specific behavior
-
-    :param state: state
-    :param agent_raw_proxs: agent raw proximeters
-    :param ent_neighbors_idx: idx of agent neighbors
-    :param sensed_entities: array of sensed entities
-    :return: updated proximeters
-    """
-    # iterate over all the types in sensed_entities and return if they are sensed or not
-    for ent_type_id, sensed in enumerate(sensed_entities):
-        # change the proxs if you don't perceive the entity, else leave them unchanged
-        agent_raw_proxs = lax.cond(
-            sensed,
-            dont_change,
-            mask_sensors,
-            state,
-            agent_raw_proxs,
-            ent_type_id,
-            ent_neighbors_idx,
-        )
-    # Compute the final proxs with a max on the updated raw_proxs
-    proxs = jnp.max(agent_raw_proxs, axis=0)
-    return proxs
-
-
-def compute_behavior_proxs_motors(
-    state, params, sensed, behavior, motor, agent_raw_proxs, ent_neighbors_idx
-):
-    """Return the proximeters and the motors for a specific behavior
-
-    :param state: state
-    :param params: params of the behavior
-    :param sensed: sensed mask of the behavior
-    :param behavior: behavior
-    :param motor: motor values
-    :param agent_raw_proxs: agent_raw_proxs
-    :param ent_neighbors_idx: ent_neighbors_idx
-    :return: behavior proximeters, behavior motors
-    """
-    behavior_prox = compute_behavior_prox(
-        state, agent_raw_proxs, ent_neighbors_idx, sensed
-    )
-    behavior_motors = compute_motor(behavior_prox, params, behavior, motor)
-    return behavior_prox, behavior_motors
-
-
-# vmap on params, sensed and behavior (parallelize on all agents behaviors at once, but not motorrs because are the same)
-compute_all_behavior_proxs_motors = vmap(
-    compute_behavior_proxs_motors, in_axes=(None, 0, 0, 0, None, None, None)
-)
-
-
-def compute_agent_proxs_motors(
-    state,
-    agent_idx,
-    params,
-    sensed,
-    behavior,
-    motor,
-    raw_proxs,
-    ag_idx_dense_senders,
-    ag_idx_dense_receivers,
-):
-    """Compute the agent proximeters and motors for all behaviors
-
-    :param state: state
-    :param agent_idx: idx of the agent in entities
-    :param params: array of params for all behaviors
-    :param sensed: array of sensed mask for all behaviors
-    :param behavior: array of behaviors
-    :param motor: motor values
-    :param raw_proxs: raw_proximeters of all agents
-    :param ag_idx_dense_senders: ag_idx_dense_senders to get the idx of raw proxs (shape=(2, n_agents * (n_entities - 1))
-    :param ag_idx_dense_receivers: ag_idx_dense_receivers (shape=(n_agents, n_entities - 1))
-    :return: array of agent_proximeters, mean of behavior motors
-    """
-    behavior = jnp.expand_dims(behavior, axis=1)
-    ent_ag_idx = ag_idx_dense_senders[agent_idx]
-    ent_neighbors_idx = ag_idx_dense_receivers[agent_idx]
-    agent_raw_proxs = raw_proxs[ent_ag_idx]
-
-    # vmap on params, sensed, behaviors and motorss (vmap on all agents)
-    agent_proxs, agent_motors = compute_all_behavior_proxs_motors(
-        state, params, sensed, behavior, motor, agent_raw_proxs, ent_neighbors_idx
-    )
-    mean_agent_motors = jnp.mean(agent_motors, axis=0)
-
-    # need to return a dummy array as 2nd argument to match the compute_agent_proxs_motors function returns with occlusion
-    dummy = (jnp.zeros(1), jnp.zeros(1))
-    return agent_proxs, dummy, mean_agent_motors
-
-
-compute_all_agents_proxs_motors = vmap(
-    compute_agent_proxs_motors, in_axes=(None, 0, 0, 0, 0, 0, None, None, None)
-)
-
-
-def braitenberg_state_fn(braitenberg_state_field, displacement, mask_fn, agents_neighs_idx, agents_idx_dense, occlusion=True):
+    agent_neighbors = neighbors_idx[braitenberg_mask]
+    mask = neighbors_entity_mask(agent_neighbors, source_mask, target_mask, neighbor_mask[braitenberg_mask])
     
-    assert occlusion, "Non occlusion not working yet"
-    prox_motor_function = compute_all_agents_proxs_motors_occl if occlusion else compute_all_agents_proxs_motors
-     
-    def state_fn(state, neighbors, key):
+    all_dist, all_relative_theta = (
+        get_relative_displacement(
+            positions,
+            orientations[braitenberg_mask], 
+            braitenberg_mask,
+            agent_neighbors, 
+            displacement_fn=displacement
+        )
+    )
 
-        # Retrieve different neighbors format
-        senders, receivers = agents_neighs_idx
-        ag_idx_dense_senders, ag_idx_dense_receivers = agents_idx_dense
+    all_dist = jnp.where(
+        mask, 
+        all_dist, 
+        jnp.inf)
+
+    left_prox, left_idx = left_or_right_prox(
+        mask & (jnp.sin(all_relative_theta) >= 0),
+        all_dist,
+        all_relative_theta,
+        proxs_dist_max,
+        proxs_cos_min,
+        agent_neighbors
+    )
+
+    right_prox, right_idx = left_or_right_prox(
+        mask & (jnp.sin(all_relative_theta) < 0),
+        all_dist,
+        all_relative_theta,
+        proxs_dist_max,
+        proxs_cos_min,
+        agent_neighbors
+    )
+
+    return (
+        jnp.vstack((left_prox, right_prox)).T,
+        jnp.vstack((left_idx, right_idx)).T
+    )
+
+
+def extend_prox_per_subtype(prox, prox_idx, entity_subtype, n_subtypes):
+    subtype_mask = entity_subtype[prox_idx][:, :, jnp.newaxis] == jnp.arange(n_subtypes)[jnp.newaxis, jnp.newaxis, :]
+    return prox[:, :, jnp.newaxis] * subtype_mask
+
+
+def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement, mask_fn):
+
+    def state_fn(state, neighbors, key):
 
         exists_mask = mask_fn(state)
 
         braitenberg_state = getattr(state, braitenberg_state_field)
 
-        # Compute raw proxs for all agents first
-        dist, relative_theta, proximity_dist_map, proximity_dist_theta = (
-            get_relative_displacement(
-                state, braitenberg_state, agents_neighs_idx, displacement_fn=displacement
-            )
+        neighbor_mask = partition.neighbor_list_mask(neighbors, mask_self=True)
+
+        proxs, prox_idx = compute_proxs(
+            braitenberg_mask=braitenberg_mask,
+            source_mask=state.entity_state.exists[braitenberg_state.entity_idx],
+            target_mask=state.entity_state.exists,
+            neighbor_mask=neighbor_mask,
+            neighbors_idx=neighbors.idx,
+            displacement=displacement,
+            positions=state.entity_state.position,
+            orientations=state.entity_state.orientation,
+            proxs_dist_max=braitenberg_state.proxs_dist_max,
+            proxs_cos_min=braitenberg_state.proxs_cos_min
         )
 
-        dist_max = braitenberg_state.proxs_dist_max[senders]
-        cos_min = braitenberg_state.proxs_cos_min[senders]
-        # changed agents_neighs_idx[1, :] to receivers in line below (check if it works)
-        target_exist_mask = state.entity_state.exists[receivers]
-        # Compute agents raw proximeters (proximeters for all neighbors)
-        raw_proxs = sensor_fn(
-            dist, relative_theta, dist_max, cos_min, target_exist_mask
+        prox_per_subtype = extend_prox_per_subtype(
+            proxs, prox_idx, state.entity_state.entity_subtype, braitenberg_state.sensed.shape[-1]
         )
 
-        # Compute real agents proximeters and motors
-        agent_proxs, prox_sensed_ent_tuple, mean_agent_motors = (
-            prox_motor_function(
-                state,
-                braitenberg_state.entity_idx,
-                braitenberg_state.behavior_params,
-                braitenberg_state.sensed,
-                braitenberg_state.behavior,
-                braitenberg_state.motor,
-                raw_proxs,
-                ag_idx_dense_senders,
-                ag_idx_dense_receivers,
-            )
-        )
+        motors = vmap(vmap(compute_motor_selective, (None, 0, 0, 0, None)))(prox_per_subtype, braitenberg_state.sensed, braitenberg_state.behavior_params, braitenberg_state.behavior, braitenberg_state.motor)
 
-        prox_sensed_ent_idx, prox_sensed_ent_type = prox_sensed_ent_tuple
+        motors = jnp.mean(motors, axis=1)
 
-        # Update agents state
+        # # Update agents state
         braitenberg_state = braitenberg_state.set(
-            prox=agent_proxs,
-            # prox_sensed_ent_type=prox_sensed_ent_type,
-            # prox_sensed_ent_idx=prox_sensed_ent_idx,
+            prox=proxs,
+            prox_per_subtype=prox_per_subtype,
             # proximity_map_dist=proximity_dist_map,
             # proximity_map_theta=proximity_dist_theta,
-            motor=mean_agent_motors,
+            motor=motors,
         )
 
-        # Update the entities and the state
+        # # Update the entities and the state
         state = state.set(**{braitenberg_state_field: braitenberg_state})
 
         center, orientation = motor_force(state, braitenberg_state, exists_mask)

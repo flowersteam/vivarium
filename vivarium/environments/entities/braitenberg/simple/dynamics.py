@@ -1,106 +1,15 @@
 import jax.numpy as jnp
 
 from jax import vmap
-from jax import ops
 
-from jax_md import space, rigid_body
+from jax_md import rigid_body
 
-from vivarium.environments.utils import normal, relative_position
+from vivarium.environments.utils import normal
 
-
-from vivarium.environments.entities.braitenberg.behaviors import Behaviors
-
+#TODO: merge simple and selective_sensing packages (now we only use selective_sensing)
 
 ### Define the constants and the classes of the environment to store its state ###
 SPACE_NDIMS = 2
-
-
-# --- 1 Functions to compute the proximeter of braitenberg agents ---#
-proximity_map = vmap(relative_position, (0, 0))
-
-
-def sensor_fn(dist, relative_theta, dist_max, cos_min, target_exists):
-    """
-    Compute the proximeter activations (left, right) induced by the presence of an entity
-    :param dist: distance from the agent to the entity
-    :param relative_theta: angle of the entity in the reference frame of the agent (front direction at angle 0)
-    :param dist_max: Max distance of the proximiter (will return 0. above this distance)
-    :param cos_min: Field of view as a cosinus (e.g. cos_min = 0 means a pi/4 FoV on each proximeter, so pi/2 in total)
-    :return: left and right proximeter activation in a jnp array with shape (2,)
-    """
-    cos_dir = jnp.cos(relative_theta)
-    prox = 1.0 - (dist / dist_max)
-    in_view = jnp.logical_and(dist < dist_max, cos_dir > cos_min)
-    at_left = jnp.logical_and(True, jnp.sin(relative_theta) >= 0)
-    left = in_view * at_left * prox
-    right = in_view * (1.0 - at_left) * prox
-    return jnp.array([left, right]) * target_exists  # i.e. 0 if target does not exist
-
-
-sensor_fn = vmap(sensor_fn, (0, 0, 0, 0, 0))
-
-
-def sensor(dist, relative_theta, dist_max, cos_min, max_agents, senders, target_exists):
-    """Return the sensor values of all agents
-
-    :param dist: relative distances between agents and targets
-    :param relative_theta: relative angles between agents and targets
-    :param dist_max: maximum range of proximeters
-    :param cos_min: cosinus of proximeters angles
-    :param max_agents: number of agents
-    :param senders: indexes of agents sensing the environment
-    :param target_exists: mask to indicate which sensed entities exist or not
-    :return: proximeter activations
-    """
-    raw_proxs = sensor_fn(dist, relative_theta, dist_max, cos_min, target_exists)
-    # Computes the maximum within the proximeter activations of agents on all their neigbhors.
-    proxs = ops.segment_max(raw_proxs, senders, max_agents)
-
-    return proxs
-
-
-def compute_prox(state, agents_neighs_idx, target_exists_mask, displacement):
-    """
-    Set agents' proximeter activations
-    :param state: full simulation State
-    :param agents_neighs_idx: Neighbor representation, where sources are only agents. Matrix of shape (2, n_pairs),
-    where n_pairs is the number of neighbor entity pairs where sources (first row) are agent indexes.
-    :param target_exists_mask: Specify which target entities exist. Vector with shape (n_entities,).
-    target_exists_mask[i] is True (resp. False) if entity of index i in state.entities exists (resp. don't exist).
-    :return:
-    """
-    center = state.entity_state.position_center
-    orientation = state.entity_state.position_orientation
-    mask = target_exists_mask[agents_neighs_idx[1, :]]
-    senders, receivers = agents_neighs_idx
-    Ra = center[senders]
-    Rb = center[receivers]
-    dR = -space.map_bond(displacement)(
-        Ra, Rb
-    )  # Looks like it should be opposite, but don't understand why
-
-    # Create distance and angle maps between entities
-    dist, theta = proximity_map(dR, orientation[senders])
-    proximity_map_dist = jnp.zeros(
-        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
-    )
-    proximity_map_dist = proximity_map_dist.at[senders, receivers].set(dist)
-    proximity_map_theta = jnp.zeros(
-        (state.agent_state.ent_idx.shape[0], state.entity_state.entity_idx.shape[0])
-    )
-    proximity_map_theta = proximity_map_theta.at[senders, receivers].set(theta)
-
-    prox = sensor(
-        dist,
-        theta,
-        state.agent_state.proxs_dist_max[senders],
-        state.agent_state.proxs_cos_min[senders],
-        len(state.agent_state.ent_idx),
-        senders,
-        mask,
-    )
-
-    return prox, proximity_map_dist, proximity_map_theta
 
 
 def linear_behavior(proxs, params):
@@ -114,22 +23,6 @@ def linear_behavior(proxs, params):
 
 
 v_linear_behavior = vmap(linear_behavior, in_axes=(0, 0))
-
-
-def compute_motor(proxs, params, behaviors, motors):
-    """Compute new motor values. If behavior is manual, keep same motor values. Else, compute new values with proximeters and params.
-
-    :param proxs: proximeters of all agents
-    :param params: parameters mapping proximeters to new motor values
-    :param behaviors: array of behaviors
-    :param motors: current motor values
-    :return: new motor values
-    """
-    manual = jnp.where(behaviors == Behaviors.MANUAL.value, 1, 0)
-    manual_mask = jnp.broadcast_to(jnp.expand_dims(manual, axis=1), motors.shape)
-    linear_motor_values = v_linear_behavior(proxs, params)
-    motor_values = linear_motor_values * (1 - manual_mask) + motors * manual_mask
-    return motor_values
 
 
 def lr_2_fwd_rot(left_spd, right_spd, base_length, wheel_diameter):
@@ -243,30 +136,3 @@ def sum_force_to_entities(entity_state, center, orientation=0.):
         orientation += entity_state.force.orientation         
         return entity_state.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
-
-def braitenberg_state_fn(displacement, mask_fn, agents_neighs_idx):
-    def state_fn(state, neighbors):
-        exists_mask = mask_fn(state)
-        prox, proximity_dist_map, proximity_dist_theta = compute_prox(
-            state,
-            agents_neighs_idx,
-            target_exists_mask=exists_mask,
-            displacement=displacement,
-        )
-
-        motor = compute_motor(
-            prox, state.agent_state.params, state.agent_state.behavior, state.agent_state.motor
-        )
-        agent_state = state.agent_state.set(
-            prox=prox,
-            proximity_map_dist=proximity_dist_map,
-            proximity_map_theta=proximity_dist_theta,
-            motor=motor,
-        )
-
-        state = state.set(agent_state=agent_state)
-
-        center, orientation = motor_force(state, exists_mask)
-
-        return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
-    return state_fn
