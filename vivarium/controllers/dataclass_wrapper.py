@@ -292,6 +292,12 @@ class SimulatorParametersWrapper:
 
 
 class EntityWrapper:
+    """
+    Wraps a State into an interface to manipulate a single entitty (usually from a SimulatorController)
+    Modifying attributes of an EntityWrapper will not change the state immediately, but will record changes
+    that can be applied to the state later using the `apply_to_state` method. This is useful for batch updates
+    during client-server interactions.
+    """
     position_center = create_property('position', 'center')
     momentum_center = create_property('momentum', 'center')
     force_center = create_property('force', 'center')
@@ -309,7 +315,7 @@ class EntityWrapper:
         object.__setattr__(self, '_is_rigid_body', self._state.entity_state.is_rigid_body())
         object.__setattr__(self, '_change_recorder', ChangeRecorder())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_fields', ['ent_subtype', 'diameter', 'friction',
+        object.__setattr__(self, '_entity_fields', ['entity_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
                                'position', 'momentum', 'force', 'mass',
                                'position_center', 'position_orientation',
