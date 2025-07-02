@@ -1,8 +1,8 @@
-cls: vivarium.environments.entities.controller.EntityController
+defaults:
+  - default
+
 controller_kwargs:
   color:
     _all_values_: blue
-  visible:
-    _all_values_: true
 renderer_kwargs:
   shape: square
