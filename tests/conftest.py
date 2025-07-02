@@ -2,7 +2,7 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.environments.dynamics.existence import ConsumptionComponent, EnergyComponent, ReproductionComponent
+from vivarium.environments.dynamics.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
 from vivarium.environments.entities.particle_lenia.controller import ParamParticleLenia
 from vivarium.environments.physics_engine import ProximityMapComponent, StepComponent
 from vivarium.environments.entities.braitenberg.component import BraitenbergComponent

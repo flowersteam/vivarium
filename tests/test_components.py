@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from vivarium.environments.dynamics.existence import type_mask
+from vivarium.environments.dynamics.eco_evo import type_mask
 from vivarium.utils.scene_configs import SceneConfiguration
 
 
