@@ -1,0 +1,12 @@
+  defaults:
+    - default
+
+  cls: vivarium.environments.entities.particle_lenia.ParticleLeniaController
+  
+  controller_kwargs:
+    color:
+      _all_values_: yellow
+  
+  renderer_kwargs:
+    shape: circle
+    line_width: 0.1

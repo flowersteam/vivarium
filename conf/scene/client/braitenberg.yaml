@@ -1,0 +1,15 @@
+defaults:
+  - default
+
+cls: vivarium.environments.entities.braitenberg.BraitenbergController
+
+controller_kwargs:
+  color:
+    _all_values_: red
+  visible_wheels:
+    _all_values_: true
+  visible_proxs:
+    _all_values_: true
+
+renderer_kwargs:
+  shape: square

@@ -1,0 +1,2 @@
+_target_: vivarium.environments.physics_engine.ResetForceComponent
+precedence: 0

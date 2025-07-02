@@ -1,84 +1,30 @@
+defaults:
+  - environment/kwargs/default@environment.kwargs
+  - environment/components/reset/default@environment.components.reset
+  - environment/components/friction/default@environment.components.friction
+  - environment/components/step/default@environment.components.step
+  - environment/components/entities/particle_lenia@environment.components.particles
+  - client/particle_lenia@client.particles
+  
+scene_name: particle_lenia
+
 environment:
   cls: vivarium.environments.Environment
   kwargs:
-    box_size: 36.0
-    neighbor_radius: 50.0
-    num_scan_steps: 8
-    to_jit: True
-
-simulator:
-  cls: vivarium.simulator.Simulator
-  kwargs:
-    freq: -1
+    num_scan_steps: 10
+  components:
+    particles:
+      n_exists: 400
+      subtype_to_n:
+        - [0, 400]
+      diameter:
+        _all_values_: 0.4
+      friction:
+        _all_values_: 0.7
 
 subtypes:
   - particle
 
-state:
-  cls: vivarium.environments.state.BaseState
+simulator:
   kwargs:
-    dt: 0.1
-    collision_alpha: 2.0
-    collision_eps: 1.0
-
-entities:
-  entity_state:
-    cls: vivarium.environments.state.EntityState
-    
-  entity_types:
-    - particles
-
-  particles:
-    cls: vivarium.environments.entities.particle_lenia.ParticleLeniaState
-    kwargs:
-      n_exists: 600
-      mass:
-        _all_values_: 1.0
-      diameter:
-        _all_values_: 0.2
-      friction:
-        _all_values_: 1.0
-      subtype_to_n:
-        - [0, 600]
-      position: random
-      orientation:
-        _all_values_: 0.0
-      mu_k:
-        _all_values_: 4.0
-      sigma_k:
-        _all_values_: 1.0
-      w_k:
-        _all_values_: 0.022
-      mu_g:
-        _all_values_: 0.6
-      sigma_g:
-        _all_values_: 0.15
-      c_rep:
-        _all_values_: 0.0 
-
-client:
-  particles:
-    kwargs:
-      color:
-        _all_values_: red
-      visible:
-        _all_values_: true
-      visible_wheels:
-        _all_values_: true
-      visible_proxs:
-        _all_values_: true
-    simulator_controller:
-      cls: vivarium.controllers.simulator_controller.ControllerObject
-      kwargs: {}  #TODO: kwargs now defined a level upper, could be all removed at this level? (also in objects)
-    notebook_controller:
-      cls: vivarium.controllers.notebook_controller.Object
-      kwargs: {}
-    param:
-      cls: vivarium.controllers.panel_controller.Object
-      kwargs: {}
-    panel_controller:
-      cls: vivarium.controllers.panel_controller.PanelControllerObject
-      kwargs: {}
-    panel_interface:
-      cls: vivarium.interface.panel_app.ObjectManager
-      kwargs: {}
+    freq: -1

@@ -1,0 +1,5 @@
+defaults:
+  - reset: default
+  - collision: default
+  - friction: default
+  - step: default

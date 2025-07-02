@@ -1,0 +1,9 @@
+cls: vivarium.environments.entities.controller.EntityController
+controller_kwargs:
+  color:
+    _all_values_: red
+  visible:
+    _all_values_: true
+renderer_kwargs:
+  shape: circle
+  

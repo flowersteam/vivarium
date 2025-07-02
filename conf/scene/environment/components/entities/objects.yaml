@@ -1,0 +1,14 @@
+_target_: vivarium.environments.entities.objects.ObjectComponent
+precedence: 10
+n_exists: 4
+mass:
+  _all_values_: 1.0
+position: _random_
+orientation: _random_
+diameter:
+  _all_values_: 8.0
+friction:
+  _all_values_: 1.0
+subtype_to_n:
+  - [0, 4]
+  

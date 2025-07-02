@@ -1,0 +1,5 @@
+defaults:
+  - kwargs: default
+  - components: default
+
+cls: vivarium.environments.Environment

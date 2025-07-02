@@ -1,0 +1,10 @@
+defaults:
+  - environment: default
+
+simulator:
+  cls: vivarium.simulator.Simulator
+  kwargs:
+    freq: 40.
+
+subtypes:
+  - dummy

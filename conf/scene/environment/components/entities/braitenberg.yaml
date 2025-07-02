@@ -1,0 +1,21 @@
+_target_: vivarium.environments.entities.braitenberg.BraitenbergComponent
+precedence: 10
+n_exists: 10
+mass:
+  _all_values_: 1.0
+position: _random_
+orientation: _random_
+diameter:
+  _all_values_: 6.0
+friction:
+  _all_values_: 1.0
+n_behaviors: 4
+subtype_to_n:
+  - [0, 10]
+wheel_diameter:
+  _all_values_: 3.0
+proxs_dist_max:
+  _all_values_: 20.0
+proxs_cos_min:
+  _all_values_: 0.0
+  

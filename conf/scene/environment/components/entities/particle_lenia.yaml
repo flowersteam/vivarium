@@ -1,0 +1,28 @@
+_target_: vivarium.environments.entities.particle_lenia.ParticleLeniaComponent
+precedence: 10
+n_exists: 400
+mass:
+  _all_values_: 1.0
+diameter:
+  _all_values_: 0.2
+friction:
+  _all_values_: 1.
+subtype_to_n:
+  - [0, 400]
+position:
+  _range_: [20, 40, 20, 40]
+orientation:
+  _all_values_: 0.0
+mu_k:
+  _all_values_: 4.0
+sigma_k:
+  _all_values_: 1.0
+w_k:
+  _all_values_: 0.022
+mu_g:
+  _all_values_: 0.6
+sigma_g:
+  _all_values_: 0.15
+c_rep:
+  _all_values_: 0. 
+  
