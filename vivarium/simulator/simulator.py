@@ -1,4 +1,3 @@
-from dataclasses import dataclass, fields
 import os
 import time
 import math
@@ -8,10 +7,10 @@ import datetime
 import threading
 from functools import partial
 from contextlib import contextmanager
-
-from vivarium.utils.converters import access_nested_fields
+from dataclasses import dataclass, fields
 
 from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list
+from vivarium.utils.converters import access_nested_fields
 # from vivarium.utils.scene_configs import SceneConfiguration
 
 
