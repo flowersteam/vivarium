@@ -55,49 +55,15 @@ class ControllerEntity(EntityWrapper):
         else:
             super().__setattr__(item, val)
 
-
-#TODO: to remove
-class ControllerObject(ControllerEntity):
-    pass
-    
-
-# def create_entity_lists(state, etype_to_class, etype_to_idx, etype_to_kwargs):
-
-#     entity_lists = {
-#         etype: EntityList(
-#             state=state, entity_type=etype, entity_type_idx=etype_to_idx[etype],
-#             entity_wrapper_list=[
-#                 eclass(state, idx, etype, 
-#                        **{attr: val[int(state.entity_state.entity_type_idx[idx])]
-#                           for attr, val in etype_to_kwargs[etype].items()}
-#                        ) 
-#                 for idx, type in enumerate(state.entity_state.entity_type)
-#                 if type == etype_to_idx[etype]]
-#         )
-#         for etype, eclass in etype_to_class.items()
-#     }
-#     return entity_lists
-
-def entity_type_property(entity_type):
-    @property
-    def prop(self):
-        return self.entity_lists[entity_type]
-    return prop
-
 class SimulatorController:
-    # config_field = 'simulator_controller'
 
     def __init__(self, client=None, subtypes=[], **controllers):
         self.client = client or SimulatorGRPCClient()
-        # self.etype_to_class = etype_to_class
-        # self.etype_to_kwargs = etype_to_kwargs
         self.state = self.client.state
         self.simulator_parameters = self.client.get_simulator_parameters()
-        # self.scene_config = SceneConfiguration(self.client.scene_name)
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
-        # self.create_entity_lists()
         self.entity_lists = {etype: c.controller(self.state) for etype, c in controllers.items()}
 
         for etype, elist in self.entity_lists.items():
@@ -109,21 +75,8 @@ class SimulatorController:
         if scene_config is None:
             client = client or SimulatorGRPCClient()
             scene_config = SceneConfiguration(client.scene_name)
-        # controller_parameters = scene_config.create_controller_parameters()
-        # factories = scene_config.create_component_factories()
-        # etype_to_class = {factory.entity_type: factory.__class__.controller_cls for factory in factories
-        #                   if factory.is_entity_component}
-        # etype_to_kwargs = {factory.entity_type: {'controller_parameters': controller_parameters} for factory in factories
-        #                    if factory.is_entity_component}
         controllers = scene_config.create_controllers()
         return cls(**controllers, client=client, subtypes=scene_config.config.subtypes)
-
-    # def create_entity_lists(self):
-    #     # etype_to_class = {etype: getattr(config, self.config_field).cls for etype, config in self.scene_config.entity_type_client_configs.items()}
-    #     # etype_to_idx = {etype: config.idx for etype, config in self.scene_config.entity_type_configs.items()}
-    #     etype_to_idx = {etype: getattr(self.state, etype).entity_type for etype, _ in self.etype_to_class.items()}
-    #     # etype_to_kwargs = {etype: getattr(config, self.config_field).kwargs for etype, config in self.scene_config.entity_type_client_configs.items()}
-    #     self.entity_lists = create_entity_lists(self.state, self.etype_to_class, etype_to_idx, self.etype_to_kwargs)
 
     def create_simulator_parameters_wrapper(self):
         self.simulator_parameters = SimulatorParametersWrapper(self.simulator_parameters)
