@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
 from vivarium.environments.entities.component import EntityComponent
-from vivarium.controllers.simulator_controller import ControllerObject
+from vivarium.controllers.simulator_controller import ControllerEntity
 from vivarium.environments.state import BaseParticleState
 
 
@@ -13,6 +13,8 @@ class ObjectState(BaseParticleState):
     pass
 
 
+class ControllerObject(ControllerEntity):
+    pass
 # TODO: What's the purpose of this class? Not uses at the moment (May, 31, 2025) but the whole pipeline seems to work anyway.
 # (Idem in braintenberg component.py)
 class PanelControllerObject(ControllerObject):
