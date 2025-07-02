@@ -2,6 +2,7 @@ import numpy as np
 
 from vivarium.environments.entities.controller import EntityController
 from vivarium.controllers.simulator_controller import ControllerEntity
+from vivarium.controllers.notebook_controller import Agent
 from vivarium.environments.entities.braitenberg.interface import ParamAgent
 from vivarium.environments.entities.braitenberg.interface import AgentManager
 from vivarium.environments.entities.braitenberg.behaviors import Behaviors, behavior_to_params
@@ -46,6 +47,7 @@ class BraitenbergController(EntityController):
                  controller_cls=ControllerAgent, 
                  param_cls=ParamAgent,
                  render_cls=AgentManager,
+                 notebook_controller_cls=Agent,
                  **kwargs):
         super().__init__(
             entity_type=entity_type,
@@ -54,3 +56,4 @@ class BraitenbergController(EntityController):
             render_cls=render_cls,
             **kwargs
         )
+        self.notebook_controller_cls = notebook_controller_cls

@@ -349,6 +349,9 @@ class NotebookController(SimulatorController):
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
 
+    def create_entity_list(self):
+        return {etype: c.controller(self.state, c.notebook_controller_cls) for etype, c in self.controllers.items()}
+
     def is_running(self):
         """Check if the simulator is running"""
         return self._is_running

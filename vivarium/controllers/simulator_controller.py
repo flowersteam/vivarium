@@ -64,7 +64,8 @@ class SimulatorController:
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
-        self.entity_lists = {etype: c.controller(self.state) for etype, c in controllers.items()}
+        
+        self.entity_lists = self.create_entity_list()
 
         for etype, elist in self.entity_lists.items():
             setattr(self, etype, elist)
@@ -77,6 +78,9 @@ class SimulatorController:
             scene_config = SceneConfiguration(client.scene_name)
         controllers = scene_config.create_controllers()
         return cls(**controllers, client=client, subtypes=scene_config.config.subtypes)
+
+    def create_entity_list(self):
+        return {etype: c.controller(self.state) for etype, c in self.controllers.items()}
 
     def create_simulator_parameters_wrapper(self):
         self.simulator_parameters = SimulatorParametersWrapper(self.simulator_parameters)
