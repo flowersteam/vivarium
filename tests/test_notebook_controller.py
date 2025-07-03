@@ -1,16 +1,14 @@
+import pytest
 import jax.numpy as jnp
 
 from vivarium.controllers.notebook_controller import NotebookController
 
 NUM_STEPS = 4
 
+@pytest.mark.parametrize('scene_name', ['braitenberg', 'lenia_braitenberg'])
+def test_notebook_controller(scene_name):
 
-def test_notebook_controller(scene_config):
-    """Test default simulator run"""
-    config = scene_config('braitenberg')
-    controllers = config.create_controllers()
-    simulator = config.create_simulator()
-    controller = NotebookController(client=simulator, subtypes=config.config.subtypes, **controllers)
+    controller = NotebookController.from_config(scene_config=scene_name, simulator_as_client=True)
     agent_field = 'agents'
     controller.step()
 

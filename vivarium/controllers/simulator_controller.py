@@ -72,10 +72,20 @@ class SimulatorController:
         self.create_simulator_parameters_wrapper()
 
     @classmethod
-    def from_config(cls, scene_config=None, client=None):
+    def from_config(cls, scene_config=None, client=None, simulator_as_client=False):
+        if type(scene_config) is str:
+            scene_config = SceneConfiguration(scene_config)
+        assert scene_config is None or isinstance(scene_config, SceneConfiguration)
         if scene_config is None:
             client = client or SimulatorGRPCClient()
             scene_config = SceneConfiguration(client.scene_name)
+        elif client is None:  # scene_config is not None and client is None
+            if simulator_as_client:
+                client = scene_config.create_simulator()
+            else:
+                client = SimulatorGRPCClient()
+        assert scene_config.scene_name == client.scene_name, \
+            f"Scene name mismatch between config and client: {scene_config.scene_name} != {client.scene_name}"
         controllers = scene_config.create_controllers()
         return cls(**controllers, client=client, subtypes=scene_config.config.subtypes)
 
