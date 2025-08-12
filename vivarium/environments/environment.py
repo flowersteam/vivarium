@@ -32,6 +32,7 @@ class NeighborManager:
         )
         self.box_size = box_size
         self.neighbor_radius = neighbor_radius
+        self.dr_threshold = dr_threshold
     
     def allocate(self, positions):
         self.neighbors = self.neighbor_fn.allocate(positions)
@@ -59,15 +60,15 @@ nested_fields_to_access = {
 }
 
 
-@access_nested_fields({'neighbor_manager': ['box_size', 'neighbor_radius']})
+@access_nested_fields({'neighbor_manager': ['box_size', 'neighbor_radius', 'dr_threshold']})
 class Environment:
     def __init__(self,
                  neighbor_manager,
                  base_state_cls=BaseState,
                  factories=[], 
-                 num_scan_steps=1, to_jit=True, key=random.PRNGKey(42)):
+                 num_scan_steps=1, to_jit=True, seed=42):
 
-        self.key = key
+        self.key = random.PRNGKey(seed)
         self.base_state_cls = base_state_cls
         self.factories = factories
         self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(factories)}
