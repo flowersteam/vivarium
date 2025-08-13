@@ -2,9 +2,9 @@ defaults:
   - environment: default
 
 simulator:
-  cls: vivarium.simulator.Simulator
-  kwargs:
-    freq: 40.
+  _target_: vivarium.simulator.Simulator
+  freq: 40.
+  env: ${scene.environment}
 
 subtypes:
   - dummy

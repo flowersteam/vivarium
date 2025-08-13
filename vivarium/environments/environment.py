@@ -112,6 +112,7 @@ class Environment:
 
     def to_config(self, state):
         config = OmegaConf.create({
+            '_target_': f'{self.__class__.__module__}.{self.__class__.__name__}',
             'kwargs': {
                 'base_state_cls': f"{self.base_state_cls.__module__}.{self.base_state_cls.__name__}",
                 'box_size': self.box_size,

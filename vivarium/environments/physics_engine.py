@@ -213,8 +213,8 @@ class CollisionComponent(Component):
     def to_config(self, state):
         config = super().to_config(state)
         config.update({
-            'epsilon': state.collision_eps,
-            'alpha': state.collision_alpha,
+            'epsilon': state.collision_eps.item(),
+            'alpha': state.collision_alpha.item(),
             'mask_fn': self.mask_fn.to_config(state)
         })
         return config
@@ -354,7 +354,7 @@ class StepComponent(Component):
     def to_config(self, state):
         config = super().to_config(state)
         config.update({
-            'dt': state.dt,
+            'dt': state.dt.item(),
             'mask_fn': self.mask_fn.to_config(state)
         })
         return config

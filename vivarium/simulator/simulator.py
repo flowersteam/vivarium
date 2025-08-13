@@ -1,11 +1,13 @@
 import os
 import time
 import math
+import hydra
 import pickle
 import logging
 import datetime
 import threading
 from functools import partial
+from omegaconf import OmegaConf
 from contextlib import contextmanager
 from dataclasses import dataclass, fields
 
@@ -15,17 +17,6 @@ from vivarium.utils.converters import access_nested_fields
 
 
 lg = logging.getLogger(__name__)
-
-
-nested_fields_to_access = {
-    'env': [
-        'box_size',
-        'neighbor_radius',
-        'num_scan_steps',
-        'to_jit'
-    ]
-}
-
 
 @dataclass
 class SimulatorConfiguration:
@@ -42,6 +33,15 @@ class SimulatorConfiguration:
             field_name: getattr(simulator, field_name)
             for field_name in field_names})
 
+
+nested_fields_to_access = {
+    'env': [
+        'box_size',
+        'neighbor_radius',
+        'num_scan_steps',
+        'to_jit'
+    ]
+}
 
 @access_nested_fields(nested_fields_to_access)
 class Simulator:
@@ -61,6 +61,20 @@ class Simulator:
         self.saving_dir = None
 
         lg.info("Simulator initialized")
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(
+            env=hydra.utils.get_class(config.env._target_).from_config(config.env),
+            freq=config.freq
+        )
+    
+    def to_config(self, state):
+        return OmegaConf.create({
+            '_target_': f'{self.__class__.__module__}.{self.__class__.__name__}',
+            'freq': self.freq,
+            'env': self.env.to_config(state)
+        })
 
     # def load_scene(self, scene_name):
     #     """Load a scene in the simulator
