@@ -131,8 +131,8 @@ class Environment:
         for factory in self.factories:
             self.step_functions.append(factory.get_step_function(state, self.neighbor_manager, self.key))
 
-    def get_dynamics_function_by_name(self, name):
-        return self.dynamics_functions[self.dynamics_function_names_to_idx[name]]
+    def get_factory_by_name(self, name):
+        return self.factories[self.factories_names_to_idx[name]]
     
     def _step_env(
         self, state, neighbors, num_scan_steps=1
