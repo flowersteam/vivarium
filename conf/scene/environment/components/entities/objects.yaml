@@ -3,7 +3,8 @@ precedence: 10
 n_exists: 4
 mass:
   _all_values_: 1.0
-position: _random_
+position:
+  _range_: [0, "${scene.environment.kwargs.box_size}", 0, "${scene.environment.kwargs.box_size}"] 
 orientation: _random_
 diameter:
   _all_values_: 8.0
