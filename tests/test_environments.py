@@ -2,6 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.environments import Environment
 
 
 NUM_STEPS = 5
@@ -27,3 +28,30 @@ def test_env(scene_name):
     assert env
     assert state
     assert not state.entity_state.is_rigid_body()
+
+def test_load_save_env_config():
+    """Test the environment creation from config and back."""
+
+    scene_config = SceneConfiguration("braitenberg")
+    env_config = scene_config.config.environment
+    env = Environment.from_config(env_config)
+    state = env.init_state()
+    state = env.step(state, scan=False)
+
+    env.box_size = 42.
+    state = state.set(
+        collision_eps=42.,
+    )
+
+    new_env_config = env.to_config(state)
+
+    assert new_env_config.kwargs.box_size == 42.
+    assert new_env_config.components['collision'].epsilon == 42.
+
+    new_env = Environment.from_config(new_env_config)
+    new_state = new_env.init_state()
+    new_state = new_env.step(new_state, scan=False)
+    
+    assert new_env.box_size == 42.
+    assert new_env.get_factory_by_name('collision').epsilon == 42.
+    assert new_state.collision_eps == 42.
