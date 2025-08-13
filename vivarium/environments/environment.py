@@ -1,4 +1,6 @@
+import hydra
 import logging
+from omegaconf import OmegaConf
 
 from jax import jit, lax, random
 import jax.numpy as jnp
@@ -93,6 +95,37 @@ class Environment:
         neighbor_manager = NeighborManager(box_size, neighbor_radius, dr_threshold, space_fn)
         return cls(neighbor_manager, **kwargs)
     
+    @classmethod
+    def from_config(cls, config):
+        base_state_cls = hydra.utils.get_class(config.kwargs.base_state_cls)
+        component_factories = [hydra.utils.get_class(c._target_).from_config(c, name=name) for name, c in config.components.items()]
+        return cls.init_neighbor_manager(
+            box_size=config.kwargs.box_size,
+            neighbor_radius=config.kwargs.neighbor_radius,
+            dr_threshold=config.kwargs.dr_threshold,
+            space_fn=space.periodic,
+            base_state_cls=base_state_cls,
+            factories=component_factories,
+            num_scan_steps=config.kwargs.num_scan_steps,
+            to_jit=config.kwargs.to_jit
+            )
+
+    def to_config(self, state):
+        config = OmegaConf.create({
+            'kwargs': {
+                'base_state_cls': f"{self.base_state_cls.__module__}.{self.base_state_cls.__name__}",
+                'box_size': self.box_size,
+                'neighbor_radius': self.neighbor_radius,
+                'dr_threshold': self.dr_threshold,
+                'num_scan_steps': self.num_scan_steps,
+                'to_jit': self.to_jit
+            },
+            'components': {
+                f.name: f.to_config(state) for f in self.factories
+            }
+        })
+        return config
+
     def init_state_cls(self):
         update_fns = [f.update_state_cls for f in self.factories]
         return create_state_cls(base_state_cls=self.base_state_cls, update_fns=update_fns)

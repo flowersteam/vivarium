@@ -29,16 +29,29 @@ class Component:
         self.is_entity_component = False
 
     @classmethod
-    def from_config(cls, name, scene_config, config_node):
+    def from_config(cls, config, **kwargs):
+        kwargs.update(cls.get_kwargs(config))
+        return cls(**kwargs)
+    
+    def to_config(self, state):
+        return omegaconf.OmegaConf.create(
+            {
+                '_target_': f"{self.__class__.__module__}.{self.__class__.__name__}",
+                'precedence': self.precedence
+            }
+        )
+    
+    @staticmethod
+    def get_kwargs(config):
         kwargs = {}
-        for k, v in config_node.items():
+        for k, v in config.items():
             if k == '_target_':
                 pass
             elif isinstance(v, (dict, omegaconf.dictconfig.DictConfig)) and '_target_' in v:
-                    kwargs[k] = hydra.utils.instantiate(v)
+                kwargs[k] = hydra.utils.instantiate(v)
             else:
                 kwargs[k] = v
-        return cls(name=name, **kwargs)
+        return kwargs
 
     def init_base_entity(self, entity_state):
         return entity_state
@@ -197,6 +210,15 @@ class CollisionComponent(Component):
         self.alpha = alpha
         self.mask_fn = mask_fn
 
+    def to_config(self, state):
+        config = super().to_config(state)
+        config.update({
+            'epsilon': state.collision_eps,
+            'alpha': state.collision_alpha,
+            'mask_fn': self.mask_fn.to_config(state)
+        })
+        return config
+
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
             collision_eps=self.epsilon,
@@ -245,6 +267,13 @@ class FrictionComponent(Component):
     def __init__(self, name, precedence, mask_fn):
         super().__init__(name, precedence)
         self.mask_fn = mask_fn
+
+    def to_config(self, state):
+        config = super().to_config(state)
+        config.update({
+            'mask_fn': self.mask_fn.to_config(state)
+        })
+        return config
 
     def get_step_function(self, state, neighbor_manager, key):
         def state_fn(state, neighbor, key):
@@ -321,6 +350,14 @@ class StepComponent(Component):
         super().__init__(name, precedence)
         self.dt = dt
         self.mask_fn = mask_fn
+
+    def to_config(self, state):
+        config = super().to_config(state)
+        config.update({
+            'dt': state.dt,
+            'mask_fn': self.mask_fn.to_config(state)
+        })
+        return config
 
     def update_state_cls(self, state_cls):
         state_cls.__annotations__['dt'] = jnp.float32

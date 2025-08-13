@@ -41,11 +41,16 @@ class BraitenbergComponent(EntityComponent):
         self.proxs_cos_min = jnp.array(proxs_cos_min)
         self.controller_kwargs = controller_kwargs
 
-    @classmethod
-    def get_kwargs(cls, name, scene_config, config_node, exclude=[]):
-        kwargs = super().get_kwargs(name, scene_config, config_node, exclude)
-        kwargs['n_subtypes'] = len(scene_config.config.subtypes)
-        return kwargs
+    def to_config(self, state):
+        config = super().to_config(state)
+        config.update({
+            'n_behaviors': self.n_behaviors,
+            'n_subtypes': self.n_subtypes,  # Do we need this? (in the yaml config it computes it from ${scene.subtypes})
+            'wheel_diameter': getattr(state, self.entity_type).wheel_diameter.tolist(),
+            'proxs_dist_max': getattr(state, self.entity_type).proxs_dist_max.tolist(),
+            'proxs_cos_min': getattr(state, self.entity_type).proxs_cos_min.tolist(),
+        })
+        return config
 
     def update_state_cls(self, state_cls):
         state_cls.__annotations__[self.entity_type] = AgentState
