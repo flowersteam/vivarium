@@ -3,6 +3,6 @@ precedence: 2
 epsilon: 1.0
 alpha: 2
 mask_fn:
-  _target_: vivarium.environments.environment.get_mask_fn
+  _target_: vivarium.environments.environment.MaskFunction
   label: exists
   

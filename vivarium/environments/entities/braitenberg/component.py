@@ -3,7 +3,7 @@ from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environments.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
 from vivarium.environments.entities.component import EntityComponent
-from vivarium.environments.environment import get_mask_fn
+from vivarium.environments.environment import MaskFunction
 from vivarium.environments.state import BaseParticleState
 
 
@@ -73,4 +73,4 @@ class BraitenbergComponent(EntityComponent):
 
     def get_step_function(self, state, neighbor_manager, key):
         braitenberg_mask = state.entity_state.entity_type == getattr(state, self.entity_type).entity_type
-        return  braitenberg_state_fn(self.entity_type, braitenberg_mask, neighbor_manager.displacement, get_mask_fn('exists'))
+        return  braitenberg_state_fn(self.entity_type, braitenberg_mask, neighbor_manager.displacement, MaskFunction('exists'))

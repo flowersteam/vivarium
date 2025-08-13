@@ -1,6 +1,6 @@
 _target_: vivarium.environments.physics_engine.FrictionComponent
 precedence: 3
 mask_fn:
-  _target_: vivarium.environments.environment.get_mask_fn
+  _target_: vivarium.environments.environment.MaskFunction
   label: exists
   

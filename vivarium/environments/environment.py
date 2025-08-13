@@ -13,9 +13,19 @@ lg = logging.getLogger(__name__)
 
 
 # Generic mask function factory
-def get_mask_fn(label):
-    if label == 'exists':
-        return lambda state: state.entity_state.exists == 1
+class MaskFunction:
+    def __init__(self, label):
+        self.label = label
+
+    def to_config(self, state):
+        return OmegaConf.create({
+            '_target_': f'{self.__class__.__module__}.{self.__class__.__name__}',
+            'label': self.label
+        })
+
+    def __call__(self, state):
+        if self.label == 'exists':
+            return state.entity_state.exists == 1
 
 
 class NeighborManager:

@@ -1,1 +1,1 @@
-from vivarium.environments.environment import Environment, NeighborManager, get_mask_fn
+from vivarium.environments.environment import Environment, NeighborManager, MaskFunction

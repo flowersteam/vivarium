@@ -6,7 +6,7 @@ from vivarium.environments.dynamics.eco_evo import ConsumptionComponent, EnergyC
 from vivarium.environments.entities.particle_lenia.controller import ParamParticleLenia
 from vivarium.environments.physics_engine import ProximityMapComponent, StepComponent
 from vivarium.environments.entities.braitenberg.component import BraitenbergComponent
-from vivarium.environments import Environment, NeighborManager, get_mask_fn
+from vivarium.environments import Environment, NeighborManager, MaskFunction
 from vivarium.environments.entities.braitenberg.interface import ParamAgent
 from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.environments.state import BaseState, create_state_cls
@@ -159,7 +159,7 @@ def braitenberg(step):
 
 @pytest.fixture
 def step():
-    return [StepComponent('step', 10, 0.1, get_mask_fn('exists'))]
+    return [StepComponent('step', 10, 0.1, MaskFunction('exists'))]
 
 
 @pytest.fixture
