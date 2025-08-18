@@ -1,9 +1,9 @@
 defaults:
   - base_scene
-  - environment/components/entities/braitenberg@environment.components.agents
+  - environment/components/entities/braitenberg@environment.components.braitenberg
   - environment/components/entities/objects@environment.components.objects
-  - client/braitenberg@client.agents
-  - client/objects@client.objects
+  - clients/braitenberg@clients.client_list.agents  # Refering to agents here is weird
+  - clients/objects@clients.client_list.objects
 
 scene_name: braitenberg
 

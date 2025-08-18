@@ -1,12 +1,12 @@
+import hydra
 import jax.numpy as jnp
 
 from vivarium.environments.dynamics.eco_evo import type_mask
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.utils.scene_configs import component_factories_from_config
 
-
-def test_instantiate():
-    scene_config = SceneConfiguration('braitenberg')
-    df = scene_config.create_component_factories()
+def test_instantiate(scene_config):
+    scene_config = scene_config('braitenberg')
+    component_factories = component_factories_from_config(scene_config.environment.components)
     pass
 
 
@@ -96,7 +96,6 @@ def test_consumption(environment_and_state, consumption):
     assert state.entity_state.consuming[consumer_idx]
     assert state.entity_state.consumed[consumee_idx]
     assert not state.entity_state.exists[consumee_idx]
-
 
 
 def test_energy(environment_and_state, energy):

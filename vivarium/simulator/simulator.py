@@ -9,29 +9,15 @@ import threading
 from functools import partial
 from omegaconf import OmegaConf
 from contextlib import contextmanager
-from dataclasses import dataclass, fields
+from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
 
-from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list
+from vivarium.utils.scene_configs import extend_kwargs
 from vivarium.utils.converters import access_nested_fields
-# from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.simulator.config import SimulatorConfiguration
+from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list, create_dataclass_from_dict
 
 
 lg = logging.getLogger(__name__)
-
-@dataclass
-class SimulatorConfiguration:
-    freq: float
-    box_size: float
-    num_scan_steps: int
-    neighbor_radius: float
-    to_jit: bool
-
-    @classmethod
-    def from_simulator(cls, simulator):
-        field_names = [field.name for field in fields(cls)]
-        return cls(**{
-            field_name: getattr(simulator, field_name)
-            for field_name in field_names})
 
 
 nested_fields_to_access = {
@@ -42,6 +28,7 @@ nested_fields_to_access = {
         'to_jit'
     ]
 }
+
 
 @access_nested_fields(nested_fields_to_access)
 class Simulator:
@@ -64,17 +51,40 @@ class Simulator:
 
     @classmethod
     def from_config(cls, config):
+
+        try:
+            kwargs = {}
+            for etype, c_config in config.clients.items():
+                n_max = c_config.n_max  # get_n_max(self.config.environment.components[etype])
+                controller_kwargs = extend_kwargs(c_config.controller_kwargs, n_max)
+                kwargs[etype] = controller_kwargs
+            cp = create_dataclass_from_dict('ControllerParameters', kwargs)
+        except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
+            logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")
+            cp = None
+
+        try:
+            scene_name = config.scene_name
+        except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
+            logging.warning("Scene name not found, Simulator.scene_name will be None.")
+            scene_name = None
+        
         return cls(
             env=hydra.utils.get_class(config.env._target_).from_config(config.env),
-            freq=config.freq
+            freq=config.freq,
+            scene_name=scene_name,
+            controller_parameters=cp
         )
     
     def to_config(self, state):
-        return OmegaConf.create({
-            '_target_': f'{self.__class__.__module__}.{self.__class__.__name__}',
-            'freq': self.freq,
-            'env': self.env.to_config(state)
-        })
+        
+        with hydra.initialize(config_path='../../conf/scene/simulator', version_base=None):
+            cfg = hydra.compose(config_name="base_simulator")
+            cfg = OmegaConf.merge(cfg, OmegaConf.create({
+                'freq': self.freq,
+                'env': self.env.to_config(state)
+            }))
+        return cfg
 
     # def load_scene(self, scene_name):
     #     """Load a scene in the simulator

@@ -2,8 +2,7 @@ import pytest
 
 import jax.numpy as jnp
 
-from vivarium.utils.scene_configs import SceneConfiguration
-from vivarium.controllers.panel_controller import PanelController
+from vivarium.controllers import PanelController
 
 
 @pytest.mark.parametrize("scene_name", [
@@ -11,12 +10,11 @@ from vivarium.controllers.panel_controller import PanelController
     'particle_lenia',
     'braitenberg',
 ])
-def test_panel_controller(scene_name):
-    config = SceneConfiguration(scene_name)
-    controllers = config.create_controllers()
-    simulator = config.create_simulator()
-    controller = PanelController(client=simulator, subtypes=config.config.subtypes, **controllers)
-    for entity_type in controllers.keys():
+def test_panel_controller(scene_name, simulator_controller_from_config):
+
+    controller = simulator_controller_from_config(scene_name, PanelController)
+
+    for entity_type in controller.controllers.keys():
         entity_idx = 1
         idx = getattr(controller.state, entity_type).entity_idx[entity_idx]
         pos = controller.state.entity_state.position_center[idx]

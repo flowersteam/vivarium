@@ -1,0 +1,14 @@
+defaults:
+  - default_entity_client
+
+cls: vivarium.environments.entities.particle_lenia.ParticleLeniaController
+
+n_max: ${....environment.components.particle_lenia.n_max}
+
+controller_kwargs:
+  color:
+    _all_values_: yellow
+
+renderer_kwargs:
+  shape: circle
+  line_width: 0.1

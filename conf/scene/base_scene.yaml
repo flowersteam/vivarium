@@ -1,10 +1,7 @@
 defaults:
   - environment: default
-
-simulator:
-  _target_: vivarium.simulator.Simulator
-  freq: 40.
-  env: ${scene.environment}
+  - clients: base_clients
+  - simulator: base_simulator
 
 subtypes:
   - dummy

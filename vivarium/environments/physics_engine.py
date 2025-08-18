@@ -37,7 +37,8 @@ class Component:
         return omegaconf.OmegaConf.create(
             {
                 '_target_': f"{self.__class__.__module__}.{self.__class__.__name__}",
-                'precedence': self.precedence
+                'precedence': self.precedence,
+                'name': self.name
             }
         )
     
@@ -213,8 +214,8 @@ class CollisionComponent(Component):
     def to_config(self, state):
         config = super().to_config(state)
         config.update({
-            'epsilon': state.collision_eps.item(),
-            'alpha': state.collision_alpha.item(),
+            'epsilon': state.collision_eps.item() if isinstance(state.collision_eps, jnp.ndarray) else state.collision_eps,
+            'alpha': state.collision_alpha.item() if isinstance(state.collision_alpha, jnp.ndarray) else state.collision_alpha,
             'mask_fn': self.mask_fn.to_config(state)
         })
         return config
@@ -354,7 +355,7 @@ class StepComponent(Component):
     def to_config(self, state):
         config = super().to_config(state)
         config.update({
-            'dt': state.dt.item(),
+            'dt': state.dt.item() if isinstance(state.dt, jnp.ndarray) else state.dt,
             'mask_fn': self.mask_fn.to_config(state)
         })
         return config

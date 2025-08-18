@@ -1,15 +1,13 @@
+defaults:
+  - _self_
+  - base_entities
+
 _target_: vivarium.environments.entities.objects.ObjectComponent
 precedence: 10
-n_exists: 4
+n_max: 4
 mass:
   _all_values_: 1.0
-position:
-  _range_: [0, "${scene.environment.kwargs.box_size}", 0, "${scene.environment.kwargs.box_size}"] 
-orientation: _random_
 diameter:
   _all_values_: 8.0
 friction:
   _all_values_: 1.0
-subtype_to_n:
-  - [0, 4]
-  

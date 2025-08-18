@@ -284,7 +284,7 @@ class SimulatorParametersWrapper:
         changes = self._change_recorder.fetch_changes()
         return changes
 
-    def apply_to_state(self, simulator):
+    def apply_to_state(self, simulator):  # TODO: change method name
         changes = self.fetch_changes()
         self._simulator = update_dataclass(simulator, changes)
         self._change_recorder = ChangeRecorder()

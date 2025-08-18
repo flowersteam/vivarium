@@ -1,4 +1,3 @@
-
 import pytest
 import jax.numpy as jnp
 
@@ -6,11 +5,13 @@ from vivarium.environments.dynamics.eco_evo import ConsumptionComponent, EnergyC
 from vivarium.environments.entities.particle_lenia.controller import ParamParticleLenia
 from vivarium.environments.physics_engine import ProximityMapComponent, StepComponent
 from vivarium.environments.entities.braitenberg.component import BraitenbergComponent
+from vivarium.utils.scene_configs import load_config, component_factories_from_config
 from vivarium.environments import Environment, NeighborManager, MaskFunction
 from vivarium.environments.entities.braitenberg.interface import ParamAgent
-from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.environments.state import BaseState, create_state_cls
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.controllers import SimulatorController
+from vivarium.environments import Environment
+from vivarium.simulator import Simulator
 
 
 param_fields_to_delete = {
@@ -37,14 +38,14 @@ def cleanup_parameterized_class(request):
 @pytest.fixture
 def scene_config():
     def fn(scene_name):
-        return SceneConfiguration(scene_name)
+        return load_config('scene', scene_name)
     return fn
 
 
 @pytest.fixture
 def environment_from_config(scene_config):
     def fn(scene_name):
-        return scene_config(scene_name).create_environment()
+        return Environment.from_config(scene_config(scene_name).environment)
     return fn
 
 
@@ -53,7 +54,7 @@ def state_from_config(scene_config):
     def fn(scene_name):
         config = scene_config(scene_name)
         base_state_cls = config.environment.base_state_cls
-        update_fns = [f.update_state_cls for f in config.create_component_factories()]
+        update_fns = [f.update_state_cls for f in component_factories_from_config(config.environment.components)]
         return create_state_cls(base_state_cls, update_fns)
     return fn
 
@@ -61,15 +62,15 @@ def state_from_config(scene_config):
 @pytest.fixture
 def simulator_from_config(scene_config):
     def fn(scene_name):
-        return scene_config(scene_name).create_simulator()
+        return Simulator.from_config(scene_config(scene_name).simulator)
     return fn
     
 
 @pytest.fixture
 def simulator_controller_from_config(scene_config, simulator_from_config):
-    def fn(scene_name):
-        return SimulatorController.from_config(
-            scene_config=scene_config(scene_name), 
+    def fn(scene_name, controller_cls=SimulatorController):
+        return controller_cls.from_config(
+            config=scene_config(scene_name).clients, 
             client=simulator_from_config(scene_name)
         )
     return fn
@@ -94,11 +95,13 @@ def proximity_map(step, braitenberg):
 
 @pytest.fixture
 def consumption(proximity_map):
-    consumption = ConsumptionComponent(name='consumption', 
-                                         precedence=1, 
-                                         source_subtype=0, 
-                                         target_subtype=1, 
-                                         range=20.0)
+    consumption = ConsumptionComponent(
+        name='consumption', 
+        precedence=1, 
+        source_subtype=0, 
+        target_subtype=1, 
+        range=20.0
+    )
     return [*proximity_map, consumption]
 
 

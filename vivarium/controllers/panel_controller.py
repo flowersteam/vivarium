@@ -220,7 +220,7 @@ class PanelController(SimulatorController):
                 onlychanged=True,
                 precedence=1,
             )
-
+    
     def create_simulator_parameters_wrapper(self):
         self.simulator_parameters = PanelSimulatorParametersWrapper(self.simulator_parameters)
 

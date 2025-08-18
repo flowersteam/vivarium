@@ -1,5 +1,7 @@
+import hydra
+
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.utils.scene_configs import extend_kwargs
 from vivarium.controllers.dataclass_wrapper import (
     ChangeRecorder, EntityWrapper, SimulatorParametersWrapper
 )
@@ -72,22 +74,17 @@ class SimulatorController:
         self.create_simulator_parameters_wrapper()
 
     @classmethod
-    def from_config(cls, scene_config=None, client=None, simulator_as_client=False):
-        if type(scene_config) is str:
-            scene_config = SceneConfiguration(scene_config)
-        assert scene_config is None or isinstance(scene_config, SceneConfiguration)
-        if scene_config is None:
-            client = client or SimulatorGRPCClient()
-            scene_config = SceneConfiguration(client.scene_name)
-        elif client is None:  # scene_config is not None and client is None
-            if simulator_as_client:
-                client = scene_config.create_simulator()
-            else:
-                client = SimulatorGRPCClient()
-        assert scene_config.scene_name == client.scene_name, \
-            f"Scene name mismatch between config and client: {scene_config.scene_name} != {client.scene_name}"
-        controllers = scene_config.create_controllers()
-        return cls(**controllers, client=client, subtypes=scene_config.config.subtypes)
+    def from_config(cls, config, client=None):
+        controllers = {}
+        for etype, e_config in config.client_list.items():
+            e_cls = hydra.utils.get_class(e_config.cls)
+            kwargs = extend_kwargs(e_config.controller_kwargs, e_config.n_max)
+            controllers[etype] = e_cls(etype, **kwargs)
+        return cls(
+            subtypes=config.subtypes,
+            client=client,
+            **controllers
+        )
 
     def create_entity_list(self):
         return {etype: c.controller(self.state) for etype, c in self.controllers.items()}

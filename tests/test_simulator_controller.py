@@ -1,6 +1,8 @@
 import jax.numpy as jnp
 
 from vivarium.environments.entities.braitenberg.controller import BraitenbergController
+from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.simulator import Simulator
 
 NUM_STEPS = 10
 
@@ -22,8 +24,12 @@ def test_base_entity(environment_and_state, braitenberg):
     assert changes['color'][0]['__value'] == 'pink'
 
 
-def test_simulator_controller(simulator_controller_from_config):
-    controller = simulator_controller_from_config('braitenberg')
+def test_load_simulator_controller(scene_config):
+    config = scene_config('braitenberg')
+    client_config = config.clients
+    simulator = Simulator.from_config(config.simulator)
+    controller = SimulatorController.from_config(client_config, client=simulator)
+
     controller.step()
 
     idx = 0

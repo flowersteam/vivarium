@@ -9,6 +9,7 @@ from jax_md import partition, space
 
 from vivarium.environments.state import BaseState, create_state_cls
 from vivarium.utils.converters import access_nested_fields
+from vivarium.utils.scene_configs import component_factories_from_config
 
 
 lg = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ class Environment:
     @classmethod
     def from_config(cls, config):
         base_state_cls = hydra.utils.get_class(config.kwargs.base_state_cls)
-        component_factories = [hydra.utils.get_class(c._target_).from_config(c, name=name) for name, c in config.components.items()]
+        component_factories = component_factories_from_config(config.components)
         return cls.init_neighbor_manager(
             box_size=config.kwargs.box_size,
             neighbor_radius=config.kwargs.neighbor_radius,

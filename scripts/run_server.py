@@ -3,7 +3,7 @@ import logging
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.simulator import Simulator
 from vivarium.simulator.grpc_server.simulator_server import serve
 
 
@@ -20,7 +20,7 @@ def main(cfg: DictConfig = None) -> None:
     lg.info(f"Scene running: {cfg.scene.scene_name}")
 
     # Create the simulator
-    simulator = SceneConfiguration(cfg.scene).create_simulator()
+    simulator = Simulator.from_config(cfg.scene.simulator)
 
     # start and host the simulator on a server
     serve(simulator)

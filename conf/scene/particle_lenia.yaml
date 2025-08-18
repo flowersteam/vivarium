@@ -1,19 +1,21 @@
 defaults:
+  - simulator: base_simulator
   - environment/kwargs/default@environment.kwargs
   - environment/components/reset/default@environment.components.reset
   - environment/components/friction/default@environment.components.friction
   - environment/components/step/default@environment.components.step
-  - environment/components/entities/particle_lenia@environment.components.particles
-  - client/particle_lenia@client.particles
+  - environment/components/entities/particle_lenia@environment.components.particle_lenia
+  - clients: base_clients
+  - clients/particle_lenia@clients.client_list.particles
   
 scene_name: particle_lenia
 
 environment:
-  cls: vivarium.environments.Environment
+  _target_: vivarium.environments.Environment
   kwargs:
     num_scan_steps: 10
   components:
-    particles:
+    particle_lenia:
       n_exists: 400
       subtype_to_n:
         - [0, 400]
@@ -26,5 +28,4 @@ subtypes:
   - particle
 
 simulator:
-  kwargs:
-    freq: -1
+  freq: -1

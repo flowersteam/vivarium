@@ -1,21 +1,21 @@
+defaults:
+  - _self_
+  - base_entities
+
 _target_: vivarium.environments.entities.braitenberg.BraitenbergComponent
 precedence: 10
-n_exists: 10
+name: 'agents'
+n_max: 10
 mass:
   _all_values_: 1.0
-position:
-  _range_: [0, "${scene.environment.kwargs.box_size}", 0, "${scene.environment.kwargs.box_size}"]
-orientation: _random_
 diameter:
   _all_values_: 6.0
 friction:
   _all_values_: 1.0
 n_behaviors: 4
-subtype_to_n:
-  - [0, 10]
 n_subtypes: 
   _target_: builtins.len
-  _args_: ["${scene.subtypes}"]
+  _args_: ["${......subtypes}"]
 wheel_diameter:
   _all_values_: 3.0
 proxs_dist_max:

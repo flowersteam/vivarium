@@ -1,0 +1,6 @@
+n_exists: ${.n_max}
+position:
+  _range_: [0, "${......environment.kwargs.box_size}", 0, "${......environment.kwargs.box_size}"]
+orientation: _random_
+subtype_to_n:
+  - [0, "${...n_max}"]

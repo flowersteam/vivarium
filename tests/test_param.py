@@ -78,7 +78,7 @@ def test_simulator_state_param(simulator_controller_from_config):
 
 
 def test_controller_parameters(simulator_controller_from_config):
-    controller = simulator_controller_from_config('lenia_braitenberg')
+    controller = simulator_controller_from_config('braitenberg')
     controller.agents[0].visible_wheels = False
     controller.apply_changes()
     controller.update_state()

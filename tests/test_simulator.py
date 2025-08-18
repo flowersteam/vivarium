@@ -1,9 +1,7 @@
 import pytest
 
 from vivarium.simulator import Simulator
-from vivarium.utils.scene_configs import SceneConfiguration
-from vivarium.environments.entities.braitenberg.component import AgentState
-from vivarium.environments.entities.particle_lenia.component import ParticleLeniaState
+
 
 NUM_STEPS = 6
 
@@ -16,10 +14,10 @@ def test_simulator_run(scene_name, simulator_from_config):
 
     assert simulator
 
-def test_load_simulator_config():
-    scene_config = SceneConfiguration('braitenberg')
-    simulator_config = scene_config.config.simulator
-    simulator = Simulator.from_config(simulator_config)
+
+def test_load_save_simulator_config(scene_config):
+    config = scene_config('braitenberg')
+    simulator = Simulator.from_config(config.simulator)
 
     state = simulator.env.init_state()
     state = simulator.env.step(state)

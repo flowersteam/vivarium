@@ -18,7 +18,7 @@ from param import Parameterized
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.panel_controller import PanelController
-from vivarium.utils.scene_configs import SceneConfiguration
+from vivarium.utils.scene_configs import load_scene_config
 
 
 lg = logging.getLogger(__name__)
@@ -244,10 +244,8 @@ class WindowManager(Parameterized):
         super().__init__(**kwargs)
         pn.config.theme = 'dark'
         client = client or SimulatorGRPCClient()
-        self.scene_config = SceneConfiguration(client.scene_name)
-        self.controller = PanelController(client=client, 
-                                          subtypes=self.scene_config.config.subtypes, 
-                                          **self.scene_config.create_controllers())
+        self.scene_config = load_scene_config(client.scene_name)
+        self.controller = PanelController.from_config(self.scene_config.clients, client=client)
         self.entity_types = list(self.controller.entity_lists.keys())
         self.start_toggle = pn.widgets.Toggle(
             **(
@@ -274,7 +272,7 @@ class WindowManager(Parameterized):
                 selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
-                ** self.scene_config.config.client[etype].renderer_kwargs
+                ** self.scene_config.clients.client_list[etype].renderer_kwargs
             )
             for etype, manager_class in self.entity_manager_classes.items()
         }

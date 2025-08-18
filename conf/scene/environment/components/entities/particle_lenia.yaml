@@ -1,14 +1,17 @@
+defaults:
+  - _self_
+  - base_entities
+
 _target_: vivarium.environments.entities.particle_lenia.ParticleLeniaComponent
 precedence: 10
-n_exists: 400
+name: particles
+n_max: 400
 mass:
   _all_values_: 1.0
 diameter:
   _all_values_: 0.2
 friction:
   _all_values_: 1.
-subtype_to_n:
-  - [0, 400]
 position:
   _range_: [20, 40, 20, 40]
 orientation:

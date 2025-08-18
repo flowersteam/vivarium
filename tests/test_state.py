@@ -3,10 +3,10 @@ import jax.numpy as jnp
 from vivarium.environments.entities.braitenberg import BraitenbergComponent
 from vivarium.environments.entities.objects import ObjectComponent
 
-def expected_values_from_config(scene_config):
+def expected_values_from_config(config):
 
-    agent = scene_config.config.environment.components['agents']
-    object = scene_config.config.environment.components['objects']
+    agent = config.environment.components.braitenberg
+    object = config.environment.components.objects
     n_agents = agent.n_max
     n_objects = object.n_max
 
@@ -23,12 +23,12 @@ def expected_values_from_config(scene_config):
 
 
 def test_create_state(scene_config, environment_and_state):
-    scene_config = scene_config('braitenberg')
-    factories = [BraitenbergComponent.from_config('agents', scene_config, scene_config.config.environment.components.agents),
-                 ObjectComponent.from_config('objects', scene_config, scene_config.config.environment.components.objects)]
+    config = scene_config('braitenberg')
+    factories = [BraitenbergComponent.from_config(config.environment.components.braitenberg, name='agents'),
+                 ObjectComponent.from_config(config.environment.components.objects, name='objects')]
     _, state = environment_and_state(factories)
 
-    expected_values = expected_values_from_config(scene_config)
+    expected_values = expected_values_from_config(config)
 
     assert jnp.equal(state.agents.proxs_dist_max, jnp.array(expected_values["proxs_dist_max"])).all()
     assert jnp.equal(state.entity_state.entity_type, jnp.array(expected_values["entity_type"])).all()

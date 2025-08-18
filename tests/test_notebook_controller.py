@@ -6,9 +6,9 @@ from vivarium.controllers.notebook_controller import NotebookController
 NUM_STEPS = 4
 
 @pytest.mark.parametrize('scene_name', ['braitenberg', 'lenia_braitenberg'])
-def test_notebook_controller(scene_name):
+def test_notebook_controller(scene_name, simulator_controller_from_config):
 
-    controller = NotebookController.from_config(scene_config=scene_name, simulator_as_client=True)
+    controller = simulator_controller_from_config(scene_name, NotebookController)
     agent_field = 'agents'
     controller.step()
 

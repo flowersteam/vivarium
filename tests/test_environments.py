@@ -1,7 +1,6 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.utils.scene_configs import SceneConfiguration
 from vivarium.environments import Environment
 
 
@@ -9,13 +8,12 @@ NUM_STEPS = 5
 
 
 @pytest.mark.parametrize("scene_name", ["braitenberg", "particle_lenia", "lenia_braitenberg"])
-def test_env(scene_name):
+def test_env(scene_name, scene_config):
     """Test the stepping mechanism of the env with occlusion (default)"""
-    scene_config = SceneConfiguration(scene_name)
-    scene_config.config.environment.kwargs['to_jit'] = False
-    env = scene_config.create_environment()
+    config = scene_config(scene_name)
+    config.environment.kwargs['to_jit'] = False
+    env = Environment.from_config(config.environment)
     state = env.init_state()
-    env.neighbor_manager.allocate(state.entity_state.position)
     previous_state = state
     for t in range(NUM_STEPS):
         prev_prev = previous_state
@@ -29,11 +27,12 @@ def test_env(scene_name):
     assert state
     assert not state.entity_state.is_rigid_body()
 
-def test_load_save_env_config():
+
+def test_load_save_env_config(scene_config):
     """Test the environment creation from config and back."""
 
-    scene_config = SceneConfiguration("braitenberg")
-    env_config = scene_config.config.environment
+    config = scene_config("braitenberg")
+    env_config = config.environment
     env = Environment.from_config(env_config)
     state = env.init_state()
     state = env.step(state, scan=False)
