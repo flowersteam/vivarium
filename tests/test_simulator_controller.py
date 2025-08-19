@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from vivarium.environments.components.entities.braitenberg.controller import BraitenbergController
+from vivarium.environment.components.entities.braitenberg.controller import BraitenbergController
 from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.simulator import Simulator
 

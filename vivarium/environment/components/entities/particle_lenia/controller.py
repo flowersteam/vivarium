@@ -1,8 +1,8 @@
 import numpy as np
 import param
 from vivarium.controllers.panel_controller import ParamEntity
-from vivarium.environments.components.entities.controller import EntityController
-from vivarium.environments.components.entities.particle_lenia.creatures import CREATURES
+from vivarium.environment.components.entities.controller import EntityController
+from vivarium.environment.components.entities.particle_lenia.creatures import CREATURES
 
 class ParamParticleLenia(ParamEntity):
     mu_k = param.Number()

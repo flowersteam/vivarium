@@ -1,4 +1,4 @@
-cls: vivarium.environments.components.entities.controller.EntityController
+cls: vivarium.environment.components.entities.controller.EntityController
 controller_kwargs:
   color:
     _all_values_: red

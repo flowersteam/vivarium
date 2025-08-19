@@ -4,7 +4,7 @@ from jax import vmap
 
 from jax_md import rigid_body
 
-from vivarium.environments.utils import normal
+from vivarium.environment.utils import normal
 
 #TODO: merge simple and selective_sensing packages (now we only use selective_sensing)
 

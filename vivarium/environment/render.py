@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from IPython.display import display, clear_output
 
-from vivarium.environments.utils import normal
+from vivarium.environment.utils import normal
 
 def plot_particles(ax, state, type, color, size_scale=30):
     entities = getattr(state, type)

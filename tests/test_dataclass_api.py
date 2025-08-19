@@ -2,7 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.controllers.dataclass_wrapper import *
-from vivarium.environments.state import to_rigid_body_state
+from vivarium.environment.state import to_rigid_body_state
 
 
 scene_name = 'braitenberg'
@@ -180,3 +180,15 @@ def test_simulator_apply_change(simulator_from_config):
     simulator.apply_changes([changes])
     assert simulator.env.box_size == 42.
     assert simulator.freq == -10.
+
+# def test_simulator_controller(simulator_controller_from_config):
+#     controller = simulator_controller_from_config(scene_name)
+#     dw = DataclassWrapper()
+#     dw.simulator_parameters.freq = 42.
+#     controller = dw.apply(controller)
+#     assert controller.simulator_parameters.freq == 42.
+
+#     dw = DataclassWrapper()
+#     dw.simulator_parameters.num_scan_steps = 100
+#     controller = dw.apply(controller)
+#     assert controller.simulator_parameters.num_scan_steps == 100

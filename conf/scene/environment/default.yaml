@@ -2,4 +2,4 @@ defaults:
   - kwargs: default
   - components: default
 
-_target_: vivarium.environments.Environment
+_target_: vivarium.environment.Environment

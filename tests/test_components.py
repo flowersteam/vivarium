@@ -1,7 +1,7 @@
 import hydra
 import jax.numpy as jnp
 
-from vivarium.environments.utils import type_mask
+from vivarium.environment.utils import type_mask
 from vivarium.utils.scene_configs import component_factories_from_config
 
 def test_instantiate(scene_config):

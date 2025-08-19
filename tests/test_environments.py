@@ -1,7 +1,7 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.environments import Environment
+from vivarium.environment import Environment
 
 
 NUM_STEPS = 5

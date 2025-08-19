@@ -2,5 +2,5 @@ box_size: 100.0
 neighbor_radius: 20.
 dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
 num_scan_steps: 60
-base_state_cls: vivarium.environments.state.BaseState
+base_state_cls: vivarium.environment.state.BaseState
 to_jit: True

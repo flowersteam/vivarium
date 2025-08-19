@@ -4,8 +4,8 @@ from jax import vmap
 from jax_md import quantity, partition
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.state import BaseParticleState
-from vivarium.environments.components.entities import EntityComponent
+from vivarium.environment.state import BaseParticleState
+from vivarium.environment.components.entities import EntityComponent
 
 
 from_mask_fn = lambda state: jnp.array(range(len(state.entity_state.entity_type_idx)))

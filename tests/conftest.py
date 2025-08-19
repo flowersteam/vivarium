@@ -1,16 +1,16 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.environments.components.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
-from vivarium.environments.components.entities.particle_lenia.controller import ParamParticleLenia
-from vivarium.environments.components.physics.component import ProximityMapComponent, StepComponent
-from vivarium.environments.components.entities.braitenberg.component import BraitenbergComponent
+from vivarium.environment.components.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
+from vivarium.environment.components.entities.particle_lenia.controller import ParamParticleLenia
+from vivarium.environment.components.physics.component import ProximityMapComponent, StepComponent
+from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
-from vivarium.environments import Environment, NeighborManager, MaskFunction
-from vivarium.environments.components.entities.braitenberg.interface import ParamAgent
-from vivarium.environments.state import BaseState, create_state_cls
+from vivarium.environment import Environment, NeighborManager, MaskFunction
+from vivarium.environment.components.entities.braitenberg.interface import ParamAgent
+from vivarium.environment.state import BaseState, create_state_cls
 from vivarium.controllers import SimulatorController
-from vivarium.environments import Environment
+from vivarium.environment import Environment
 from vivarium.simulator import Simulator
 
 

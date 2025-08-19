@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_entities
 
-_target_: vivarium.environments.components.entities.braitenberg.BraitenbergComponent
+_target_: vivarium.environment.components.entities.braitenberg.BraitenbergComponent
 precedence: 10
 n_max: 10
 mass:

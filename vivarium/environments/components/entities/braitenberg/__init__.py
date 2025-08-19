@@ -1,2 +1,0 @@
-from vivarium.environments.components.entities.braitenberg.component import BraitenbergComponent
-from vivarium.environments.components.entities.braitenberg.controller import BraitenbergController

@@ -5,15 +5,15 @@ from jax import vmap
 
 from jax_md import partition
 
-from vivarium.environments.components.entities.braitenberg.behaviors import Behaviors
+from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors
 
-from vivarium.environments.components.entities.braitenberg.simple.dynamics import (
+from vivarium.environment.components.entities.braitenberg.simple.dynamics import (
     linear_behavior,
     motor_force,
     sum_force_to_entities
 )
-from vivarium.environments.utils import neighbors_entity_mask
-from vivarium.environments.utils import get_relative_displacement
+from vivarium.environment.utils import neighbors_entity_mask
+from vivarium.environment.utils import get_relative_displacement
 
 
 def compute_motor(proxs, params, behaviors, motors):

@@ -1,12 +1,12 @@
 import numpy as np
 
 from vivarium.controllers.utils import BehaviorHandler, Logger
-from vivarium.environments.components.entities.controller import EntityController
+from vivarium.environment.components.entities.controller import EntityController
 from vivarium.controllers.simulator_controller import ControllerEntity
-from vivarium.environments.components.entities.braitenberg.interface import ParamAgent
-from vivarium.environments.components.entities.braitenberg.interface import AgentManager
+from vivarium.environment.components.entities.braitenberg.interface import ParamAgent
+from vivarium.environment.components.entities.braitenberg.interface import AgentManager
 from vivarium.controllers.notebook_controller import NotebookControllerEntity
-from vivarium.environments.components.entities.braitenberg.behaviors import Behaviors, behavior_to_params
+from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
 class ControllerAgent(ControllerEntity):

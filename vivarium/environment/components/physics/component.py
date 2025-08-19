@@ -6,8 +6,8 @@ import jax
 
 from jax_md import rigid_body, util, simulate, energy, quantity, smap, space, partition
 
-from vivarium.environments.components.component import Component
-from vivarium.environments.utils import neighbors_entity_mask, get_relative_displacement
+from vivarium.environment.components.component import Component
+from vivarium.environment.utils import neighbors_entity_mask, get_relative_displacement
 
 
 lg = logging.getLogger(__name__)

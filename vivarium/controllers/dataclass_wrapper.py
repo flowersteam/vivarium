@@ -6,7 +6,7 @@ import numpy as np
 from omegaconf import DictConfig
 from jax_md.dataclasses import is_dataclass
 
-from vivarium.environments.state import field_accessors
+from vivarium.environment.state import field_accessors
 
 
 def create_dataclass_from_dict(class_name: str, data: dict):

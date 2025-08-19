@@ -7,8 +7,8 @@ from jax import random
 from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.state import BaseState, BaseEntityState
-from vivarium.environments.braitenberg.behaviors import Behaviors, behavior_to_params
+from vivarium.environment.state import BaseState, BaseEntityState
+from vivarium.environment.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
 class EntityType(Enum):

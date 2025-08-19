@@ -2,7 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.simulator import Simulator
-from vivarium.environments import Environment
+from vivarium.environment import Environment
 
 
 @pytest.mark.parametrize('scene_name, entity_type',

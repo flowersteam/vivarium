@@ -5,12 +5,12 @@ import jax.numpy as jnp
 from jax_md.dataclasses import dataclass as md_dataclass
 from jax_md import partition
 
-from vivarium.environments.state import BaseEntityState
-from vivarium.environments.utils import (
+from vivarium.environment.state import BaseEntityState
+from vivarium.environment.utils import (
     generate_random_positions, generate_random_orientations, 
     is_position_close, neighbors_entity_mask)
-from vivarium.environments.components.component import Component
-from vivarium.environments.utils import type_mask
+from vivarium.environment.components.component import Component
+from vivarium.environment.utils import type_mask
 
 
 def sample_true_index(key, x):

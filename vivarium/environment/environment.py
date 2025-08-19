@@ -7,7 +7,7 @@ import jax.numpy as jnp
 
 from jax_md import partition, space
 
-from vivarium.environments.state import BaseState, create_state_cls
+from vivarium.environment.state import BaseState, create_state_cls
 from vivarium.utils.converters import access_nested_fields
 from vivarium.utils.scene_configs import component_factories_from_config
 

@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
-from vivarium.environments.components.entities.component import EntityComponent
-from vivarium.environments.state import BaseParticleState
+from vivarium.environment.components.entities.component import EntityComponent
+from vivarium.environment.state import BaseParticleState
 
 
 from jax_md.dataclasses import dataclass as md_dataclass
