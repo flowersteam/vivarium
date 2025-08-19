@@ -1,4 +1,4 @@
-from vivarium.environments.entities.controller import EntityController
+from vivarium.environments.components.entities.controller import EntityController
 from vivarium.controllers.simulator_controller import ControllerEntity
 
 

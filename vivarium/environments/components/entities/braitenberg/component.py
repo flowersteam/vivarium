@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 from jax_md.dataclasses import dataclass as md_dataclass
 
-from vivarium.environments.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
-from vivarium.environments.entities.component import EntityComponent
+from vivarium.environments.components.entities.braitenberg.selective_sensing.dynamics import braitenberg_state_fn
+from vivarium.environments.components.entities.component import EntityComponent
 from vivarium.environments.environment import MaskFunction
 from vivarium.environments.state import BaseParticleState
 

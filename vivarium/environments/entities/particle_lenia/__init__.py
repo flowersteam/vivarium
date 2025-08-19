@@ -1,2 +1,0 @@
-from vivarium.environments.entities.particle_lenia.component import ParticleLeniaComponent
-from vivarium.environments.entities.particle_lenia.controller import ParticleLeniaController

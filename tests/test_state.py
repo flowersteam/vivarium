@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 
-from vivarium.environments.entities.braitenberg import BraitenbergComponent
-from vivarium.environments.entities.objects import ObjectComponent
+from vivarium.environments.components.entities.braitenberg import BraitenbergComponent
+from vivarium.environments.components.entities.objects import ObjectComponent
 
 def expected_values_from_config(config):
 

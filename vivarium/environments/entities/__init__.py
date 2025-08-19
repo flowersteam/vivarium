@@ -1,1 +1,0 @@
-from vivarium.environments.entities.component import EntityComponent

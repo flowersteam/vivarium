@@ -5,9 +5,9 @@ from jax import vmap
 
 from jax_md import partition
 
-from vivarium.environments.entities.braitenberg.behaviors import Behaviors
+from vivarium.environments.components.entities.braitenberg.behaviors import Behaviors
 
-from vivarium.environments.entities.braitenberg.simple.dynamics import (
+from vivarium.environments.components.entities.braitenberg.simple.dynamics import (
     linear_behavior,
     motor_force,
     sum_force_to_entities

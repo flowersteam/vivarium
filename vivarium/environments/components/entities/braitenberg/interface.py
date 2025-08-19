@@ -6,7 +6,7 @@ import numpy as np
 from bokeh.plotting import figure
 
 from vivarium.controllers.panel_controller import ParamEntity, ParameterMapping, behavior_param_name, sensed_param_name
-from vivarium.environments.entities.braitenberg.behaviors import Behaviors
+from vivarium.environments.components.entities.braitenberg.behaviors import Behaviors
 from vivarium.interface.panel_app import EntityManager, normal
 
 
