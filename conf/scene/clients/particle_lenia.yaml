@@ -3,8 +3,6 @@ defaults:
 
 cls: vivarium.environments.entities.particle_lenia.ParticleLeniaController
 
-n_max: ${....environment.components.particle_lenia.n_max}
-
 controller_kwargs:
   color:
     _all_values_: yellow

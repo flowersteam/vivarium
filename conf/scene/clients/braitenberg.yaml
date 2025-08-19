@@ -3,8 +3,6 @@ defaults:
 
 cls: vivarium.environments.entities.braitenberg.BraitenbergController
 
-n_max: ${....environment.components.braitenberg.n_max}  # Not ideal, should be a default, but refer to braitenberg
-
 controller_kwargs:
   color:
     _all_values_: red

@@ -59,6 +59,9 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def GetSimulatorParameters(self, request, context):
         parameters = SimulatorConfiguration.from_simulator(self.simulator)
         return dataclass_to_proto(parameters)
+    
+    def GetControllerParameters(self, request, context):
+        return dataclass_to_proto(self.simulator.controller_parameters)
 
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name

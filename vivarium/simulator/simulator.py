@@ -55,9 +55,9 @@ class Simulator:
         try:
             kwargs = {}
             for etype, c_config in config.clients.items():
-                n_max = c_config.n_max  # get_n_max(self.config.environment.components[etype])
+                n_max = config.env.components[etype].n_max
                 controller_kwargs = extend_kwargs(c_config.controller_kwargs, n_max)
-                kwargs[etype] = controller_kwargs
+                kwargs[etype] = OmegaConf.to_container(controller_kwargs, resolve=True)
             cp = create_dataclass_from_dict('ControllerParameters', kwargs)
         except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
             logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")

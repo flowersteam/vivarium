@@ -1,8 +1,6 @@
 defaults:
   - default_entity_client
 
-n_max: ${....environment.components.objects.n_max}
-
 controller_kwargs:
   color:
     _all_values_: blue

@@ -1,7 +1,7 @@
 import hydra
+from dataclasses import asdict
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.utils.scene_configs import extend_kwargs
 from vivarium.controllers.dataclass_wrapper import (
     ChangeRecorder, EntityWrapper, SimulatorParametersWrapper
 )
@@ -76,10 +76,10 @@ class SimulatorController:
     @classmethod
     def from_config(cls, config, client=None):
         controllers = {}
+        cp = asdict(client.controller_parameters)
         for etype, e_config in config.client_list.items():
             e_cls = hydra.utils.get_class(e_config.cls)
-            kwargs = extend_kwargs(e_config.controller_kwargs, e_config.n_max)
-            controllers[etype] = e_cls(etype, **kwargs)
+            controllers[etype] = e_cls(etype, **cp[etype])
         return cls(
             subtypes=config.subtypes,
             client=client,

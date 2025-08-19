@@ -53,7 +53,16 @@ class SimulatorGRPCClient(SimulatorClient):
     
     def get_simulator_parameters(self):
         parameters = self.stub.GetSimulatorParameters(Empty())
-        return proto_to_dataclass(parameters, SimulatorConfiguration)
+        return proto_to_dataclass(parameters) #, SimulatorConfiguration)
+
+    @property
+    def controller_parameters(self):
+        """Get the controller parameters of the simulator.
+
+        :return: controller parameters
+        """
+        parameters = self.stub.GetControllerParameters(Empty())
+        return proto_to_dataclass(parameters)
 
     @property
     def scene_name(self):

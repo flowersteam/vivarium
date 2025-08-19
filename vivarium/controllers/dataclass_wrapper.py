@@ -26,7 +26,7 @@ def create_dataclass_from_dict(class_name: str, data: dict):
             nested_class_name = f"{class_name}_{key.capitalize()}"
             return (key, create_dataclass_from_dict(nested_class_name, value).__class__, field(default_factory=lambda: create_dataclass_from_dict(nested_class_name, value)))
         else:
-            return (key, type(value), field(default=value))
+            return (key, type(value), field(default_factory=type(value)))
 
     # Create fields for the dataclass
     fields = [process_value(key, value) for key, value in data.items()]
