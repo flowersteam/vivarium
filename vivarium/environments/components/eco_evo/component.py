@@ -10,6 +10,7 @@ from vivarium.environments.utils import (
     generate_random_positions, generate_random_orientations, 
     is_position_close, neighbors_entity_mask)
 from vivarium.environments.components.component import Component
+from vivarium.environments.utils import type_mask
 
 
 def sample_true_index(key, x):
@@ -22,27 +23,6 @@ def sample_true_index(key, x):
     masked = lax.cond(has_true, lambda: jnp.where(x, random_values, -jnp.inf), lambda: jnp.zeros_like(random_values))
     # Return the index of the maximum (randomly chosen True index)
     return has_true, jnp.argmax(masked)
-
-
-def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
-    mask_entity_type = lax.cond(
-        entity_type == -1,
-        lambda: entity_state.exists == exists,
-        lambda: jnp.logical_and(
-            entity_state.exists == exists,
-            entity_state.entity_type == entity_type
-            )
-    )
-    mask_subtype = lax.cond(
-        subtype == -1,
-        lambda: entity_state.exists == exists,
-        lambda: jnp.logical_and(
-            entity_state.exists == exists,
-            entity_state.entity_subtype == subtype
-        )
-    )
-    mask = jnp.logical_and(mask_entity_type, mask_subtype)
-    return mask
 
 
 def non_existing(key, entity_state, entity_type=-1, subtype=-1):

@@ -188,3 +188,24 @@ def get_relative_displacement(all_positions, source_orientations, source_mask, n
     dist, theta = proximity_map(dR, source_orientations)
 
     return dist, theta
+
+
+def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
+    mask_entity_type = lax.cond(
+        entity_type == -1,
+        lambda: entity_state.exists == exists,
+        lambda: jnp.logical_and(
+            entity_state.exists == exists,
+            entity_state.entity_type == entity_type
+            )
+    )
+    mask_subtype = lax.cond(
+        subtype == -1,
+        lambda: entity_state.exists == exists,
+        lambda: jnp.logical_and(
+            entity_state.exists == exists,
+            entity_state.entity_subtype == subtype
+        )
+    )
+    mask = jnp.logical_and(mask_entity_type, mask_subtype)
+    return mask
