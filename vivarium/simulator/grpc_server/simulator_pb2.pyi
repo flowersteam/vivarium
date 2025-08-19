@@ -58,26 +58,42 @@ class Idx(_message.Message):
     def __init__(self, int_idx: _Optional[int] = ..., slice_idx: _Optional[_Union[Slice, _Mapping]] = ..., index_list: _Optional[_Union[IndexList, _Mapping]] = ..., is_none: bool = ...) -> None: ...
 
 class Value(_message.Message):
-    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value", "list_value")
+    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value", "list_float_value", "list_string_value", "list_bool_value")
     NDARRAY_FIELD_NUMBER: _ClassVar[int]
     BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
     INT_VALUE_FIELD_NUMBER: _ClassVar[int]
     FLOAT_VALUE_FIELD_NUMBER: _ClassVar[int]
     STR_VALUE_FIELD_NUMBER: _ClassVar[int]
-    LIST_VALUE_FIELD_NUMBER: _ClassVar[int]
+    LIST_FLOAT_VALUE_FIELD_NUMBER: _ClassVar[int]
+    LIST_STRING_VALUE_FIELD_NUMBER: _ClassVar[int]
+    LIST_BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
     ndarray: NDArray
     bool_value: bool
     int_value: int
     float_value: float
     str_value: str
-    list_value: List
-    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ..., list_value: _Optional[_Union[List, _Mapping]] = ...) -> None: ...
+    list_float_value: ListFloat
+    list_string_value: ListString
+    list_bool_value: ListBool
+    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ..., list_float_value: _Optional[_Union[ListFloat, _Mapping]] = ..., list_string_value: _Optional[_Union[ListString, _Mapping]] = ..., list_bool_value: _Optional[_Union[ListBool, _Mapping]] = ...) -> None: ...
 
-class List(_message.Message):
+class ListFloat(_message.Message):
     __slots__ = ("list",)
     LIST_FIELD_NUMBER: _ClassVar[int]
     list: _containers.RepeatedScalarFieldContainer[float]
     def __init__(self, list: _Optional[_Iterable[float]] = ...) -> None: ...
+
+class ListString(_message.Message):
+    __slots__ = ("list",)
+    LIST_FIELD_NUMBER: _ClassVar[int]
+    list: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, list: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class ListBool(_message.Message):
+    __slots__ = ("list",)
+    LIST_FIELD_NUMBER: _ClassVar[int]
+    list: _containers.RepeatedScalarFieldContainer[bool]
+    def __init__(self, list: _Optional[_Iterable[bool]] = ...) -> None: ...
 
 class Change(_message.Message):
     __slots__ = ("idx", "value")

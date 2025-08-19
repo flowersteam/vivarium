@@ -16,7 +16,9 @@ service SimulatorServer {
   
   // Get state of the simulation
   rpc GetState(google.protobuf.Empty) returns (Dataclass) {}
+  
   rpc GetSimulatorParameters(google.protobuf.Empty) returns (Dataclass) {}
+  rpc GetControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
   rpc SetControllerAtrributes(Dataclass) returns (google.protobuf.Empty) {}
 
@@ -70,12 +72,22 @@ message Value {
     int32 int_value = 4;
     float float_value = 5;
     string str_value = 6;
-    List list_value = 7;
+    ListFloat list_float_value = 7;
+    ListString list_string_value = 8;
+    ListBool list_bool_value = 9;
   }
 }
 
-message List {
+message ListFloat {
   repeated float list = 1;
+}
+
+message ListString {
+  repeated string list = 1;
+}
+
+message ListBool {
+  repeated bool list = 1;
 }
 
 message Change {

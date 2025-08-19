@@ -6,6 +6,8 @@ import jax.numpy as jnp
 from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import fields
 
+from vivarium.controllers.dataclass_wrapper import create_dataclass_from_dict
+
 import simulator_pb2
 
 from vivarium.simulator.grpc_server.numproto.numproto import (
@@ -66,9 +68,21 @@ def changes_to_proto(changes):
                     simulator_pb2.Value(str_value=change['__value'])
                 )
             elif isinstance(change['__value'], list):
-                proto_change.value.CopyFrom(
-                    simulator_pb2.Value(list_value=simulator_pb2.List(list=change['__value']))
-                )
+                if isinstance(change['__value'][0], bool):
+                    value = simulator_pb2.Value(
+                        list_bool_value=simulator_pb2.ListBool(list=change['__value'])
+                    )                
+                elif isinstance(change['__value'][0], (float, int)):
+                    value = simulator_pb2.Value(
+                        list_float_value=simulator_pb2.ListFloat(list=change['__value'])
+                    )
+                elif isinstance(change['__value'][0], str):
+                    value = simulator_pb2.Value(
+                        list_string_value=simulator_pb2.ListString(list=change['__value'])
+                    )
+                else:
+                    raise ValueError(f"List items of type {type(change['__value'][0])} not supported yet.")
+                proto_change.value.CopyFrom(value)
             else:
                 raise ValueError(f"Unknown value type {type(change['__value'])}")
             proto_changes.changes.append(proto_change)
@@ -149,8 +163,12 @@ def proto_to_changes(proto_changes):
             value = proto_changes.value.bool_value
         elif proto_changes.value.HasField('str_value'):
             value = proto_changes.value.str_value
-        elif proto_changes.value.HasField('list_value'):
-            value = list(proto_changes.value.list_value.list)
+        elif proto_changes.value.HasField('list_float_value'):
+            value = list(proto_changes.value.list_float_value.list)
+        elif proto_changes.value.HasField('list_string_value'):
+            value = list(proto_changes.value.list_string_value.list)
+        elif proto_changes.value.HasField('list_bool_value'):
+            value = list(proto_changes.value.list_bool_value.list)
         change = {
             '__idx': proto_to_idx(proto_changes.idx),
             '__value': value
@@ -178,18 +196,25 @@ def proto_to_changes(proto_changes):
     return changes
 
 
-def proto_to_dataclass(dataclass, dataclass_type):
+def proto_to_dataclass(dataclass, dataclass_type=None):
     """Convert a protobuf to a dataclass instance.
 
     :param dataclass: simulator_pb2.Dataclass message
+    :param dataclass_type: The type of the dataclass to convert to. 
+    If None, a generic dataclass is created. In this case class methods won't be accessible after deserialization.
     :return: python dataclass instance
     """
 
-    if is_dataclass(dataclass_type):
+    if len(dataclass.nested_fields) > 0:
         kwargs = {}
-        for field in fields(dataclass_type):
-            kwargs[field.name] = proto_to_dataclass(dataclass.nested_fields[field.name], field.type)
-        return dataclass_type(**kwargs)
+        if dataclass_type is not None:
+            for field in fields(dataclass_type):
+                kwargs[field.name] = proto_to_dataclass(dataclass.nested_fields[field.name], field.type)
+            return dataclass_type(**kwargs)
+        else: # In this case class methods won't be accessible
+            for field, value in dataclass.nested_fields.items():
+                kwargs[field] = proto_to_dataclass(value) #, None)
+            return create_dataclass_from_dict('FromProto', kwargs)
     elif dataclass.value.HasField('int_value'):
         return dataclass.value.int_value
     elif dataclass.value.HasField('float_value'):
@@ -198,8 +223,12 @@ def proto_to_dataclass(dataclass, dataclass_type):
         return dataclass.value.bool_value
     elif dataclass.value.HasField('str_value'):
         return dataclass.value.str_value
-    elif dataclass.value.HasField('list_value'):
-        return dataclass.value.list_value
+    elif dataclass.value.HasField('list_float_value'):
+        return dataclass.value.list_float_value.list
+    elif dataclass.value.HasField('list_string_value'):
+        return dataclass.value.list_string_value.list
+    elif dataclass.value.HasField('list_bool_value'):
+        return dataclass.value.list_bool_value.list
     elif dataclass.value.HasField('ndarray'):
         return proto_to_ndarray(dataclass.value.ndarray)
     elif 'center' in dataclass.nested_fields and 'orientation' in dataclass.nested_fields:
@@ -227,9 +256,16 @@ def dataclass_to_proto(dataclass):
                     simulator_pb2.Value(bool_value=dataclass)
                 )
     elif isinstance(dataclass, list):
-        message.value.CopyFrom(
-                    simulator_pb2.Value(list_value=dataclass)
-                )
+        if isinstance(dataclass[0], bool):
+            value = simulator_pb2.Value(list_bool_value=simulator_pb2.ListBool(list=dataclass))
+        elif isinstance(dataclass[0], (float, int)):
+            value = simulator_pb2.Value(list_float_value=simulator_pb2.ListFloat(list=dataclass))
+        elif isinstance(dataclass[0], str):
+            value = simulator_pb2.Value(list_string_value=simulator_pb2.ListString(list=dataclass))
+
+        else:
+            raise ValueError(f"List items of type {type(dataclass[0])} not supported yet.")
+        message.value.CopyFrom(value)
     elif isinstance(dataclass, int):
         message.value.CopyFrom(
                     simulator_pb2.Value(int_value=dataclass)

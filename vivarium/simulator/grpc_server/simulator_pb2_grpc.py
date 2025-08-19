@@ -36,6 +36,11 @@ class SimulatorServerStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=simulator__pb2.Dataclass.FromString,
                 )
+        self.GetControllerParameters = channel.unary_unary(
+                '/simulator.SimulatorServer/GetControllerParameters',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=simulator__pb2.Dataclass.FromString,
+                )
         self.SetControllerAtrributes = channel.unary_unary(
                 '/simulator.SimulatorServer/SetControllerAtrributes',
                 request_serializer=simulator__pb2.Dataclass.SerializeToString,
@@ -93,6 +98,12 @@ class SimulatorServerServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetSimulatorParameters(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetControllerParameters(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -157,6 +168,11 @@ def add_SimulatorServerServicer_to_server(servicer, server):
             ),
             'GetSimulatorParameters': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSimulatorParameters,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
+            ),
+            'GetControllerParameters': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetControllerParameters,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=simulator__pb2.Dataclass.SerializeToString,
             ),
@@ -264,6 +280,23 @@ class SimulatorServer(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetSimulatorParameters',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            simulator__pb2.Dataclass.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetControllerParameters(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/GetControllerParameters',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             simulator__pb2.Dataclass.FromString,
             options, channel_credentials,

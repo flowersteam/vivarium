@@ -31,7 +31,8 @@ def test_state_de_serialization(state):
 def test_parameters_de_serialization(simulator):
     simulator_parameters = simulator.get_simulator_parameters()
     p_parameters = dataclass_to_proto(simulator_parameters)
-    simulator_parameters_2 = proto_to_dataclass(p_parameters, simulator_parameters.__class__)
+    simulator_parameters_2 = proto_to_dataclass(p_parameters)
+
     assert simulator_parameters.freq == simulator_parameters_2.freq
     assert simulator_parameters.box_size == simulator_parameters_2.box_size
 
