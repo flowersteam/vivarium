@@ -6,7 +6,6 @@ from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
 from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 
 from vivarium.utils.scene_configs import load_scene_config
-from vivarium.simulator.config import SimulatorConfiguration
 from vivarium.utils.scene_configs import component_factories_from_config
 from vivarium.environment.state import create_state_cls
 
