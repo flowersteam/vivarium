@@ -1,4 +1,4 @@
-_target_: vivarium.environments.physics_engine.CollisionComponent
+_target_: vivarium.environments.components.physics.CollisionComponent
 precedence: 2
 epsilon: 1.0
 alpha: 2

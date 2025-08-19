@@ -9,7 +9,7 @@ from vivarium.environments.state import BaseEntityState
 from vivarium.environments.utils import (
     generate_random_positions, generate_random_orientations, 
     is_position_close, neighbors_entity_mask)
-from vivarium.environments.physics_engine import Component
+from vivarium.environments.components.component import Component
 
 
 def sample_true_index(key, x):

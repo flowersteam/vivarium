@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from omegaconf import OmegaConf
 
 from vivarium.controllers.simulator_controller import ControllerEntity
-from vivarium.environments.physics_engine import Component
+from vivarium.environments.components.component import Component
 
 from vivarium.utils.scene_configs import compute_parameters
 
