@@ -4,7 +4,6 @@ defaults:
 
 _target_: vivarium.environments.entities.particle_lenia.ParticleLeniaComponent
 precedence: 10
-name: particles
 n_max: 400
 mass:
   _all_values_: 1.0

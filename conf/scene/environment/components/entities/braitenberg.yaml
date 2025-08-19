@@ -4,7 +4,6 @@ defaults:
 
 _target_: vivarium.environments.entities.braitenberg.BraitenbergComponent
 precedence: 10
-name: 'agents'
 n_max: 10
 mass:
   _all_values_: 1.0

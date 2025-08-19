@@ -6,8 +6,8 @@ from vivarium.environments import Environment
 
 
 @pytest.mark.parametrize('scene_name, entity_type',
-                         [('braitenberg', 'braitenberg'), 
-                          ('particle_lenia', 'particle_lenia')
+                         [('braitenberg', 'agents'), 
+                          ('particle_lenia', 'particles')
                           ])
 def test_state(scene_name, entity_type, scene_config):
     config = scene_config(scene_name)
@@ -60,4 +60,4 @@ def test_controller_parameters(scene_config):
 
     controller_parameters = Simulator.from_config(config.simulator).controller_parameters
 
-    assert controller_parameters.agents.color == ['red'] * config.environment.components.braitenberg.n_max
+    assert controller_parameters.agents.color == ['red'] * config.environment.components.agents.n_max

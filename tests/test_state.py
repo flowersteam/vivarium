@@ -5,7 +5,7 @@ from vivarium.environments.entities.objects import ObjectComponent
 
 def expected_values_from_config(config):
 
-    agent = config.environment.components.braitenberg
+    agent = config.environment.components.agents
     object = config.environment.components.objects
     n_agents = agent.n_max
     n_objects = object.n_max
@@ -24,7 +24,7 @@ def expected_values_from_config(config):
 
 def test_create_state(scene_config, environment_and_state):
     config = scene_config('braitenberg')
-    factories = [BraitenbergComponent.from_config(config.environment.components.braitenberg, name='agents'),
+    factories = [BraitenbergComponent.from_config(config.environment.components.agents, name='agents'),
                  ObjectComponent.from_config(config.environment.components.objects, name='objects')]
     _, state = environment_and_state(factories)
 

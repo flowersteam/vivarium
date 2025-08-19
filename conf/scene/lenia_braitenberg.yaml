@@ -1,8 +1,8 @@
 defaults:
   - base_scene
-  - environment/components/entities/braitenberg@environment.components.braitenberg
-  - environment/components/entities/particle_lenia@environment.components.particle_lenia
-  - clients/braitenberg@clients.client_list.agents  # Refering to agents here is weird
+  - environment/components/entities/braitenberg@environment.components.agents
+  - environment/components/entities/particle_lenia@environment.components.particles
+  - clients/braitenberg@clients.client_list.agents
   - clients/particle_lenia@clients.client_list.particles
 
 scene_name: lenia_braitenberg
@@ -13,18 +13,18 @@ environment:
     neighbor_radius: 10.
     num_scan_steps: 10
   components:
-    braitenberg:
+    agents:
       n_max: 8
       diameter:
         _all_values_: 1.0
       proxs_dist_max:
         _all_values_: 10.
       subtype_to_n:
-        - [0, 8]
-    particle_lenia:
+        - [0, "${...n_max}"]
+    particles:
       n_max: 400
       subtype_to_n:
-        - [1, 400]
+        - [1, "${...n_max}"]
 
 subtypes:
   - agent
