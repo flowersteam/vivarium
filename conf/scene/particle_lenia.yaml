@@ -4,7 +4,7 @@ defaults:
   - environment/components/friction/default@environment.components.component_list.friction
   - environment/components/step/default@environment.components.component_list.step
   - environment/components/entities/particle_lenia@environment.components.component_list.particles
-  - clients/particle_lenia@clients.client_list.particles
+  - clients/particle_lenia@environment.components.component_list.particles.client
   
 scene_name: particle_lenia
 

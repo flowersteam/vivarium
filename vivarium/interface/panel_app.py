@@ -245,7 +245,7 @@ class WindowManager(Parameterized):
         pn.config.theme = 'dark'
         client = client or SimulatorGRPCClient()
         self.scene_config = load_scene_config(client.scene_name)
-        self.controller = PanelController.from_config(self.scene_config.clients, client=client)
+        self.controller = PanelController.from_config(self.scene_config.environment.components, client=client)
         self.entity_types = list(self.controller.entity_lists.keys())
         self.start_toggle = pn.widgets.Toggle(
             **(
@@ -272,7 +272,7 @@ class WindowManager(Parameterized):
                 selected=self.controller.selected[etype],
                 etype=etype,
                 state=self.controller.state,
-                ** self.scene_config.clients.client_list[etype].renderer_kwargs
+                ** self.scene_config.environment.components.component_list[etype].client.renderer_kwargs
             )
             for etype, manager_class in self.entity_manager_classes.items()
         }

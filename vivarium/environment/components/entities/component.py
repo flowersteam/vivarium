@@ -62,16 +62,7 @@ class EntityComponent(Component):
         config.update(kwargs)
         kwargs.update(compute_parameters(config))
 
-        if 'by_indices' in config:
-            for each in config.by_indices:
-                for label, data in each.items():
-                    for k, v in data.items():
-                        if k != 'indices':
-                            for idx in data.indices:
-                                kwargs[k][idx] = v
-
-        n_max = len(config.position)
-        exclude = exclude + ['_target_', 'n_max', 'subtype_labels', 'by_indices']
+        exclude = exclude + ['_target_', 'n_max', 'subtype_labels', 'by_indices', 'client']
         kwargs = {k: v for k, v in config.items()
                     if k not in exclude}
 

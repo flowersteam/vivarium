@@ -77,9 +77,10 @@ class SimulatorController:
     def from_config(cls, config, client=None):
         controllers = {}
         cp = asdict(client.controller_parameters)
-        for etype, e_config in config.client_list.items():
-            e_cls = hydra.utils.get_class(e_config.cls)
-            controllers[etype] = e_cls(etype, **cp[etype])
+        for etype, e_config in config.component_list.items():
+            if 'client' in e_config:
+                e_cls = hydra.utils.get_class(e_config.client.cls)
+                controllers[etype] = e_cls(etype, **cp[etype])
         return cls(
             subtypes=config.subtype_labels,
             client=client,

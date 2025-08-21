@@ -58,6 +58,27 @@ def extend_kwargs(kwargs, n):
     for attr, val in kwargs.items():
         if isinstance(val, Iterable) and '_all_values_' in val:
             kwargs[attr] = [val['_all_values_']] * n
+            
+        if attr == 'by_indices':
+            for each in val:
+                for label, data in each.items():
+                    for k, v in data.items():
+                        if k != 'indices' and k != 'client':
+                            for idx in data.indices:
+                                kwargs[k][idx] = v
+            
+    return kwargs
+
+
+def extend_controller_kwargs(kwargs, by_indices, n):
+    kwargs = extend_kwargs(kwargs, n)
+    for each in by_indices:
+        for label, data in each.items():
+            if 'client' in data:
+                for k, v in data.client.items():
+                    for idx in data.indices:
+                        kwargs[k][idx] = v
+
     return kwargs
 
 

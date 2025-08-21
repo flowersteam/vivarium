@@ -21,7 +21,7 @@ def test_notebook_controller(scene_name, simulator_controller_from_config):
     idx = 0
     pos = controller.state.entity_state.position_center[idx]
 
-    ag =controller.agents[idx]
+    ag = controller.agents[idx]
 
     ag.attach_behavior(beh)
     

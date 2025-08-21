@@ -1,6 +1,5 @@
 defaults:
   - environment: default
-  - clients: base_clients
   - simulator: base_simulator
 
 subtype_labels:

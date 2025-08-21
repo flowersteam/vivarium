@@ -3,8 +3,8 @@ defaults:
   - environment/components/base_physics@environment.components.component_list
   - environment/components/entities/braitenberg@environment.components.component_list.agents
   - environment/components/entities/objects@environment.components.component_list.objects
-  - clients/braitenberg@clients.client_list.agents
-  - clients/objects@clients.client_list.objects
+  - clients/braitenberg@environment.components.component_list.agents.client
+  - clients/objects@environment.components.component_list.objects.client
 
 scene_name: braitenberg
 
@@ -18,6 +18,8 @@ environment:
               indices: "${range: 0, 5}"
               subtype: prey
               diameter: 6.0
+              client:
+                color: purple
           - predator:
               indices: "${range: 5, 10}"
               subtype: predator

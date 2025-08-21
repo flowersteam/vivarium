@@ -26,9 +26,9 @@ def test_base_entity(environment_and_state, braitenberg):
 
 def test_load_simulator_controller(scene_config):
     config = scene_config('braitenberg')
-    client_config = config.clients
+    component_config = config.environment.components
     simulator = Simulator.from_config(config.simulator)
-    controller = SimulatorController.from_config(client_config, client=simulator)
+    controller = SimulatorController.from_config(component_config, client=simulator)
 
     controller.step()
 

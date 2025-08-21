@@ -1,4 +1,0 @@
-defaults:
-  - client_list: []
-
-subtype_labels: ${..subtype_labels}

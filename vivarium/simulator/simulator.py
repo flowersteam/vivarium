@@ -11,7 +11,7 @@ from omegaconf import OmegaConf
 from contextlib import contextmanager
 from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
 
-from vivarium.utils.scene_configs import extend_kwargs
+from vivarium.utils.scene_configs import extend_controller_kwargs
 from vivarium.utils.converters import access_nested_fields
 from vivarium.simulator.config import SimulatorConfiguration
 from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list, create_dataclass_from_dict
@@ -52,13 +52,15 @@ class Simulator:
     @classmethod
     def from_config(cls, config):
 
+        
         try:
             kwargs = {}
-            for etype, c_config in config.clients.items():
-                n_max = config.env.components.component_list[etype].n_max
-                controller_kwargs = extend_kwargs(c_config.controller_kwargs, n_max)
-                kwargs[etype] = OmegaConf.to_container(controller_kwargs, resolve=True)
-            cp = create_dataclass_from_dict('ControllerParameters', kwargs)
+            for name, c_config in config.env.components.component_list.items():
+                if 'client' in c_config:
+                    n_max = c_config.n_max
+                    controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
+                    kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
+            cp = create_dataclass_from_dict('ControllerParameters', kwargs)            
         except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
             logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")
             cp = None

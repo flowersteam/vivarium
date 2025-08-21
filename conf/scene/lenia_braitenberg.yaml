@@ -3,8 +3,8 @@ defaults:
   - environment/components/base_physics@environment.components.component_list
   - environment/components/entities/braitenberg@environment.components.component_list.agents
   - environment/components/entities/particle_lenia@environment.components.component_list.particles
-  - clients/braitenberg@clients.client_list.agents
-  - clients/particle_lenia@clients.client_list.particles
+  - clients/braitenberg@environment.components.component_list.agents.client
+  - clients/particle_lenia@environment.components.component_list.particles.client
 
 scene_name: lenia_braitenberg
 

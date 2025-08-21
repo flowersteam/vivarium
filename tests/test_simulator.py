@@ -19,6 +19,8 @@ def test_load_save_simulator_config(scene_config):
     config = scene_config('braitenberg')
     simulator = Simulator.from_config(config.simulator)
 
+    assert hasattr(simulator.controller_parameters, 'agents')
+
     state = simulator.env.init_state()
     state = simulator.env.step(state)
 
@@ -32,5 +34,7 @@ def test_load_save_simulator_config(scene_config):
 
     assert new_simulator.freq == 42.
     assert new_simulator
+
+    # assert hasattr(new_simulator.controller_parameters, 'agents')
 
     pass

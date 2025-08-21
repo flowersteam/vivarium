@@ -61,4 +61,4 @@ def test_controller_parameters(scene_config):
 
     controller_parameters = Simulator.from_config(config.simulator).controller_parameters
 
-    assert controller_parameters.agents.color == ['red'] * config.environment.components.component_list.agents.n_max
+    assert controller_parameters.agents.color == ['purple'] * 5 + ['red'] * 5
