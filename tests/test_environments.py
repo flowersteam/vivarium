@@ -45,7 +45,7 @@ def test_load_save_env_config(scene_config):
     new_env_config = env.to_config(state)
 
     assert new_env_config.kwargs.box_size == 42.
-    assert new_env_config.components['collision'].epsilon == 42.
+    assert new_env_config.components.component_list['collision'].epsilon == 42.
 
     new_env = Environment.from_config(new_env_config)
     new_state = new_env.init_state()

@@ -78,13 +78,14 @@ def particle_lenia_state_fn(displacement, particle_lenia_state_field, from_mask_
 class ParticleLeniaComponent(EntityComponent):
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction, exists,
-                 mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep
+                 mu_k, sigma_k, w_k, mu_g, sigma_g, c_rep, subtype_labels=None
                  ):
         super().__init__(name=name, precedence=precedence, 
                          entity_type=entity_type, subtype=subtype,
                          position=position, orientation=orientation,
                          mass=mass, diameter=diameter, 
-                         friction=friction, exists=exists)  
+                         friction=friction, exists=exists,
+                         subtype_labels=subtype_labels)  
 
         self.mu_k = jnp.array(mu_k)
         self.sigma_k = jnp.array(sigma_k)

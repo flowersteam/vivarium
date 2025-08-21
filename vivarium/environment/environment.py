@@ -123,7 +123,10 @@ class Environment:
                 'to_jit': self.to_jit
             },
             'components': {
-                f.name: f.to_config(state) for f in self.factories
+                'component_list': {
+                    f.name: f.to_config(state) for f in self.factories
+                },
+                'subtype_labels': '${..subtype_labels}'
             }
         })
         return config

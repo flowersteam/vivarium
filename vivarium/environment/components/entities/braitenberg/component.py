@@ -26,13 +26,14 @@ class BraitenbergComponent(EntityComponent):
                  position, orientation, mass, diameter, friction,
                  exists, n_behaviors, n_subtypes,
                  wheel_diameter, proxs_dist_max, proxs_cos_min,
-                 controller_kwargs=None):
+                 subtype_labels=None, controller_kwargs=None):
 
         super().__init__(name=name, precedence=precedence,
                          entity_type=entity_type, subtype=subtype,
                          position=position, orientation=orientation,
                          mass=mass, diameter=diameter,
-                         friction=friction, exists=exists)
+                         friction=friction, exists=exists, 
+                         subtype_labels=subtype_labels)
 
         self.n_behaviors = n_behaviors
         self.n_subtypes = n_subtypes

@@ -14,11 +14,10 @@ friction:
 n_behaviors: 4
 n_subtypes: 
   _target_: builtins.len
-  _args_: ["${......subtypes}"]
+  _args_: ["${...subtype_labels}"]
 wheel_diameter:
   _all_values_: 3.0
 proxs_dist_max:
   _all_values_: 20.0
 proxs_cos_min:
   _all_values_: 0.0
-  

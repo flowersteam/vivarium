@@ -81,7 +81,7 @@ class SimulatorController:
             e_cls = hydra.utils.get_class(e_config.cls)
             controllers[etype] = e_cls(etype, **cp[etype])
         return cls(
-            subtypes=config.subtypes,
+            subtypes=config.subtype_labels,
             client=client,
             **controllers
         )

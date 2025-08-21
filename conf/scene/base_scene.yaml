@@ -3,5 +3,5 @@ defaults:
   - clients: base_clients
   - simulator: base_simulator
 
-subtypes:
+subtype_labels:
   - dummy

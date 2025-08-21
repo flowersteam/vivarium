@@ -55,7 +55,7 @@ class Simulator:
         try:
             kwargs = {}
             for etype, c_config in config.clients.items():
-                n_max = config.env.components[etype].n_max
+                n_max = config.env.components.component_list[etype].n_max
                 controller_kwargs = extend_kwargs(c_config.controller_kwargs, n_max)
                 kwargs[etype] = OmegaConf.to_container(controller_kwargs, resolve=True)
             cp = create_dataclass_from_dict('ControllerParameters', kwargs)

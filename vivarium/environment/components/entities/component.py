@@ -13,7 +13,7 @@ class EntityComponent(Component):
     controller_cls = ControllerEntity
 
     def __init__(self, name, precedence, entity_type, subtype,
-                 position, orientation, mass, diameter, friction, exists
+                 position, orientation, mass, diameter, friction, exists, subtype_labels=None
                  ):
         super().__init__(name, precedence)
         self.n_max = len(position)
@@ -25,6 +25,7 @@ class EntityComponent(Component):
         self.diameter = jnp.array(diameter)
         self.friction = jnp.array(friction)
         self.exists = jnp.array(exists)
+        self.subtype_labels = subtype_labels
 
         self.is_entity_component = True
 
@@ -36,45 +37,46 @@ class EntityComponent(Component):
         if 'entity_type' not in kwargs:
             kwargs['entity_type'] = kwargs['name']
 
-        return cls(**kwargs)
+        return cls(subtype_labels=config.subtype_labels, **kwargs)
 
     def to_config(self, state):
         config = super().to_config(state)
 
-        n_subtypes = max(state.entity_state.entity_subtype) + 1
-        subtype_to_n = [[i, sum(state.entity_subtype(self.entity_type) == i).item()] for i in range(n_subtypes)]
-
         config.update({
             'n_max': state.exists(self.entity_type).shape[0],
-            'n_exists': sum(state.exists(self.entity_type)).item(),  #TODO: associations between entity existence, subtypes and other attributes might get mixed up, to fix
+            'exists': [bool(e.item()) for e in state.exists(self.entity_type)],
             'mass': state.mass(self.entity_type)[:, 0].tolist(),
             'position': state.position(self.entity_type).tolist(),
             'orientation': state.orientation(self.entity_type).tolist(),
             'diameter': state.diameter(self.entity_type).tolist(),
             'friction': state.friction(self.entity_type).tolist(),
-            'subtype_to_n': subtype_to_n
+            'subtype': [self.subtype_labels[i.item()] for i in state.entity_subtype(self.entity_type)],
+            'subtype_labels': self.subtype_labels
         })
         return config
 
     @staticmethod
     def get_kwargs(config, exclude=[]):
         kwargs = super(EntityComponent, EntityComponent).get_kwargs(config)
+                            
         config.update(kwargs)
         kwargs.update(compute_parameters(config))
 
+        if 'by_indices' in config:
+            for each in config.by_indices:
+                for label, data in each.items():
+                    for k, v in data.items():
+                        if k != 'indices':
+                            for idx in data.indices:
+                                kwargs[k][idx] = v
+
         n_max = len(config.position)
-        exclude = exclude + ['_target_', 'n_max', 'n_exists', 'subtype_to_n']
+        exclude = exclude + ['_target_', 'n_max', 'subtype_labels', 'by_indices']
         kwargs = {k: v for k, v in config.items()
                     if k not in exclude}
-        exists = jnp.zeros(n_max, dtype=int)
-        exists = exists.at[:config.n_exists].set(1)
-        kwargs['exists'] = exists
-        subtype = []
-        for s, n in config.subtype_to_n:
-            subtype.extend([s] * n)
-        
-        kwargs['subtype'] = jnp.array(subtype)    
-        
+
+        kwargs['subtype'] = jnp.array([config.subtype_labels.index(s) for s in kwargs['subtype']])
+
         return kwargs
 
     def init_base_entity(self, entity_state):

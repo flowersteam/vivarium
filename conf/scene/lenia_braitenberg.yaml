@@ -1,7 +1,8 @@
 defaults:
   - base_scene
-  - environment/components/entities/braitenberg@environment.components.agents
-  - environment/components/entities/particle_lenia@environment.components.particles
+  - environment/components/base_physics@environment.components.component_list
+  - environment/components/entities/braitenberg@environment.components.component_list.agents
+  - environment/components/entities/particle_lenia@environment.components.component_list.particles
   - clients/braitenberg@clients.client_list.agents
   - clients/particle_lenia@clients.client_list.particles
 
@@ -13,20 +14,21 @@ environment:
     neighbor_radius: 10.
     num_scan_steps: 10
   components:
-    agents:
-      n_max: 8
-      diameter:
-        _all_values_: 1.0
-      proxs_dist_max:
-        _all_values_: 10.
-      subtype_to_n:
-        - [0, "${...n_max}"]
-    particles:
-      n_max: 400
-      subtype_to_n:
-        - [1, "${...n_max}"]
+    component_list:
+      agents:
+        n_max: 8
+        diameter:
+          _all_values_: 1.0
+        proxs_dist_max:
+          _all_values_: 10.
+        subtype:
+          _all_values_: agent
+      particles:
+        n_max: 400
+        subtype:
+          _all_values_: particle
 
-subtypes:
+subtype_labels:
   - agent
   - particle
 

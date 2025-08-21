@@ -15,14 +15,15 @@ class ObjectComponent(EntityComponent):
 
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction,
-                 exists,
+                 exists, subtype_labels=None,
                  controller_kwargs=None):
 
         super().__init__(name=name, precedence=precedence,
                          entity_type=entity_type, subtype=subtype,
                          position=position, orientation=orientation,
                          mass=mass, diameter=diameter,
-                         friction=friction, exists=exists)
+                         friction=friction, exists=exists,
+                         subtype_labels=subtype_labels)
 
         self.controller_kwargs = controller_kwargs
 

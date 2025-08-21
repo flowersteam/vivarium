@@ -1,4 +1,3 @@
-defaults:
-  - client_list: []
+component_list: {}
 
 subtype_labels: ${..subtype_labels}

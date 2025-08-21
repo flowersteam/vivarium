@@ -1,13 +1,33 @@
 defaults:
   - base_scene
-  - environment/components/entities/braitenberg@environment.components.agents
-  - environment/components/entities/objects@environment.components.objects
+  - environment/components/base_physics@environment.components.component_list
+  - environment/components/entities/braitenberg@environment.components.component_list.agents
+  - environment/components/entities/objects@environment.components.component_list.objects
   - clients/braitenberg@clients.client_list.agents
   - clients/objects@clients.client_list.objects
 
 scene_name: braitenberg
 
-subtypes:
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 10
+        by_indices:
+          - prey:
+              indices: "${range: 0, 5}"
+              subtype: prey
+              diameter: 6.0
+          - predator:
+              indices: "${range: 5, 10}"
+              subtype: predator
+              diameter: 10.0
+      objects:
+        subtype:
+          _all_values_: resource
+
+
+subtype_labels:
   - prey
   - predator
   - resource

@@ -13,12 +13,13 @@ def test_state(scene_name, entity_type, scene_config):
     config = scene_config(scene_name)
     env = Environment.from_config(config.environment)
     state = env.init_state()
-    n_entities = getattr(config.environment.components, entity_type).n_max
-    assert state.entity_state.exists[:n_entities].sum() == getattr(config.environment.components, entity_type).n_exists
-    entity_pos = getattr(config.environment.components, entity_type).position
+    n_entities = getattr(config.environment.components.component_list, entity_type).n_max
+    assert jnp.equal(state.entity_state.exists[:n_entities], 
+                   jnp.array(getattr(config.environment.components.component_list, entity_type).exists)).all()
+    entity_pos = getattr(config.environment.components.component_list, entity_type).position
     assert jnp.equal(state.entity_state.position[:n_entities], jnp.array(entity_pos)).all()
     if entity_type == 'braitenberg':
-        entity_name = config.environment.components[entity_type].name
+        entity_name = config.environment.components.component_list[entity_type].name
         assert getattr(state, entity_name).prox.shape == (n_entities, 2)
 
 
@@ -60,4 +61,4 @@ def test_controller_parameters(scene_config):
 
     controller_parameters = Simulator.from_config(config.simulator).controller_parameters
 
-    assert controller_parameters.agents.color == ['red'] * config.environment.components.agents.n_max
+    assert controller_parameters.agents.color == ['red'] * config.environment.components.component_list.agents.n_max

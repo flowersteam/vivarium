@@ -5,9 +5,10 @@ from math import pi
 from collections.abc import Iterable
 
 from hydra.core.global_hydra import GlobalHydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import hydra
 
+OmegaConf.register_new_resolver("range", lambda start, end: list(range(start, end)))
 
 abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
@@ -77,6 +78,6 @@ def compute_parameters(config):
 def component_factories_from_config(config):
     """Create component factories from a configuration object."""
     component_factories = [
-        hydra.utils.get_class(c._target_).from_config(c,name=name) for name, c in config.items()
+        hydra.utils.get_class(c._target_).from_config(c,name=name) for name, c in config.component_list.items()
     ]
     return component_factories
