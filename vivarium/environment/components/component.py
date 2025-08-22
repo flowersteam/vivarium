@@ -10,7 +10,7 @@ class Component:
     def __init__(self, name, precedence):
         self.name = name
         self.precedence = precedence
-        self.is_entity_component = False
+        self.is_entity_component = False  # No longer needed?
 
     @classmethod
     def from_config(cls, config, **kwargs):

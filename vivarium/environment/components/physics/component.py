@@ -232,8 +232,10 @@ class FrictionComponent(Component):
             mask = self.mask_fn(state)
             force = friction_force(state, neighbor, mask)
             if state.entity_state.is_rigid_body():
-                force = force.set(center=state.entity_state.force.center + force.center,
-                                orientation=state.entity_state.force.orientation + force.orientation)
+                force = force.set(
+                    center=state.entity_state.force.center + force.center,
+                    orientation=state.entity_state.force.orientation + force.orientation
+                )
             else:
                 force = state.entity_state.force + force
             entity_state=state.entity_state.set(force=force)

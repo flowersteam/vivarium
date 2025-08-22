@@ -27,7 +27,7 @@ class EntityComponent(Component):
         self.exists = jnp.array(exists)
         self.subtype_labels = subtype_labels
 
-        self.is_entity_component = True
+        self.is_entity_component = True  # No longer needed?
 
     @classmethod
     def from_config(cls, config, **kwargs):
