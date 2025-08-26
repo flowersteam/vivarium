@@ -1,7 +1,5 @@
-import numpy as np
 import param
 from vivarium.environment.components.entities.interface import ParamEntity
-from vivarium.environment.components.entities.controller import EntityController
 from vivarium.environment.components.entities.particle_lenia.creatures import CREATURES
 
 class ParamParticleLenia(ParamEntity):
@@ -23,14 +21,3 @@ class ParamParticleLenia(ParamEntity):
         for i in self.selection:
             for attr in ['mu_k', 'sigma_k', 'w_k', 'mu_g', 'sigma_g', 'c_rep']:
                 setattr(self.data[i], attr, creature[attr])
-
-
-class ParticleLeniaController(EntityController):
-    def __init__(self, entity_type, 
-                 param_cls=ParamParticleLenia,
-                 **kwargs):
-        super().__init__(
-            entity_type=entity_type,
-            param_cls=param_cls,
-            **kwargs
-        )

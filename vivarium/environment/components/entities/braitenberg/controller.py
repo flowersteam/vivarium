@@ -1,13 +1,13 @@
 import numpy as np
 
 from vivarium.controllers.utils import BehaviorHandler, Logger
-from vivarium.controllers.simulator_controller import ControllerEntity
-from vivarium.controllers.notebook_controller import NotebookControllerEntity
 from vivarium.environment.components.entities.controller import EntityController
+from vivarium.environment.components.entities.controller import NotebookControllerEntity
+from vivarium.environment.components.entities.controller import EntityListController
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_to_params
 
 
-class ControllerAgent(ControllerEntity):
+class AgentController(EntityController):
 
     def set_behavior(self, slot_idx, behavior, sensed):
         assert slot_idx < self.behavior.shape[0], 'Behavior index out of bounds'
@@ -25,7 +25,7 @@ class ControllerAgent(ControllerEntity):
 
 
 # TODO: What's the purpose of this class? Not uses at the moment (May, 31, 2025) but the whole pipeline seems to work anyway.
-class PanelControllerAgent(ControllerAgent):
+class PanelControllerAgent(AgentController):
     def __init__(self, state, ent_idx, entity_type, controller_parameters):
         super().__init__(state, ent_idx, entity_type, controller_parameters)
 
@@ -41,7 +41,7 @@ class PanelControllerAgent(ControllerAgent):
             super().__setattr__(attr, val)
 
 
-class Agent(NotebookControllerEntity):
+class AgentNotebookController(NotebookControllerEntity):
     """Agent class that represents an agent in the simulation
     """
 
@@ -274,10 +274,10 @@ class Agent(NotebookControllerEntity):
         return print("\n".join(info_lines))
 
 
-class BraitenbergController(EntityController):
+class BraitenbergController(EntityListController):
     def __init__(self, entity_type, state, subtype_labels, 
-                 controller_cls=ControllerAgent, 
-                 notebook_controller_cls=Agent,
+                 controller_cls=AgentController, 
+                 notebook_controller_cls=AgentNotebookController,
                  **kwargs
                  ):
         super().__init__(

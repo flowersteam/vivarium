@@ -7,10 +7,8 @@ import functools
 
 import numpy as np
 
-from vivarium.controllers.simulator_controller import (
-    SimulatorController, ControllerEntity
-)
 from vivarium.controllers.utils import RoutineHandler
+from vivarium.controllers.simulator_controller import SimulatorController
 
 
 lg = logging.getLogger(__name__)
@@ -21,68 +19,6 @@ if logging.root.handlers:
     lg.setLevel(logging.root.level)
 else:
     lg.setLevel(logging.WARNING)
-
-
-class NotebookControllerEntity(ControllerEntity):
-    """Entity class that represents an entity in the simulation"""
-
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, controller_parameters)
-        object.__setattr__(self, 'routine_handler', RoutineHandler())
-        object.__setattr__(self, 'controller_parameters', controller_parameters)
-
-    def attach_routine(self, routine_fn, name=None, interval=1):
-        """Attach a routine to the entity
-
-        :param routine_fn: routine_fn
-        :param name: routine name, defaults to None
-        :param interval: routine execution interval, defaults to 1
-        """
-        self.routine_handler.attach_routine(routine_fn, name, interval)
-
-    def detach_routine(self, name):
-        """Detach a routine from the entity
-
-        :param name: routine name
-        """
-        self.routine_handler.detach_routine(name)
-
-    def detach_all_routines(self):
-        """Detach all routines from the entity"""
-        self.routine_handler.detach_all_routines()
-
-    def step(self, time, catch_errors):
-        """Execute the entity's routines with their corresponding execution intervals"""
-        # Give self object as parameter to the routine function so it executes functions on the entity
-        self.routine_handler.routine_step(self, time, catch_errors)
-
-    def print_infos(self):
-        # TODO: to fix according to recent refactoring
-        """Print the entity's infos
-
-        :return: entity's infos
-        """
-        dict_infos = self.config.to_dict()
-
-        info_lines = []
-        info_lines.append("Entity Overview:")
-        info_lines.append(f"{'-' * 20}")
-        info_lines.append(f"Type: {self.etype.name}")
-        info_lines.append(f"Subtype: {self.subtype_label}")
-        info_lines.append(f"Idx: {self.idx}")
-        info_lines.append(f"Exists: {self.exists}")
-        info_lines.append(
-            f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}"
-        )
-        info_lines.append(f"Diameter: {self.diameter:.2f}")
-        info_lines.append(f"Color: {self.color}")
-        info_lines.append("")
-
-        return print("\n".join(info_lines))
-
-    def print_routines(self):
-        """Print the entity's routines"""
-        self.routine_handler.print_routines()
 
 
 class NotebookController(SimulatorController):

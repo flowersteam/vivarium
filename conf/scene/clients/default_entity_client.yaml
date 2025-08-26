@@ -1,4 +1,4 @@
-controller_cls: vivarium.environment.components.entities.controller.EntityController
+controller_cls: vivarium.environment.components.entities.controller.EntityListController
 interface_cls: vivarium.environment.components.entities.interface.EntityInterface
 controller_kwargs:
   color:

@@ -1,10 +1,9 @@
 from vivarium.environment.components.entities.controller import EntityController
-from vivarium.controllers.simulator_controller import ControllerEntity
 
 
 # This module is not used at the moment (June 3, 2025).
 
-class ControllerObject(ControllerEntity):
+class ControllerObject(EntityController):
     pass
 
 

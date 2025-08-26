@@ -2,61 +2,9 @@ import hydra
 from dataclasses import asdict
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.dataclass_wrapper import (
-    ChangeRecorder, EntityWrapper, SimulatorParametersWrapper
-)
+from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 from vivarium.controllers.panel_controller import ParamSimulator
 
-
-class InternalData:
-    pass
-
-
-def is_split_attribute(attr):
-    return attr.startswith('left_') or attr.startswith('right_') or attr.startswith('x_') or attr.startswith('y_')
-
-
-def split(attr):
-    prefix, suffix = attr.split('_', 1)
-    suffix = suffix + '_center' if suffix == 'position' else suffix
-    return suffix, 0 if prefix == 'left' or prefix == 'x' else 1
-
-
-class ControllerEntity(EntityWrapper):
-    """Entity class that represents an entity in the simulation"""
-
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type)
-        object.__setattr__(self, 'controller_parameters', controller_parameters)
-        object.__setattr__(self, '_controller_change_recorder', ChangeRecorder())
-        object.__setattr__(self, 'internal', InternalData())
-
-    def __getattr__(self, item):
-        if item in self.__dict__:
-            return self.__dict__[item]
-        if is_split_attribute(item):
-            suffix, idx = split(item)
-            field = getattr(self, suffix)
-            if suffix == 'position' and self._is_rigid_body:
-                field = field.center
-            return field[idx]
-        if item in self.controller_parameters.__class__.__dataclass_fields__:
-            return getattr(self.controller_parameters, item)
-        return super().__getattr__(item)
-
-    def __setattr__(self, item, val):
-        if item in self.controller_parameters.__class__.__dataclass_fields__:
-            getattr(self._controller_change_recorder, item)[self._entity_type_idx] = val
-            object.__setattr__(self.controller_parameters, item, val)
-            return
-        if item in self.__dict__:
-            super().__setattr__(item, val)
-        elif is_split_attribute(item):
-            suffix, idx = split(item)
-            self._setitem(suffix, val, idx)
-            return
-        else:
-            super().__setattr__(item, val)
 
 class SimulatorController:
 
