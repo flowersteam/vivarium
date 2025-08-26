@@ -5,9 +5,10 @@ import numpy as np
 
 from bokeh.plotting import figure
 
-from vivarium.controllers.panel_controller import ParamEntity, ParameterMapping, behavior_param_name, sensed_param_name
+from vivarium.controllers.panel_controller import ParameterMapping
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors
-from vivarium.interface.panel_app import EntityManager, normal
+from vivarium.environment.components.entities.interface import ParamEntity, normal
+from vivarium.environment.components.entities.interface import EntityRenderer, EntityInterface
 
 
 parameter_mapping = {
@@ -17,6 +18,14 @@ parameter_mapping = {
         param_to_jax_fn=lambda x: x
     ),
 }
+
+
+def behavior_param_name(b_idx):
+    return f'behavior_{b_idx}'
+
+
+def sensed_param_name(label, b_idx):
+    return f'sensed_{label}_{b_idx}'
 
 class ParamAgent(ParamEntity):
     left_motor = param.Number()
@@ -76,7 +85,7 @@ class ParamAgent(ParamEntity):
             self.data[ag_idx].set_behavior(slot_idx, behavior, sensed_indexes)
 
 
-class AgentManager(EntityManager):
+class AgentRenderer(EntityRenderer):
 
     def get_cds_data(self, state):
 
@@ -227,3 +236,9 @@ class AgentManager(EntityManager):
         
         # Plot agent bodies
         return super().plot(fig)
+
+
+class BraitenbergInterface(EntityInterface):
+    
+    param_cls = ParamAgent
+    renderer_cls = AgentRenderer

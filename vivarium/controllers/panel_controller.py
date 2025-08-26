@@ -1,21 +1,19 @@
 import param
 import logging
 
-import jax.numpy as jnp
-
-from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
 
 
 lg = logging.getLogger(__name__)
 
 
+# TODO: (2025-08-26) Rename this file, which will only contain code for param<->simulator/state communication
+
 class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        object.__setattr__(self, 'hide_non_existing', True)
         object.__setattr__(self, 'config_update', False)
-        object.__setattr__(self, 'panel_parameters', ['hide_non_existing', 'config_update'])
+        object.__setattr__(self, 'panel_parameters', ['config_update'])
 
     def __getattr__(self, attr):
         if attr in self.panel_parameters:
@@ -131,113 +129,49 @@ class ParamSimulator(ParameterizedData):
                          **params)
 
 
-entity_parameter_mapping = {
-    'orientation': ParameterMapping('position_orientation'),
-    'mass': ParameterMapping(
-        'mass_center',
-        jax_to_param_fn=lambda x: x[0].item(),
-        param_to_jax_fn=lambda x: jnp.array([x])
-    ),
-    'exists': ParameterMapping(
-        'exists',
-        jax_to_param_fn=lambda x: bool(x.item()),
-        param_to_jax_fn=lambda x: jnp.array(int(x))
-    ),
-}
-
-class ParamEntity(ParameterizedData):
-    x_position = param.Number()
-    y_position = param.Number()
-    orientation = param.Number()
-    mass = param.Number()
-    diameter = param.Number()
-    friction = param.Number()
-    exists = param.Boolean()
-    color = param.Color()
-    visible = param.Boolean()
-
-    def __init__(self, entities, subtype_labels, parameter_mapping={}, panel_parameters=[], **params):
+# class PanelController_: #(SimulatorController):
+#     """Controller for the panel interface"""
+#     def __init__(self, client=None, subtypes=[], **controllers):
         
-        self.subtype_labels = subtype_labels
-        self.subtype_label_list = [self.subtype_labels[i] for i in sorted(self.subtype_labels)]
-        self.param.add_parameter('subtype', param.Selector(objects=self.subtype_label_list))
-        parameter_mapping.update(entity_parameter_mapping)
-        parameter_mapping['subtype'] = ParameterMapping(
-            'entity_subtype',
-            jax_to_param_fn=lambda x: self.subtype_label_list[x.item()],
-            param_to_jax_fn=lambda x: jnp.array(self.subtype_label_list.index(x), dtype=int)
-        )
-        super().__init__(entities, 
-                         parameter_mapping=parameter_mapping,
-                         panel_parameters=panel_parameters + ['visible', 'color'],
-                         **params)
-        self.selection = [0]
+#         super().__init__(client=client, subtypes=subtypes, **controllers)
 
-    @property
-    def selected_entity_data(self):
-        return self.data[self.selection[0]]
-
-
-def behavior_param_name(b_idx):
-    return f'behavior_{b_idx}'
-
-
-def sensed_param_name(label, b_idx):
-    return f'sensed_{label}_{b_idx}'
-
-
-class Selected(param.Parameterized):
-    """Class to store the selected entities in the interface"""
-
-    selection = param.ListSelector([0], objects=[0])
-
-    def __len__(self):
-        return len(self.selection)
-
-
-class PanelController(SimulatorController):
-    """Controller for the panel interface"""
-    def __init__(self, client=None, subtypes=[], **controllers):
+#         # self.selected = {etype: Selected() for etype in controllers.keys()}
         
-        super().__init__(client=client, subtypes=subtypes, **controllers)
+#         # self.selected_entities = {etype: controller.param_cls(self.entity_lists[etype], self.subtype_labels) 
+#         #                           for etype, controller in controllers.items()}
 
-        self.selected = {etype: Selected() for etype in controllers.keys()}
+#         # self.param_simulator = ParamSimulator(self.simulator_parameters)
         
-        self.selected_entities = {etype: controller.param_cls(self.entity_lists[etype], self.subtype_labels) 
-                                  for etype, controller in controllers.items()}
+#         # for s_ent in self.selected_entities.values():
+#         #     s_ent.update_from_server = True
+#         # self.param_simulator.update_from_server = True
 
-        self.param_simulator = ParamSimulator(self.simulator_parameters)
-        
-        for s_ent in self.selected_entities.values():
-            s_ent.update_from_server = True
-        self.param_simulator.update_from_server = True
-
-        self.update_selected()
-        for selected in self.selected.values():
-            selected.param.watch(
-                self.pull_selected_entities,
-                ["selection"],
-                onlychanged=True,
-                precedence=1,
-            )
+#         # self.update_selected()
+#         # for selected in self.selected.values():
+#         #     selected.param.watch(
+#         #         self.pull_selected_entities,
+#         #         ["selection"],
+#         #         onlychanged=True,
+#         #         precedence=1,
+#         #     )
     
-    def create_simulator_parameters_wrapper(self):
-        self.simulator_parameters = PanelSimulatorParametersWrapper(self.simulator_parameters)
+#     def create_simulator_parameters_wrapper(self):
+#         self.simulator_parameters = PanelSimulatorParametersWrapper(self.simulator_parameters)
 
-    def update_selected(self, *events):
-        """Update the entity list"""
-        state = self.state
-        for etype, selected in self.selected.items():
-            selected.param.selection.objects = state.entity_type_idx(etype).tolist()
+#     # def update_selected(self, *events):
+#     #     """Update the entity list"""
+#     #     state = self.state
+#     #     for etype, selected in self.selected.items():
+#     #         selected.param.selection.objects = state.entity_type_idx(etype).tolist()
 
-    def pull_selected_entities(self, *events):
-        """Pull the selected configurations"""
-        for etype, selected in self.selected.items():
-            self.selected_entities[etype].selection = selected.selection
-            self.selected_entities[etype].update_from_server = True
+#     # def pull_selected_entities(self, *events):
+#     #     """Pull the selected configurations"""
+#     #     for etype, selected in self.selected.items():
+#     #         self.selected_entities[etype].selection = selected.selection
+#     #         self.selected_entities[etype].update_from_server = True
 
-    def pull_all_data(self):
-        """Pull all the data from the simulator"""
-        self.update_state()
-        self.update_entity_lists()
-        self.pull_selected_entities()
+#     def pull_all_data(self):  # TODO: No longer needed?
+#         """Pull all the data from the simulator"""
+#         self.update_state()
+#         self.update_entity_lists()
+#         self.pull_selected_entities()

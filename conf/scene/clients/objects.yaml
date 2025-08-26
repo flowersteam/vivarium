@@ -4,5 +4,5 @@ defaults:
 controller_kwargs:
   color:
     _all_values_: blue
-renderer_kwargs:
-  shape: square
+  shape:
+    _all_values_: square

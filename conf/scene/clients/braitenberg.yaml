@@ -1,7 +1,8 @@
 defaults:
   - default_entity_client
 
-cls: vivarium.environment.components.entities.braitenberg.BraitenbergController
+controller_cls: vivarium.environment.components.entities.braitenberg.BraitenbergController
+interface_cls: vivarium.environment.components.entities.braitenberg.BraitenbergInterface
 
 controller_kwargs:
   color:
@@ -10,6 +11,5 @@ controller_kwargs:
     _all_values_: true
   visible_proxs:
     _all_values_: true
-
-renderer_kwargs:
-  shape: square
+  shape:
+    _all_values_: square

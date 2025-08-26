@@ -1,9 +1,9 @@
-cls: vivarium.environment.components.entities.controller.EntityController
+controller_cls: vivarium.environment.components.entities.controller.EntityController
+interface_cls: vivarium.environment.components.entities.interface.EntityInterface
 controller_kwargs:
   color:
     _all_values_: red
   visible:
     _all_values_: true
-renderer_kwargs:
-  shape: circle
-  
+  shape:
+    _all_values_: circle

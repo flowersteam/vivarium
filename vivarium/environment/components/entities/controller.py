@@ -1,8 +1,7 @@
 from vivarium.controllers.dataclass_wrapper import EntityList, create_dataclass_from_dict
-from vivarium.controllers.simulator_controller import ControllerEntity
 from vivarium.controllers.notebook_controller import NotebookControllerEntity
-from vivarium.controllers.panel_controller import ParamEntity
-from vivarium.interface.panel_app import EntityManager
+from vivarium.controllers.simulator_controller import ControllerEntity
+
 
 def entity_list(controller_cls, state, entity_type, entity_type_int, controller_parameters):
     return EntityList(
@@ -14,23 +13,23 @@ def entity_list(controller_cls, state, entity_type, entity_type_int, controller_
             if type == entity_type_int]
     )
 
-
 class EntityController:
-    def __init__(self, entity_type, 
+    def __init__(self, entity_type, state, 
+                 subtype_labels,  # TODO: not used yet but should be to access/change it from the SimulatorController
                  controller_cls=ControllerEntity, 
                  notebook_controller_cls=NotebookControllerEntity,
-                 param_cls=ParamEntity, render_cls=EntityManager,
-                 **kwargs):
+                 **kwargs
+                 ):
+        self.controller_cls = controller_cls
+        self.notebook_controller_cls = notebook_controller_cls
+        
         self.entity_type = entity_type
         self.controller_parameters = create_dataclass_from_dict(
             'ControllerParameters',
             kwargs)
-        self.controller_cls = controller_cls
-        self.notebook_controller_cls = notebook_controller_cls
-        self.param_cls = param_cls
-        self.render_cls = render_cls
+        self.controller = self.create_controller(state)  
 
-    def controller(self, state, controller_cls=None):
+    def create_controller(self, state, controller_cls=None):
         controller_cls = controller_cls or self.controller_cls
         etype_int = getattr(state, self.entity_type).entity_type
         return entity_list(

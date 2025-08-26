@@ -5,6 +5,7 @@ from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.dataclass_wrapper import (
     ChangeRecorder, EntityWrapper, SimulatorParametersWrapper
 )
+from vivarium.controllers.panel_controller import ParamSimulator
 
 
 class InternalData:
@@ -66,6 +67,10 @@ class SimulatorController:
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
+
+        # TODO: (2025-08-26) move this to a dedicated class?
+        self.param_simulator = ParamSimulator(self.simulator_parameters)
+        self.param_simulator.update_from_server = True
         
         self.entity_lists = self.create_entity_list()
 
@@ -76,11 +81,12 @@ class SimulatorController:
     @classmethod
     def from_config(cls, config, client=None):
         controllers = {}
+        state = client.state
         cp = asdict(client.controller_parameters)
         for etype, e_config in config.component_list.items():
             if 'client' in e_config:
-                e_cls = hydra.utils.get_class(e_config.client.cls)
-                controllers[etype] = e_cls(etype, **cp[etype])
+                e_cls = hydra.utils.get_class(e_config.client.controller_cls)
+                controllers[etype] = e_cls(etype, state, config.subtype_labels, **cp[etype])
         return cls(
             subtypes=config.subtype_labels,
             client=client,
@@ -88,7 +94,7 @@ class SimulatorController:
         )
 
     def create_entity_list(self):
-        return {etype: c.controller(self.state) for etype, c in self.controllers.items()}
+        return {etype: c.controller for etype, c in self.controllers.items()}
 
     def create_simulator_parameters_wrapper(self):
         self.simulator_parameters = SimulatorParametersWrapper(self.simulator_parameters)

@@ -1,3 +1,2 @@
 from .simulator_controller import SimulatorController
-from .panel_controller import PanelController
 from .notebook_controller import NotebookController
