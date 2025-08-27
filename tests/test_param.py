@@ -9,13 +9,12 @@ from vivarium.controllers.panel_controller import ParamSimulator
                           ('braitenberg', 'objects'),
                           ('particle_lenia', 'particles')])
 @pytest.mark.parametrize("idx", [0, 2])
-def test_param_entity(scene_name, entity_type, idx, simulator_controller_from_config):
-    controller = simulator_controller_from_config(scene_name)
+def test_param_entity(scene_name, entity_type, idx, controller_and_interfaces_from_config):
+    controller, interfaces = controller_and_interfaces_from_config(scene_name)
 
-    controller_entities = getattr(controller, entity_type)
+    controller_entities = controller.controllers[entity_type]
     
-    entity_cls = controller.controllers[entity_type].param_cls
-    entity = entity_cls(controller_entities, controller.subtype_labels)
+    entity = interfaces[entity_type].parameters  #entity_cls(controller_entities, controller.subtype_labels)
     entity.selection = [idx]
     entity.update_from_server = True
 
@@ -79,6 +78,6 @@ def test_simulator_state_param(simulator_controller_from_config):
 
 def test_controller_parameters(simulator_controller_from_config):
     controller = simulator_controller_from_config('braitenberg')
-    controller.agents[0].visible_wheels = False
+    controller.controllers['agents'][0].visible_wheels = False
     controller.apply_changes()
     controller.update_state()

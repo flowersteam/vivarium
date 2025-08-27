@@ -9,6 +9,8 @@ NUM_STEPS = 4
 def test_notebook_controller(scene_name, simulator_controller_from_config):
 
     controller = simulator_controller_from_config(scene_name, NotebookController)
+    controllers = controller.controllers
+    
     agent_field = 'agents'
     controller.step()
 
@@ -21,7 +23,7 @@ def test_notebook_controller(scene_name, simulator_controller_from_config):
     idx = 0
     pos = controller.state.entity_state.position_center[idx]
 
-    ag = controller.agents[idx]
+    ag = controllers['agents'][idx]
 
     ag.attach_behavior(beh)
     

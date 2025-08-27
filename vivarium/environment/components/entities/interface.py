@@ -288,14 +288,14 @@ class EntityInterface:
     
     def __init__(self, controller, state, subtype_labels, panel_cls=Column):
         
-        self.parameters = self.param_cls(controller.controller, subtype_labels)
+        self.parameters = self.param_cls(controller, subtype_labels)
         self.parameters.update_from_server = True
         
         self.selected = Selected()
         self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
         
         self.renderer = self.renderer_cls(
-                entities = controller.controller._entity_list,  #TODO (2025-08-26) Not ideal ..
+                entities = controller._entity_list,
                 selected_param_entity=self.parameters,
                 selected=self.selected,
                 etype=controller.entity_type,

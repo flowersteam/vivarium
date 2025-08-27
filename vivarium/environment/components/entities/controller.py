@@ -1,5 +1,5 @@
 from vivarium.controllers.utils import RoutineHandler
-from vivarium.controllers.dataclass_wrapper import ChangeRecorder, EntityList, EntityWrapper, create_dataclass_from_dict
+from vivarium.controllers.dataclass_wrapper import ChangeRecorder, create_dataclass_from_dict, update_dataclass
 
 
 class InternalData:
@@ -16,7 +16,110 @@ def split(attr):
     return suffix, 0 if prefix == 'left' or prefix == 'x' else 1
 
 
-class EntityController(EntityWrapper):
+def create_property(field_name, rigid_body_field):
+    @property
+    def prop(self):
+        if self._is_rigid_body:
+            return getattr(getattr(self._state.entity_state, field_name), rigid_body_field)[self._entity_idx]
+        else:
+            if rigid_body_field == 'orientation':
+                if field_name == 'position':
+                    return self._state.entity_state.orientation[self._entity_idx]
+                else:
+                    return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
+            elif rigid_body_field == 'center':
+                return getattr(self._state.entity_state, field_name)[self._entity_idx]
+            else:
+                return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
+
+    @prop.setter
+    def prop(self, value, idx=None):
+        if idx is None:
+            idx = self._entity_idx
+        else:
+            idx = (self._entity_idx, idx)
+        if self._is_rigid_body:
+            getattr(getattr(self._change_recorder.entity_state, field_name), rigid_body_field)[idx] = value
+        else:
+            if rigid_body_field == 'orientation':
+                if field_name == 'position':
+                    self._change_recorder.entity_state.orientation[idx] = value
+                else:
+                    return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
+            elif rigid_body_field == 'center':
+                getattr(self._change_recorder.entity_state, field_name)[idx] = value
+            else:
+                raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
+    return prop
+
+
+class EntityWrapper:
+    """
+    Wraps a State into an interface to manipulate a single entitty (usually from a SimulatorController)
+    Modifying attributes of an EntityWrapper will not change the state immediately, but will record changes
+    that can be applied to the state later using the `apply_to_state` method. This is useful for batch updates
+    during client-server interactions.
+    """
+    position_center = create_property('position', 'center')
+    momentum_center = create_property('momentum', 'center')
+    force_center = create_property('force', 'center')
+    mass_center = create_property('mass', 'center')
+
+    position_orientation = create_property('position', 'orientation')
+    momentum_orientation = create_property('momentum', 'orientation')
+    force_orientation = create_property('force', 'orientation')
+    mass_orientation = create_property('mass', 'orientation')
+
+    def __init__(self, state, ent_idx, entity_type):
+        object.__setattr__(self, '_state', state)
+        object.__setattr__(self, '_entity_idx', ent_idx)
+        object.__setattr__(self, '_entity_type_idx', state.entity_state.entity_type_idx[ent_idx])
+        object.__setattr__(self, '_is_rigid_body', self._state.entity_state.is_rigid_body())
+        object.__setattr__(self, '_change_recorder', ChangeRecorder())
+        object.__setattr__(self, '_entity_type', entity_type)
+        object.__setattr__(self, '_entity_fields', ['entity_subtype', 'diameter', 'friction',
+                               'exists', 'entity_idx', 'entity_type',
+                               'position', 'momentum', 'force', 'mass',
+                               'position_center', 'position_orientation',
+                               'momentum_center', 'momentum_orientation',
+                               'force_center', 'force_orientation',
+                               'mass_center', 'mass_orientation'])
+
+    def __getattr__(self, attr):
+        if attr in self._entity_fields:
+            return getattr(self._state.entity_state, attr)[self._entity_idx]
+        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_type_idx[self._entity_idx]]
+
+    def _setitem(self, attr, value, idx=None):
+        entity_state_idx = self._entity_idx if idx is None else (self._entity_idx, idx)
+        x_state_idx = self._state.entity_state.entity_type_idx[self._entity_idx] if idx is None else (self._state.entity_state.entity_type_idx[self._entity_idx], idx)
+        if attr in self._entity_fields:
+            if attr.endswith('_center') or attr.endswith('_orientation'):
+                field_name, rigid_body_field = attr.split('_', 1)
+                p = create_property(field_name, rigid_body_field)
+                p.fset(self, value, idx)
+            else:
+                getattr(self._change_recorder.entity_state, attr)[entity_state_idx] = value
+        else:
+            getattr(getattr(self._change_recorder, self._entity_type), attr)[x_state_idx] = value
+
+    def __setattr__(self, attr, value):
+        if attr in self.__dict__:
+            self.__dict__[attr] = value
+            return
+        self._setitem(attr, value)
+
+    def apply_to_state(self, state):
+        changes = self._change_recorder.fetch_changes()
+        self._state = update_dataclass(state, changes)
+        self._change_recorder = ChangeRecorder()
+        return self._state
+
+    def set_state(self, state):
+        self._state = state
+
+
+class EntityController(EntityWrapper):  # TODO: How about merging the class and the superclass?
     """Entity class that represents an entity in the simulation"""
 
     def __init__(self, state, ent_idx, entity_type, controller_parameters):
@@ -51,6 +154,50 @@ class EntityController(EntityWrapper):
             return
         else:
             super().__setattr__(item, val)
+
+
+class EntityList:
+    def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
+        self._state = state
+        self.entity_type = entity_type
+        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type_idx]
+
+    def __getitem__(self, idx):
+        return self._entity_list[idx]
+
+    def __setitem__(self, idx, value):
+        raise NotImplementedError('Setting values directly is not supported.')
+
+    def __iter__(self):
+        return iter(self._entity_list)
+
+    def __len__(self):
+        return len(self._entity_list)
+
+    def __repr__(self):
+        return repr(self._entity_list)
+
+    def apply_to_state(self, state):
+        for entity in self._entity_list:
+            state = entity.apply_to_state(state)
+        return state
+
+    def set_state(self, state):
+        for entity in self._entity_list:
+            entity.set_state(state)
+
+    def fetch_changes(self):
+        changes = []
+        for e in self._entity_list:
+            c = e._change_recorder.fetch_changes()
+            if c:
+                changes.append(c)
+        changes = [{'state': c} for c in changes]
+        for e in self._entity_list:
+            c = e._controller_change_recorder.fetch_changes()
+            if c:
+                changes.append({'controller_parameters': {self.entity_type: c}})
+        return changes
 
 
 class NotebookControllerEntity(EntityController):
@@ -113,42 +260,32 @@ class NotebookControllerEntity(EntityController):
     def print_routines(self):
         """Print the entity's routines"""
         self.routine_handler.print_routines()
-
-
-def entity_list(controller_cls, state, entity_type, entity_type_int, controller_parameters):
-    return EntityList(
-        state=state, entity_type=entity_type, entity_type_idx=entity_type_int,
-        entity_wrapper_list=[
-            controller_cls(state, idx, entity_type,
-                            controller_parameters=controller_parameters[int(state.entity_state.entity_type_idx[idx])])
-            for idx, type in enumerate(state.entity_state.entity_type)
-            if type == entity_type_int]
-    )
     
 
-class EntityListController:
+class EntityListController(EntityList):
     def __init__(self, entity_type, state, 
-                 subtype_labels,  # TODO: not used yet but should be to access/change it from the SimulatorController
-                 controller_cls=EntityController, 
-                 notebook_controller_cls=NotebookControllerEntity,
+                 subtype_labels=None,  # TODO: not used yet but should be to access/change it from the SimulatorController
+                 controller_cls=None,
+                 notebook_control=False,
                  **kwargs
                  ):
-        self.controller_cls = controller_cls
-        self.notebook_controller_cls = notebook_controller_cls
+        controller_cls = (EntityController if not notebook_control else NotebookControllerEntity) if controller_cls is None else controller_cls
         
-        self.entity_type = entity_type
         self.controller_parameters = create_dataclass_from_dict(
             'ControllerParameters',
             kwargs)
-        self.controller = self.create_controller(state)  
 
-    def create_controller(self, state, controller_cls=None):
-        controller_cls = controller_cls or self.controller_cls
-        etype_int = getattr(state, self.entity_type).entity_type
-        return entity_list(
-            controller_cls=controller_cls,
-            state=state,
-            entity_type=self.entity_type,
-            entity_type_int=etype_int,
-            controller_parameters=self.controller_parameters
+        etype_int = getattr(state, entity_type).entity_type        
+        super().__init__(
+            state=state, entity_type=entity_type, entity_type_idx=etype_int,
+            entity_wrapper_list=[
+                controller_cls(state, idx, entity_type,
+                                controller_parameters=self.controller_parameters[int(state.entity_state.entity_type_idx[idx])])
+                for idx, type in enumerate(state.entity_state.entity_type)
+                if type == etype_int]            
         )
+        
+    def step(self, time, catch_errors):
+        # TODO : Add a check to ensure that the entity exists
+        for entity in self._entity_list:
+            entity.step(time, catch_errors=catch_errors)

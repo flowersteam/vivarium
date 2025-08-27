@@ -275,16 +275,16 @@ class AgentNotebookController(NotebookControllerEntity):
 
 
 class BraitenbergController(EntityListController):
-    def __init__(self, entity_type, state, subtype_labels, 
-                 controller_cls=AgentController, 
-                 notebook_controller_cls=AgentNotebookController,
+    def __init__(self, entity_type, state, 
+                 subtype_labels=None, 
+                 notebook_control=False,
                  **kwargs
                  ):
         super().__init__(
             entity_type=entity_type,
             state=state,
             subtype_labels=subtype_labels,
-            controller_cls=controller_cls,
-            notebook_controller_cls=notebook_controller_cls,
+            controller_cls=AgentController if not notebook_control else AgentNotebookController,
+            notebook_control=notebook_control,
             **kwargs
         )

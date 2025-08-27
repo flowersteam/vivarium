@@ -17,6 +17,19 @@ from vivarium.controllers import SimulatorController
 
 lg = logging.getLogger(__name__)
 
+def create_interfaces(component_list_config, controllers, state, subtype_labels, panel_cls=pn.Column):
+    interfaces = {}
+    for name, component in component_list_config.items():
+        if 'client' in component:
+            if 'interface_cls' in component.client:
+                interface_cls = hydra.utils.get_class(component.client.interface_cls)
+                interfaces[name] = interface_cls(
+                    controllers[name],
+                    state,
+                    subtype_labels,
+                    panel_cls=panel_cls
+                )
+    return interfaces
 
 class WindowManager(Parameterized):
 
@@ -31,19 +44,15 @@ class WindowManager(Parameterized):
         client = client or SimulatorGRPCClient()
         self.scene_config = load_scene_config(client.scene_name)
         self.controller = SimulatorController.from_config(self.scene_config.environment.components, client=client)
-        self.entity_types = list(self.controller.controllers.keys())
+        self.controller_names = list(self.controller.controllers.keys())
         
-        self.interfaces = {}
-        for name, component in self.scene_config.environment.components.component_list.items():
-            if 'client' in component:
-                if 'interface_cls' in component.client:
-                    interface_cls = hydra.utils.get_class(component.client.interface_cls)
-                    self.interfaces[name] = interface_cls(
-                        self.controller.controllers[name],
-                        self.controller.state,
-                        self.controller.subtype_labels,
-                        panel_cls=pn.Column
-                    )
+        self.interfaces = create_interfaces(
+            self.scene_config.environment.components.component_list,
+            self.controller.controllers,
+            self.controller.state,
+            self.controller.subtype_labels,
+            panel_cls=pn.Column
+        )
 
         self.start_toggle = pn.widgets.Toggle(
             **(
@@ -53,11 +62,11 @@ class WindowManager(Parameterized):
             ),
             align="center",
         )
-        self.entity_toggle = pn.widgets.ToggleGroup(
-            name="EntityToggle",
-            options=self.entity_types,
+        self.controller_toggle = pn.widgets.ToggleGroup(
+            name="ControllerToggle",
+            options=self.controller_names,
             align="center",
-            value=self.entity_types,
+            value=self.controller_names,
         )
         self.notebook_mode = notebook_mode
 
@@ -79,7 +88,7 @@ class WindowManager(Parameterized):
                 self.controller.stop()
         self.start_toggle.name = "Stop" if self.controller.is_started() else "Start"
 
-    def entity_toggle_cb(self, event):
+    def controller_toggle_cb(self, event):
         for cc in self.config_columns:
             cc.visible = cc.name in event.new
 
@@ -130,7 +139,7 @@ class WindowManager(Parameterized):
         p.x_range = Range1d(0, self.controller.param_simulator.box_size)
         p.y_range = Range1d(0, self.controller.param_simulator.box_size)
         draw_tool = PointDrawTool(
-            renderers=[self.interfaces[etype].renderer.plot(p) for etype in self.entity_types],
+            renderers=[self.interfaces[name].renderer.plot(p) for name in self.controller_names],
             add=False,
         )
         p.add_tools(draw_tool)
@@ -152,7 +161,7 @@ class WindowManager(Parameterized):
                     name="SIMULATOR",
                 )
             ]
-            + [self.interfaces[etype].widget for etype in self.entity_types]
+            + [self.interfaces[name].widget for name in self.controller_names]
         )
 
         app = pn.Row(
@@ -173,7 +182,7 @@ class WindowManager(Parameterized):
                 pn.panel(self.plot),
             ),
             pn.Column(
-                pn.Row("### Show Configurations", self.entity_toggle),
+                pn.Row("### Show Configurations", self.controller_toggle),
                 pn.Row(*self.config_columns),
             ),
         )
@@ -187,7 +196,7 @@ class WindowManager(Parameterized):
         self.pcb_plot = pn.state.add_periodic_callback(
             self.update_plot_cb, self.update_timestep.value
         )
-        self.entity_toggle.param.watch(self.entity_toggle_cb, "value")
+        self.controller_toggle.param.watch(self.controller_toggle_cb, "value")
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
         self.update_switch.param.watch(self.update_switch_cb, "value")
         self.update_timestep.param.watch(self.update_timestep_cb, "value")

@@ -45,8 +45,9 @@ class NotebookController(SimulatorController):
         # add a routine handler to the controller
         self.routine_handler = RoutineHandler()
 
-    def create_entity_list(self):
-        return {etype: c.controller(self.state, c.notebook_controller_cls) for etype, c in self.controllers.items()}
+    @classmethod
+    def from_config(cls, config, client=None):
+        return super().from_config(config, client=client, notebook_control=True)
 
     def is_running(self):
         """Check if the simulator is running"""
@@ -204,10 +205,12 @@ class NotebookController(SimulatorController):
         self.controller_routine_step(self.time, catch_errors=catch_errors)
 
         # execute routines of the existing entities
-        for etype, elist in self.entity_lists.items():
-            # TODO : Add a check to ensure that the entity exists
-            for entity in elist:
-                entity.step(self.time, catch_errors=catch_errors)
+        for _, controller in self.controllers.items():
+            controller.step(self.time, catch_errors=catch_errors)
+            
+            # # TODO : Add a check to ensure that the entity exists
+            # for entity in elist:
+            #     entity.step(self.time, catch_errors=catch_errors)
 
     def stop(self):
         """Pause the simulation"""
@@ -314,6 +317,7 @@ class NotebookController(SimulatorController):
         return [agent for agent in self.agents if not agent.exists]
 
 
+# TODO: Remove the routines below once the server-side versions of them are fully working?
 # Predefined routines that can be attached to the controller
 
 

@@ -9,6 +9,7 @@ from vivarium.utils.scene_configs import load_config, component_factories_from_c
 from vivarium.environment import Environment, NeighborManager, MaskFunction
 from vivarium.environment.components.entities.braitenberg.interface import ParamAgent
 from vivarium.environment.state import BaseState, create_state_cls
+from vivarium.interface.panel_app import create_interfaces
 from vivarium.controllers import SimulatorController
 from vivarium.environment import Environment
 from vivarium.simulator import Simulator
@@ -73,6 +74,21 @@ def simulator_controller_from_config(scene_config, simulator_from_config):
             config=scene_config(scene_name).environment.components, 
             client=simulator_from_config(scene_name)
         )
+    return fn
+
+
+@pytest.fixture
+def controller_and_interfaces_from_config(scene_config, simulator_controller_from_config):
+    def fn(scene_name):
+        controller = simulator_controller_from_config(scene_name)
+        config = scene_config(scene_name)
+        interfaces = create_interfaces(
+            config.environment.components.component_list,
+            controller.controllers,
+            controller.state,
+            controller.subtype_labels,
+        )
+        return controller, interfaces
     return fn
 
 
