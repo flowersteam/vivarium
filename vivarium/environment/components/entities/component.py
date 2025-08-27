@@ -5,6 +5,11 @@ from vivarium.environment.components.component import Component
 from vivarium.utils.scene_configs import compute_parameters
 
 
+#TODO: exists masks in entity components are currently handled manually and quite on a case-by-case basis.
+# However, jax_md.partition.neighbor_list has a custom_mask_function argument. 
+# Should we use it to simplify the code and make it less error prone?
+
+
 class EntityComponent(Component):
 
     controller_cls = EntityController
