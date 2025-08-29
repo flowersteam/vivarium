@@ -1,7 +1,7 @@
 _target_: vivarium.environment.components.physics.CollisionComponent
 precedence: 2
 epsilon: 1.0
-alpha: 2
+alpha: 0.5
 mask_fn:
   _target_: vivarium.environment.environment.MaskFunction
   label: exists

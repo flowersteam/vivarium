@@ -40,7 +40,7 @@ def collision_force_fn(displacement):
 
         #TODO: filter sources and targets based on their existence
         fn = coll_force_fn(
-            sigma=(state.entity_state.diameter[:, jnp.newaxis] + state.entity_state.diameter[neighbor.idx]), # / 2,
+            sigma=(state.entity_state.diameter[:, jnp.newaxis] + state.entity_state.diameter[neighbor.idx]) / 2.,
             epsilon=state.collision_eps,
             alpha=state.collision_alpha
         )
@@ -87,8 +87,8 @@ class CollisionComponent(Component):
 
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
-            collision_eps=self.epsilon,
-            collision_alpha=self.alpha
+            collision_eps=jnp.array(self.epsilon),
+            collision_alpha=jnp.array(self.alpha)
             )
 
     def update_state_cls(self, state_cls):
