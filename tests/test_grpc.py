@@ -99,3 +99,10 @@ def test_index_grpc():
     dw.update_dataclass(test, changes_2)
     assert test.visible_wheels == [False, True]
     
+    
+def test_controller_parameters(simulator):
+    cp = simulator.controller_parameters
+    p_cp = dataclass_to_proto(cp)
+    cp_2 = proto_to_dataclass(p_cp)
+
+    assert cp.agents.color[1] == cp_2.agents.color[1]

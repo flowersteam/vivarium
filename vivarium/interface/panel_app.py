@@ -102,15 +102,17 @@ class WindowManager(Parameterized):
     def update_plot_cb(self):
         """Periodic callback for the plot update"""
         for interface in self.interfaces.values():
-            interface.renderer.update()
+            if interface.renderer is not None:
+                interface.renderer.update()
         self.controller.apply_changes()
         state = self.controller.update_state()
         if self.controller.param_simulator.config_update:  # TODO: (2025-08-26) To change
             self.controller.pull_selected_entities()
         for interface in self.interfaces.values():
             renderer = interface.renderer
-            with renderer.no_drag_cb():
-                renderer.update_cds(state)
+            if renderer is not None:
+                with renderer.no_drag_cb():
+                    renderer.update_cds(state)
 
     def update_switch_cb(self, event):
         """Callback for the plot update switch
@@ -139,7 +141,7 @@ class WindowManager(Parameterized):
         p.x_range = Range1d(0, self.controller.param_simulator.box_size)
         p.y_range = Range1d(0, self.controller.param_simulator.box_size)
         draw_tool = PointDrawTool(
-            renderers=[self.interfaces[name].renderer.plot(p) for name in self.controller_names],
+            renderers=[interface.renderer.plot(p) for interface in self.interfaces.values() if interface.renderer is not None],
             add=False,
         )
         p.add_tools(draw_tool)
@@ -161,7 +163,7 @@ class WindowManager(Parameterized):
                     name="SIMULATOR",
                 )
             ]
-            + [self.interfaces[name].widget for name in self.controller_names]
+            + [interface.widget for interface in self.interfaces.values()]
         )
 
         app = pn.Row(

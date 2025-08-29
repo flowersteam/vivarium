@@ -56,11 +56,13 @@ class Simulator:
         try:
             kwargs = {}
             for name, c_config in config.env.components.component_list.items():
-                if 'client' in c_config:
+                if 'client' in c_config and 'controller_kwargs' in c_config.client:
                     n_max = c_config.n_max
                     controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
                     kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
-            cp = create_dataclass_from_dict('ControllerParameters', kwargs)            
+                else:
+                    kwargs[name] = {}
+            cp = create_dataclass_from_dict('ControllerParameters', kwargs)
         except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
             logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")
             cp = None
