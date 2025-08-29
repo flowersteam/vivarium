@@ -3,8 +3,7 @@ from collections import namedtuple
 from dataclasses import asdict
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.dataclass_wrapper import SimulatorParametersWrapper
-from vivarium.controllers.panel_controller import ParamSimulator
+from vivarium.controllers.panel_controller import SimulatorParametersWrapper, ParamSimulator
 
 
 class SimulatorController:

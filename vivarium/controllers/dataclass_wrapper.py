@@ -225,33 +225,3 @@ class DataclassWrapper:
         if self._dataclass_instance is not None:
             self._dataclass_instance = dataclass_instance
         return dataclass_instance
-
-  
-class SimulatorParametersWrapper:
-    def __init__(self, simulator_parameters):
-        object.__setattr__(self, '_simulator_parameters', simulator_parameters)
-        object.__setattr__(self, '_change_recorder', ChangeRecorder())
-
-    def __getattr__(self, attr):
-        return getattr(self._simulator_parameters, attr)
-
-    def _setitem(self, attr, value, idx=None):
-        setattr(self._change_recorder, attr, value)
-
-    def __setattr__(self, attr, value):
-        if attr in self.__dict__:
-            self.__dict__[attr] = value
-            return
-        self._setitem(attr, value)
-
-    def fetch_changes(self):
-        changes = self._change_recorder.fetch_changes()
-        return changes
-
-    def apply_to_state(self, simulator):  # TODO: change method name
-        changes = self.fetch_changes()
-        self._simulator = update_dataclass(simulator, changes)
-        self._change_recorder = ChangeRecorder()
-        return self._simulator
-
-
