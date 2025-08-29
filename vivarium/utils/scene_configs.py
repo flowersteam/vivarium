@@ -99,6 +99,6 @@ def compute_parameters(config):
 def component_factories_from_config(config):
     """Create component factories from a configuration object."""
     component_factories = [
-        hydra.utils.get_class(c._target_).from_config(c,name=name) for name, c in config.component_list.items()
+        hydra.utils.get_class(c._target_).from_config(c, name=name) for name, c in config.component_list.items()
     ]
     return component_factories
