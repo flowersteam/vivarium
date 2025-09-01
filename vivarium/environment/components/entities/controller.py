@@ -1,6 +1,9 @@
+import numpy as np
+
 from vivarium.controllers.utils import RoutineHandler
 from vivarium.controllers.dataclass_wrapper import ChangeRecorder, create_dataclass_from_dict, update_dataclass
 
+from ..controller import AttributeMapping
 
 class InternalData:
     pass
@@ -79,7 +82,7 @@ class EntityWrapper:
         object.__setattr__(self, '_entity_type', entity_type)
         object.__setattr__(self, '_entity_fields', ['entity_subtype', 'diameter', 'friction',
                                'exists', 'entity_idx', 'entity_type',
-                               'position', 'momentum', 'force', 'mass',
+                               'position', 'orientation', 'momentum', 'force', 'mass',
                                'position_center', 'position_orientation',
                                'momentum_center', 'momentum_orientation',
                                'force_center', 'force_orientation',
@@ -119,14 +122,40 @@ class EntityWrapper:
         self._state = state
 
 
-class EntityController(EntityWrapper):  # TODO: How about merging the class and the superclass?
+def get_entity_parameter_mapping(subtype_labels):
+    return {
+        '_default_': lambda attr: AttributeMapping(
+            attr,
+            jax_to_ctrl_fn=lambda x: x.item() if len(x.shape) == 0 else np.array(x),
+            ctrl_to_jax_fn=lambda x: np.array(x)
+        ),
+        'mass': AttributeMapping(
+            'mass_center',
+            jax_to_ctrl_fn=lambda x: x[0].item(),
+            ctrl_to_jax_fn=lambda x: np.array([x])
+        ),
+        'exists': AttributeMapping(
+            'exists',
+            jax_to_ctrl_fn=lambda x: bool(x.item()),
+            ctrl_to_jax_fn=lambda x: np.array(int(x))
+        ),
+        'subtype': AttributeMapping(
+            'entity_subtype',
+            jax_to_ctrl_fn=lambda x: subtype_labels[x.item()],
+            ctrl_to_jax_fn=lambda x: np.array(subtype_labels.index(x), dtype=int)
+        )
+    }
+
+
+class EntityController(EntityWrapper):  # TODO: How about merging the class and the superclass? Actually there is a logic (superclass has same attributes as state)
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
+    def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
         super().__init__(state, ent_idx, entity_type)
         object.__setattr__(self, 'controller_parameters', controller_parameters)
         object.__setattr__(self, '_controller_change_recorder', ChangeRecorder())
         object.__setattr__(self, 'internal', InternalData())
+        object.__setattr__(self, '_mapping', get_entity_parameter_mapping(subtype_labels))
 
     def __getattr__(self, item):
         if item in self.__dict__:
@@ -139,7 +168,8 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
             return field[idx]
         if item in self.controller_parameters.__class__.__dataclass_fields__:
             return getattr(self.controller_parameters, item)
-        return super().__getattr__(item)
+        pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
+        return pm.jax_to_ctrl_fn(super().__getattr__(pm.jax_attr))
 
     def __setattr__(self, item, val):
         if item in self.controller_parameters.__class__.__dataclass_fields__:
@@ -153,8 +183,8 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
             self._setitem(suffix, val, idx)
             return
         else:
-            super().__setattr__(item, val)
-
+            pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
+            super().__setattr__(pm.jax_attr, pm.ctrl_to_jax_fn(val))
 
 class EntityList:
     def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
@@ -183,7 +213,8 @@ class EntityList:
         return state
 
     def set_state(self, state):
-        for entity in self._entity_list:
+        self._state = state
+        for entity in self._entity_list:  # TODO: Is this loop really needed? If it makes a copy of the state of each entity, might take a lot of space..
             entity.set_state(state)
 
     def fetch_changes(self):
@@ -203,10 +234,9 @@ class EntityList:
 class NotebookControllerEntity(EntityController):
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, controller_parameters)
+    def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
+        super().__init__(state, ent_idx, entity_type, subtype_labels, controller_parameters)
         object.__setattr__(self, 'routine_handler', RoutineHandler())
-        object.__setattr__(self, 'controller_parameters', controller_parameters)
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
@@ -279,10 +309,20 @@ class EntityListController(EntityList):
         super().__init__(
             state=state, entity_type=entity_type, entity_type_idx=etype_int,
             entity_wrapper_list=[
-                controller_cls(state, idx, entity_type,
+                controller_cls(state, idx, entity_type, subtype_labels,
                                 controller_parameters=self.controller_parameters[int(state.entity_state.entity_type_idx[idx])])
                 for idx, type in enumerate(state.entity_state.entity_type)
                 if type == etype_int]            
+        )
+        
+    @classmethod
+    def from_config(cls, name, client_config, state, notebook_control=False, **controller_kwargs):
+        return cls(
+            entity_type=name,
+            state=state,
+            subtype_labels=client_config['subtype_labels'],
+            notebook_control=notebook_control,
+            **controller_kwargs
         )
         
     def step(self, time, catch_errors):

@@ -1,15 +1,16 @@
-import jax.numpy as jnp
 import param
-from enum import Enum
-from contextlib import contextmanager
 import panel as pn
+from enum import Enum
+from dataclasses import asdict
 from panel.layout import Column
-
-from bokeh.models import BooleanFilter, CDSView, ColumnDataSource
 from bokeh.plotting import figure
+from contextlib import contextmanager
+from bokeh.models import BooleanFilter, CDSView, ColumnDataSource
+
 import numpy as np
 
-from vivarium.controllers.panel_controller import ParameterMapping, ParameterizedData
+from vivarium.controllers.panel_controller import ParameterizedData
+
 
 class Shape(Enum):
     CIRCLE = 0
@@ -21,21 +22,6 @@ def normal(array):
     normals[:, 0] = np.cos(array)
     normals[:, 1] = np.sin(array)
     return normals
-
-
-entity_parameter_mapping = {
-    'orientation': ParameterMapping('position_orientation'),
-    'mass': ParameterMapping(
-        'mass_center',
-        jax_to_param_fn=lambda x: x[0].item(),
-        param_to_jax_fn=lambda x: jnp.array([x])
-    ),
-    'exists': ParameterMapping(
-        'exists',
-        jax_to_param_fn=lambda x: bool(x.item()),
-        param_to_jax_fn=lambda x: jnp.array(int(x))
-    ),
-}
 
 
 class Selected(param.Parameterized):
@@ -56,24 +42,20 @@ class ParamEntity(ParameterizedData):
     friction = param.Number()
     exists = param.Boolean()
     color = param.Color()
+    shape = param.String()
     visible = param.Boolean()
-    hide_non_existing = param.Boolean(True)
+    hide_non_existing = param.Boolean()
 
-    def __init__(self, entities, subtype_labels, parameter_mapping={}, panel_parameters=[], **params):
+    def __init__(self, entities, subtype_labels, panel_parameters=[], **params):
 
         self.subtype_labels = subtype_labels
         self.subtype_label_list = [self.subtype_labels[i] for i in sorted(self.subtype_labels)]
         self.param.add_parameter('subtype', param.Selector(objects=self.subtype_label_list))
-        parameter_mapping.update(entity_parameter_mapping)
-        parameter_mapping['subtype'] = ParameterMapping(
-            'entity_subtype',
-            jax_to_param_fn=lambda x: self.subtype_label_list[x.item()],
-            param_to_jax_fn=lambda x: jnp.array(self.subtype_label_list.index(x), dtype=int)
-        )
+
         super().__init__(entities,
-                         parameter_mapping=parameter_mapping,
                          panel_parameters=panel_parameters + ['visible', 'color', 'hide_non_existing'],
                          **params)
+        
         self.selection = [0]
 
     @property
@@ -86,16 +68,16 @@ class EntityRenderer:
         self,
         entities,
         selected_param_entity,
-        # param_simulator_state,
         selected, etype, state,
         shape,
         line_width=1.0,
     ):
         self.entities = entities
         self.selected_param_entity = selected_param_entity
-        # self.param_simulator_state = param_simulator_state
         self.selected = selected
         self.etype = etype
+        
+        self.panel_visibility_parameters = [p for p in self.selected_param_entity.panel_parameters if p.startswith('visible')]
         
         # TODO: for now only the shape of the first entity is considered
         self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
@@ -111,7 +93,7 @@ class EntityRenderer:
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
         self.selected_param_entity.param.watch(self.update_cds_view,
-                                               self.selected_param_entity.panel_visibility_parameters,
+                                               self.panel_visibility_parameters,
                                                onlychanged=True)
         self.selected_param_entity.param.watch(self.hide_non_existing,
                                                "exists",
@@ -181,7 +163,7 @@ class EntityRenderer:
                     [getattr(e, attr) and e.visible for e in self.entities]
                 )
             )
-            for attr in self.selected_param_entity.panel_visibility_parameters
+            for attr in self.panel_visibility_parameters
         }
 
     def update_cds_view(self, event):
@@ -190,7 +172,7 @@ class EntityRenderer:
         :param event: The event containing the changed value
         """
         n = event.name
-        for attr in [n] if n != "visible" else self.selected_param_entity.panel_visibility_parameters:
+        for attr in [n] if n != "visible" else self.panel_visibility_parameters:
             f = [getattr(e, attr) and e.visible for e in self.entities]
             self.cds_view[attr].filter = BooleanFilter(f)
 
@@ -217,7 +199,7 @@ class EntityRenderer:
 
     def apply_visible_filter(self):
         f = [e.visible for e in self.entities]
-        for attr in self.selected_param_entity.panel_visibility_parameters:
+        for attr in self.panel_visibility_parameters:
             self.cds_view[attr].filter = BooleanFilter(f)
 
     def hide_non_existing(self, event):
@@ -288,7 +270,7 @@ class EntityInterface:
     
     def __init__(self, controller, state, subtype_labels, panel_cls=Column):
         
-        self.parameters = self.param_cls(controller, subtype_labels)
+        self.parameters = self.param_cls(controller, subtype_labels, **asdict(controller.controller_parameters[0]))
         self.parameters.update_from_server = True
         
         self.selected = Selected()

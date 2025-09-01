@@ -30,7 +30,7 @@ class Component:
     def get_kwargs(config):
         kwargs = {}
         for k, v in config.items():
-            if k == '_target_':
+            if k == '_target_' or k == 'client':
                 pass
             elif isinstance(v, (dict, omegaconf.dictconfig.DictConfig)) and '_target_' in v:
                 kwargs[k] = hydra.utils.instantiate(v)

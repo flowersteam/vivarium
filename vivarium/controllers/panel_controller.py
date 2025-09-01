@@ -1,6 +1,5 @@
 import param
 import logging
-import numpy as np
 
 from vivarium.controllers.dataclass_wrapper import ChangeRecorder, update_dataclass
 
@@ -14,16 +13,13 @@ lg = logging.getLogger(__name__)
 class ParameterizedData(param.Parameterized):
     update_from_server = param.Event()
 
-    def __init__(self, data, parameter_mapping={}, panel_parameters=[], **params):
+    def __init__(self, data, panel_parameters=[], **params):
         super().__init__(**params)
         self.data = data
         self.selection = None
-        self.parameter_mapping = parameter_mapping
         self.panel_parameters = panel_parameters
         self.update_parameter_list()
-        self.panel_visibility_parameters = [p for p in self.panel_parameters if p.startswith('visible')]
-        self.param_to_jax = {p: self.parameter_mapping[p] if p in self.parameter_mapping else ParameterMapping(p) for p in self.parameters}
-        self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
+        
         self.param.watch(self.update_to, self.parameters, onlychanged=True)
         self.param.watch(self.udpate_panel_parameter, self.panel_parameters, onlychanged=True)
 
@@ -31,21 +27,19 @@ class ParameterizedData(param.Parameterized):
     def update_from(self):
         self.allow_update_to = False  # Prevents to call update_to callback for each updated parameter
         data = self.data if self.selection is None else self.data[self.selection[0]]
-        for p, mapping in self.param_to_jax.items():
-            setattr(self, p, mapping.jax_to_param_fn(getattr(data, mapping.jax_name)))
+        for p in self.parameters:
+            setattr(self, p, getattr(data, p))
         self.allow_update_to = True
 
     def update_to(self, event):
         if self.allow_update_to:
-            if event.name in self.param_to_jax:
-                mapping = self.param_to_jax[event.name]
-                if self.selection is None:
-                    setattr(self.data,
-                            mapping.param_name, mapping.param_to_jax_fn(event.new))
-                    return
-                for idx in self.selection:
-                    setattr(self.data[idx],
-                            mapping.param_name, mapping.param_to_jax_fn(event.new))
+            if self.selection is None:
+                setattr(self.data,
+                        event.name, event.new)
+                return
+            for idx in self.selection:
+                setattr(self.data[idx],
+                        event.name, event.new)
 
     def udpate_panel_parameter(self, event):
         if self.selection is None:
@@ -87,14 +81,6 @@ class ParameterizedData(param.Parameterized):
         return self.param.serialize_parameters(subset=self.param_names())
 
 
-class ParameterMapping:
-    def __init__(self, jax_name, param_name=None, jax_to_param_fn=None, param_to_jax_fn=None):
-        self.jax_name = jax_name
-        self.param_name = param_name if param_name is not None else jax_name
-        self.jax_to_param_fn = jax_to_param_fn if jax_to_param_fn is not None else lambda x: x
-        self.param_to_jax_fn = param_to_jax_fn if param_to_jax_fn is not None else lambda x: x
-
-
 class ParamSimulator(ParameterizedData):
     box_size = param.Number()
     num_scan_steps = param.Integer()
@@ -106,9 +92,7 @@ class ParamSimulator(ParameterizedData):
 
     def __init__(self, simulator_state_wrapper, **params):
         
-        parameter_mapping = {}
         super().__init__(simulator_state_wrapper, 
-                         parameter_mapping=parameter_mapping, 
                          panel_parameters=['hide_non_existing', 'config_update'],
                          **params)
 
@@ -159,7 +143,7 @@ class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
         else:
             super().__setattr__(attr, val)
             
-            
+       
 # class PanelController_: #(SimulatorController):
 #     """Controller for the panel interface"""
 #     def __init__(self, client=None, subtypes=[], **controllers):

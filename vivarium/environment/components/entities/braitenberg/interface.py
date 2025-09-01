@@ -5,19 +5,9 @@ import numpy as np
 
 from bokeh.plotting import figure
 
-from vivarium.controllers.panel_controller import ParameterMapping
+from vivarium.environment.components.entities.interface import EntityRenderer, EntityInterface
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors
 from vivarium.environment.components.entities.interface import ParamEntity, normal
-from vivarium.environment.components.entities.interface import EntityRenderer, EntityInterface
-
-
-parameter_mapping = {
-    'prox_per_subtype': ParameterMapping(
-        'prox_per_subtype',
-        jax_to_param_fn=lambda x: np.array(x),
-        param_to_jax_fn=lambda x: x
-    ),
-}
 
 
 def behavior_param_name(b_idx):
@@ -36,16 +26,14 @@ class ParamAgent(ParamEntity):
     proxs_dist_max = param.Number()
     proxs_cos_min = param.Number()
     prox_per_subtype = param.Array()
-    visible_wheels = param.Boolean(True)
-    visible_proxs = param.Boolean(True)
+    visible_wheels = param.Boolean()
+    visible_proxs = param.Boolean()
 
     def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, subtype_labels, parameter_mapping=parameter_mapping, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
+        super().__init__(entities, subtype_labels, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)
             self.panel_parameters.append(behavior)
-            # self.param_to_jax[behavior] = ParameterMapping(behavior)
-            # self.jax_to_param = {p.jax_name: p for p in self.param_to_jax.values()}
             self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
             self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=None), behavior, onlychanged=True)
             for idx, label in subtype_labels.items():
@@ -56,8 +44,8 @@ class ParamAgent(ParamEntity):
 
         self.update_parameter_list()
         for p in self.panel_parameters:
-            if p in self.param_to_jax:
-                del self.param_to_jax[p]
+            if p in self.parameters:
+                self.parameters.remove(p)
 
     @param.depends('update_from_server', watch=True)
     def update_from(self):
