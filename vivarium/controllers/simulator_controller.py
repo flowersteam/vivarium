@@ -1,9 +1,8 @@
 import hydra
-from collections import namedtuple
 from dataclasses import asdict
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.panel_controller import SimulatorParametersWrapper, ParamSimulator
+from vivarium.controllers.panel_controller import SimulatorParametersWrapper
 
 
 class SimulatorController:
@@ -15,10 +14,6 @@ class SimulatorController:
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
-        
-        # TODO: (2025-08-26) move this to a dedicated class?
-        self.param_simulator = ParamSimulator(self.simulator_parameters)
-        self.param_simulator.update_from_server = True
         
         self.create_simulator_parameters_wrapper()
 

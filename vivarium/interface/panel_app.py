@@ -1,6 +1,7 @@
 import hydra
 import logging
 import panel as pn
+from param import Parameterized
 
 from bokeh.plotting import figure, curdoc
 from bokeh.models import (
@@ -8,9 +9,9 @@ from bokeh.models import (
     HoverTool,
     Range1d,
 )
-from param import Parameterized
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+from vivarium.controllers.panel_controller import ParamSimulator
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers import SimulatorController
 
@@ -53,6 +54,10 @@ class WindowManager(Parameterized):
             self.controller.subtype_labels,
             panel_cls=pn.Column
         )
+        
+        # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
+        self.param_simulator = ParamSimulator(self.controller.simulator_parameters)
+        self.param_simulator.update_from_server = True
 
         self.start_toggle = pn.widgets.Toggle(
             **(
@@ -106,7 +111,7 @@ class WindowManager(Parameterized):
                 interface.renderer.update()
         self.controller.apply_changes()
         state = self.controller.update_state()
-        if self.controller.param_simulator.config_update:  # TODO: (2025-08-26) To change
+        if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
             self.controller.pull_selected_entities()
         for interface in self.interfaces.values():
             renderer = interface.renderer
@@ -138,8 +143,8 @@ class WindowManager(Parameterized):
         p.grid.visible = False
         hover = HoverTool(tooltips=None)
         p.add_tools(hover)
-        p.x_range = Range1d(0, self.controller.param_simulator.box_size)
-        p.y_range = Range1d(0, self.controller.param_simulator.box_size)
+        p.x_range = Range1d(0, self.controller.simulator_parameters.box_size)
+        p.y_range = Range1d(0, self.controller.simulator_parameters.box_size)
         draw_tool = PointDrawTool(
             renderers=[interface.renderer.plot(p) for interface in self.interfaces.values() if interface.renderer is not None],
             add=False,
@@ -156,7 +161,7 @@ class WindowManager(Parameterized):
             *[
                 pn.Column(
                     pn.pane.Markdown("### SIMULATOR", align="center"),
-                    pn.panel(self.controller.param_simulator, name="Configuration"),
+                    pn.panel(self.param_simulator, name="Configuration"),
                     visible=True,
                     sizing_mode="scale_height",
                     scroll=True,
