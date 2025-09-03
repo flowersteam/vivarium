@@ -33,5 +33,4 @@ subtype_labels:
   - particle
 
 simulator:
-  kwargs:
-    freq: -1
+  freq: -1
