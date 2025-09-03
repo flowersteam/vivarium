@@ -1,0 +1,2 @@
+controller_cls: vivarium.environment.components.physics.CollisionController
+interface_cls: vivarium.environment.components.physics.CollisionInterface
