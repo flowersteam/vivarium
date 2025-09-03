@@ -46,14 +46,13 @@ class ParamEntity(ParameterizedData):
     visible = param.Boolean()
     hide_non_existing = param.Boolean()
 
-    def __init__(self, entities, subtype_labels, panel_parameters=[], **params):
+    def __init__(self, entities, subtype_labels, **params):
 
         self.subtype_labels = subtype_labels
         self.subtype_label_list = [self.subtype_labels[i] for i in sorted(self.subtype_labels)]
         self.param.add_parameter('subtype', param.Selector(objects=self.subtype_label_list))
 
         super().__init__(entities,
-                         panel_parameters=panel_parameters + ['visible', 'color', 'hide_non_existing'],
                          **params)
         
         self.selection = [0]
@@ -77,7 +76,7 @@ class EntityRenderer:
         self.selected = selected
         self.etype = etype
         
-        self.panel_visibility_parameters = [p for p in self.selected_param_entity.panel_parameters if p.startswith('visible')]
+        self.panel_visibility_parameters = [p for p in self.selected_param_entity.direct_mapping_parameters if p.startswith('visible')]
         
         # TODO: for now only the shape of the first entity is considered
         self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
