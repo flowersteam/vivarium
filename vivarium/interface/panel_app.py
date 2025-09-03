@@ -111,8 +111,8 @@ class WindowManager(Parameterized):
                 interface.renderer.update()
         self.controller.apply_changes()
         state = self.controller.update_state()
-        if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
-            self.controller.pull_selected_entities()
+        # if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
+        #     self.controller.pull_selected_entities()
         for interface in self.interfaces.values():
             renderer = interface.renderer
             if renderer is not None:
