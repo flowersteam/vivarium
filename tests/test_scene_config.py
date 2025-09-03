@@ -32,7 +32,6 @@ def test_component_factories(scene_config):
     state = state.set(
         agents=state.agents.set(
             motor=state.agents.motor.at[idx, :].set([1., 1.]),
-            behavior=state.agents.behavior.at[idx, 0].set(5)
         )
     )
     for t in range(2):

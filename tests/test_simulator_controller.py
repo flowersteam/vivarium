@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 from vivarium.environment.components.entities.braitenberg.controller import BraitenbergController
 from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.simulator import Simulator
@@ -10,7 +11,11 @@ NUM_STEPS = 10
 def test_base_entity(environment_and_state, braitenberg):
     env, state = environment_and_state(braitenberg)
     entity_type = 'agents'
-    braitenberg_controller = BraitenbergController(entity_type, state, color=('red',) * state.agents.count())
+    braitenberg_controller = BraitenbergController(entity_type, state, 
+                                                   color=['red'] * state.agents.count(),
+                                                   visible=[True] * state.agents.count(),
+                                                   hide_non_existing=[True] * state.agents.count()
+                                                   )
     idx = 0
     entity = braitenberg_controller[idx]
     
@@ -38,20 +43,41 @@ def test_load_simulator_controller(scene_config):
     ag = controllers['agents'][idx]
     assert (jnp.equal(pos, ag.position_center).all())
 
-    ag.behavior = [3, 2, 1, 5]
+    ag.behaviors[1].label = Behaviors.LOVE
     controller.apply_changes()
     controller.update_state()
+    
+    assert ag.behaviors[1].label == Behaviors.LOVE
 
-    assert jnp.equal(jnp.array([3, 2, 1, 5]), controller.state.agents.behavior[idx]).all()
+    assert jnp.equal(
+        controller.state.agents.behavior_params[idx, 1],
+        behavior_params[Behaviors.LOVE]
+    ).all()
 
     for ag in controllers['agents']:
-        ag.behavior = 5
-        ag.motor = [0., 0.]
+        ag.behaviors[0] = Behaviors.FEAR
+            # ag.motor = [0., 0.]
+
+    controller.apply_changes()
+    controller.update_state()
+    
+    assert jnp.equal(
+        controller.state.agents.behavior_params[:, 0, :, :],
+        jnp.full_like(controller.state.agents.behavior_params[:, 0, :, :], behavior_params[Behaviors.FEAR])
+    ).all()
 
     for _ in range(NUM_STEPS):
         pos = controller.state.entity_state.position_center[idx]
         controller.step()
         assert (not jnp.equal(pos, ag.position_center).all())
+
+
+    controllers['collision'].epsilon = 42.
+    controllers['collision'].alpha = 43.
+    controller.apply_changes()
+    controller.update_state()
+    assert controller.state.collision_eps.item() == 42.
+    assert controller.state.collision_alpha.item() == 43.
 
     controller.simulator_parameters.freq = -10
     controller.simulator_parameters.box_size = 42.

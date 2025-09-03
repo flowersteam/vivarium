@@ -27,7 +27,7 @@ def test_param_entity(scene_name, entity_type, idx, controller_and_interfaces_fr
     entity.exists = False
     controller.apply_changes()
     controller.update_state()
-    assert controller_entities[idx].exists.item() == 0
+    assert not controller_entities[idx].exists
 
     if entity_type == 'agents':
         entity.right_motor = 2.
@@ -41,7 +41,7 @@ def test_param_entity(scene_name, entity_type, idx, controller_and_interfaces_fr
     entity.update_from_server = True
     assert entity.orientation == 1.
 
-    controller_entities[idx].exists = jnp.array(1)
+    controller_entities[idx].exists = True
     controller.apply_changes()
     controller.update_state()
     entity.update_from_server = True
@@ -59,6 +59,24 @@ def test_param_entity(scene_name, entity_type, idx, controller_and_interfaces_fr
         controller.update_state()
         entity.update_from_server = True
         assert entity.left_motor == 4.
+
+
+def test_controller_param(controller_and_interfaces_from_config):
+    controller, interfaces = controller_and_interfaces_from_config('braitenberg')
+
+    param = interfaces['collision'].parameters
+
+    param.update_from_server = True
+    assert param.epsilon == controller.state.collision_eps.item()
+    assert param.alpha == controller.state.collision_alpha.item()
+
+    param.epsilon = 42.
+    param.alpha = 43.
+
+    controller.apply_changes()
+    controller.update_state()
+    assert controller.state.collision_eps.item() == 42.
+    assert controller.state.collision_alpha.item() == 43.
 
 
 def test_simulator_state_param(simulator_controller_from_config):
