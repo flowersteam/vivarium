@@ -19,17 +19,18 @@ class SimulatorController:
 
     @classmethod
     def from_config(cls, config, client=None, notebook_control=False):
-        controllers = {}
+        client = client or SimulatorGRPCClient()
         state = client.state
         cp = asdict(client.controller_parameters)
+        controllers = {}
         for name, c_config in config.component_list.items():
             if 'client' in c_config:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
                 p = {} if cp[name] is None else cp[name]
                 controllers[name] = c_cls.from_config(name, c_config.client, state, notebook_control=notebook_control, **p)
         return cls(
-            subtypes=config.subtype_labels,
             client=client,
+            subtypes=config.subtype_labels,
             **controllers
         )
 

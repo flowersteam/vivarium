@@ -46,8 +46,8 @@ class NotebookController(SimulatorController):
         self.routine_handler = RoutineHandler()
 
     @classmethod
-    def from_config(cls, config, client=None):
-        return super().from_config(config, client=client, notebook_control=True)
+    def from_config(cls, config, client=None, notebook_control=True):
+        return super().from_config(config, client=client, notebook_control=notebook_control)
 
     def is_running(self):
         """Check if the simulator is running"""
