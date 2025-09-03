@@ -85,17 +85,15 @@ class EntityRenderer:
         self.cds = ColumnDataSource(data=self.get_cds_data(state))
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
-        self.selected_param_entity.param.watch(
-            self.hide_all_non_existing, "hide_non_existing", onlychanged=True,
-        )
         selected.param.watch(
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
+
         self.selected_param_entity.param.watch(self.update_cds_view,
                                                self.panel_visibility_parameters,
                                                onlychanged=True)
-        self.selected_param_entity.param.watch(self.hide_non_existing,
-                                               "exists",
+        self.selected_param_entity.param.watch(self.apply_visible_filter,
+                                               ["exists", "hide_non_existing"],
                                                onlychanged=True)
         self.apply_visible_filter()
 
@@ -142,11 +140,6 @@ class EntityRenderer:
 
         :param state: The state coming from the server
         """
-        if self.selected_param_entity.hide_non_existing:
-            exists = state.entity_state.exists[getattr(state, self.etype).entity_idx]
-            for i, e in enumerate(self.entities):
-                e.visible = bool(exists[i])
-            self.apply_visible_filter()
         self.cds.data.update(self.get_cds_data(state))
 
     def create_cds_view(self):
@@ -182,35 +175,11 @@ class EntityRenderer:
         """
         self.cds.selected.indices = event.new
 
-    def hide_all_non_existing(self, event):
-        """Hides or shows all the entities that do not exist according to the global
-        visibility of non-existing entities
 
-        :param event: The event containing the new global "visibility of non-existing
-        entities" value
-        """
-        for i, entity in enumerate(self.entities):
-            if not entity.exists:
-                entity.visible = not event.new
-
-        # CMF added this
-        self.apply_visible_filter()
-
-    def apply_visible_filter(self):
+    def apply_visible_filter(self, *args, **kwargs):
         f = [e.visible for e in self.entities]
         for attr in self.panel_visibility_parameters:
             self.cds_view[attr].filter = BooleanFilter(f)
-
-    def hide_non_existing(self, event):
-        """Hides or shows an entity that does not exist depending on the global
-        visibility of non-existing entities
-
-        :param event: The event containing the new existence value
-        """
-        if not self.selected_param_entity.hide_non_existing:
-            return
-        self.selected_param_entity.visible = event.new
-
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""

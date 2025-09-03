@@ -1,9 +1,12 @@
 controller_cls: vivarium.environment.components.entities.controller.EntityListController
 interface_cls: vivarium.environment.components.entities.interface.EntityInterface
+subtype_labels: ${..subtype_labels}
 controller_kwargs:
   color:
     _all_values_: red
   visible:
+    _all_values_: true
+  hide_non_existing:
     _all_values_: true
   shape:
     _all_values_: circle
