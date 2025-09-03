@@ -12,9 +12,8 @@ class AgentState(BaseParticleState):
     prox: jnp.array
     prox_per_subtype: jnp.array
     motor: jnp.array
-    behavior: jnp.array
     behavior_params: jnp.array
-    sensed: jnp.array
+    sensed_mask: jnp.array
     wheel_diameter: jnp.array
     proxs_dist_max: jnp.array
     proxs_cos_min: jnp.array
@@ -66,9 +65,8 @@ class BraitenbergComponent(EntityComponent):
                            prox=jnp.zeros((self.n_max, 2)),
                            prox_per_subtype=jnp.zeros((self.n_max, 2, self.n_subtypes)),
                            motor=jnp.zeros((self.n_max, 2)),
-                           behavior=jnp.full((self.n_max, self.n_behaviors), 4, dtype=int),
                            behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 3)),
-                           sensed=jnp.ones((self.n_max, self.n_behaviors, self.n_subtypes), dtype=int),
+                           sensed_mask=jnp.ones((self.n_max, self.n_behaviors, self.n_subtypes), dtype=int),
                            wheel_diameter=jnp.full((self.n_max,), self.wheel_diameter),
                            proxs_dist_max=jnp.full((self.n_max,), self.proxs_dist_max),
                            proxs_cos_min=jnp.full((self.n_max,), self.proxs_cos_min)

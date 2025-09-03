@@ -140,7 +140,7 @@ def sum_force_to_entities(entity_state, center, orientation=0.):
         return entity_state.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
         
 
-def compute_motor(proxs, params, behaviors, motors):
+def compute_motor(proxs, params, motors):
     """Compute new motor values. If behavior is manual, keep same motor values. Else, compute new values with proximeters and params.
 
     :param proxs: proximeters of all agents
@@ -149,16 +149,13 @@ def compute_motor(proxs, params, behaviors, motors):
     :param motors: current motor values
     :return: new motor values
     """
-    manual = jnp.where(behaviors == Behaviors.MANUAL.value, 1, 0)
-    manual_mask = manual
-    linear_motor_values = linear_behavior(proxs, params)
-    motor_values = linear_motor_values * (1 - manual_mask) + motors * manual_mask
+    motor_values = linear_behavior(proxs, params)
     return motor_values
 
 
-def compute_motor_selective(prox_per_subtype, sensed, params, behaviors, motors):
+def compute_motor_selective(prox_per_subtype, sensed, params, motors):
     prox = jnp.max(prox_per_subtype * sensed[jnp.newaxis, :], axis=1)
-    return compute_motor(prox, params, behaviors, motors)
+    return compute_motor(prox, params, motors)
 
 
 def left_or_right_prox(mask, dist, relative_theta, dist_max, cos_min, agent_neighbors):
@@ -251,10 +248,10 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
         )
 
         prox_per_subtype = extend_prox_per_subtype(
-            proxs, prox_idx, state.entity_state.entity_subtype, braitenberg_state.sensed.shape[-1]
+            proxs, prox_idx, state.entity_state.entity_subtype, braitenberg_state.sensed_mask.shape[-1]
         )
 
-        motors = vmap(vmap(compute_motor_selective, (None, 0, 0, 0, None)))(prox_per_subtype, braitenberg_state.sensed, braitenberg_state.behavior_params, braitenberg_state.behavior, braitenberg_state.motor)
+        motors = vmap(vmap(compute_motor_selective, (None, 0, 0, None)))(prox_per_subtype, braitenberg_state.sensed_mask, braitenberg_state.behavior_params, braitenberg_state.motor)
 
         motors = jnp.mean(motors, axis=1)
 
