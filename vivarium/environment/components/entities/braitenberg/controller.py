@@ -4,24 +4,61 @@ from vivarium.controllers.utils import BehaviorHandler, Logger
 from vivarium.environment.components.entities.controller import EntityController
 from vivarium.environment.components.entities.controller import NotebookControllerEntity
 from vivarium.environment.components.entities.controller import EntityListController
-from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_to_params
+from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 
 
-class AgentController(EntityController):
+class BehaviorController:
+    class Behavior:
+        def __init__(self, controller, slot):
+            self._controller = controller
+            self._slot = slot
+            
+        @property
+        def label(self):
+            for b in Behaviors:
+                if np.equal(self._controller.behavior_params[self._slot], behavior_params[b]).all():
+                    return b
+            return Behaviors.CUSTOM
 
-    def set_behavior(self, slot_idx, behavior, sensed):
-        assert slot_idx < self.behavior.shape[0], 'Behavior index out of bounds'
-        if isinstance(behavior, Behaviors):
-            behavior = behavior.value
-        cur_behaviors = np.array(self.behavior)
-        cur_behaviors[slot_idx] = behavior
-        self.behavior = cur_behaviors
-        cur_sensed = np.array(self.sensed)
-        cur_sensed[slot_idx] = [int(i in sensed) for i in range(len(cur_sensed[slot_idx]))]
-        self.sensed = cur_sensed
-        cur_params = np.array(self.behavior_params)
-        cur_params[slot_idx] = behavior_to_params(behavior)
-        self.behavior_params = cur_params
+        @label.setter
+        def label(self, behavior):
+            self._controller._setitem('behavior_params', behavior_params[behavior], self._slot)
+
+        @property
+        def sensed(self):
+            return [self._controller._subtype_labels[i] for i, s in enumerate(self._controller.sensed_mask[self._slot]) if bool(s)]
+
+        @sensed.setter
+        def sensed(self, subtypes):
+            sensed_mask = [(s in subtypes) for s in self._controller._subtype_labels]
+            self._controller._setitem('sensed_mask', np.array(sensed_mask, dtype=int), self._slot)
+    
+        def __next__(self):
+            if self._slot < self._controller.behavior_params.shape[0] - 1:
+                self._slot += 1
+                return self
+            else:
+                raise StopIteration
+    
+    def __init__(self, controller):
+        self._controller = controller
+
+    def __getitem__(self, idx):
+        return BehaviorController.Behavior(self._controller, idx)
+
+    def __setitem__(self, slot, behavior):
+        BehaviorController.Behavior(self._controller, slot).label = behavior
+        
+    def __iter__(self):
+        return BehaviorController.Behavior(self._controller, 0)
+            
+            
+class AgentController(EntityController):       
+
+
+    @property
+    def behaviors(self):
+        return BehaviorController(self)
 
 
 # TODO: What's the purpose of this class? Not uses at the moment (May, 31, 2025) but the whole pipeline seems to work anyway.
@@ -54,7 +91,7 @@ class AgentNotebookController(NotebookControllerEntity):
         object.__setattr__(self, 'ate', False)
         object.__setattr__(self, 'time_since_feeding', np.inf)
         object.__setattr__(self, 'simulation_entities', None)
-        self.set_manual()
+        # self.set_manual()
 
     def set_manual(self):
         """Set the agent's behavior to manual"""

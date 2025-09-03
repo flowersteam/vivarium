@@ -37,7 +37,7 @@ def create_property(field_name, rigid_body_field):
 
     @prop.setter
     def prop(self, value, idx=None):
-        if idx is None:
+        if len(idx) == 0:
             idx = self._entity_idx
         else:
             idx = (self._entity_idx, idx)
@@ -93,9 +93,9 @@ class EntityWrapper:
             return getattr(self._state.entity_state, attr)[self._entity_idx]
         return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_type_idx[self._entity_idx]]
 
-    def _setitem(self, attr, value, idx=None):
-        entity_state_idx = self._entity_idx if idx is None else (self._entity_idx, idx)
-        x_state_idx = self._state.entity_state.entity_type_idx[self._entity_idx] if idx is None else (self._state.entity_state.entity_type_idx[self._entity_idx], idx)
+    def _setitem(self, attr, value, *idx):
+        entity_state_idx = self._entity_idx if len(idx) == 0 else (self._entity_idx, *idx)
+        x_state_idx = self._state.entity_state.entity_type_idx[self._entity_idx].item() if len(idx) == 0 else (self._state.entity_state.entity_type_idx[self._entity_idx].item(), *idx)
         if attr in self._entity_fields:
             if attr.endswith('_center') or attr.endswith('_orientation'):
                 field_name, rigid_body_field = attr.split('_', 1)
@@ -155,7 +155,9 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         object.__setattr__(self, 'controller_parameters', controller_parameters)
         object.__setattr__(self, '_controller_change_recorder', ChangeRecorder())
         object.__setattr__(self, 'internal', InternalData())
+        object.__setattr__(self, '_subtype_labels', subtype_labels)
         object.__setattr__(self, '_mapping', get_entity_parameter_mapping(subtype_labels))
+        self._hide_non_existing()
 
     def __getattr__(self, item):
         if item in self.__dict__:
@@ -175,8 +177,7 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         if item in self.controller_parameters.__class__.__dataclass_fields__:
             getattr(self._controller_change_recorder, item)[self._entity_type_idx] = val
             object.__setattr__(self.controller_parameters, item, val)
-            return
-        if item in self.__dict__:
+        elif item in self.__dict__:
             super().__setattr__(item, val)
         elif is_split_attribute(item):
             suffix, idx = split(item)
@@ -185,6 +186,16 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         else:
             pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
             super().__setattr__(pm.jax_attr, pm.ctrl_to_jax_fn(val))
+        if item == 'hide_non_existing':
+            self._hide_non_existing(hide_non_existing=val)
+        elif item == 'exists':
+            self._hide_non_existing(exists=val)
+
+    def _hide_non_existing(self, hide_non_existing=None, exists=None):
+        hide_non_existing = self.hide_non_existing if hide_non_existing is None else hide_non_existing
+        exists = self.exists if exists is None else exists
+        if hide_non_existing:
+            self.visible = exists
 
 class EntityList:
     def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):

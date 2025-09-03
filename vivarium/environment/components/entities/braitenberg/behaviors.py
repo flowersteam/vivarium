@@ -10,22 +10,15 @@ class Behaviors(Enum):
     SHY = 3
     NOOP = 4
     MANUAL = 5
+    CUSTOM = 6
 
 
 behavior_params = {
-    Behaviors.FEAR.value: jnp.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
-    Behaviors.AGGRESSION.value: jnp.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]),
-    Behaviors.LOVE.value: jnp.array([[-1.0, 0.0, 1.0], [0.0, -1.0, 1.0]]),
-    Behaviors.SHY.value: jnp.array([[0.0, -1.0, 1.0], [-1.0, 0.0, 1.0]]),
-    Behaviors.NOOP.value: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
-    Behaviors.MANUAL.value: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+    Behaviors.FEAR: jnp.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]),
+    Behaviors.AGGRESSION: jnp.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0]]),
+    Behaviors.LOVE: jnp.array([[-1.0, 0.0, 1.0], [0.0, -1.0, 1.0]]),
+    Behaviors.SHY: jnp.array([[0.0, -1.0, 1.0], [-1.0, 0.0, 1.0]]),
+    Behaviors.NOOP: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+    Behaviors.MANUAL: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
+    Behaviors.CUSTOM: jnp.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]),
 }
-
-
-def behavior_to_params(behavior):
-    """Return the params associated to a behavior.
-
-    :param behavior: behavior id (int)
-    :return: params
-    """
-    return behavior_params[behavior]

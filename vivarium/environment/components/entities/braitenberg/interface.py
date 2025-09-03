@@ -30,47 +30,41 @@ class ParamAgent(ParamEntity):
     visible_proxs = param.Boolean()
 
     def __init__(self, entities, subtype_labels, **params):
-        super().__init__(entities, subtype_labels, panel_parameters=['visible_wheels', 'visible_proxs'], **params)
+        
+        super().__init__(entities, subtype_labels, **params)
+        
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             behavior = behavior_param_name(i)
-            self.panel_parameters.append(behavior)
             self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
-            self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=None), behavior, onlychanged=True)
+            self.param.watch(partial(self.update_behavior, slot_idx=i, subtype=None), behavior, onlychanged=True)
             for idx, label in subtype_labels.items():
                 sensed = sensed_param_name(label, i)
-                self.panel_parameters.append(sensed)
                 self.param.add_parameter(sensed, param.Boolean())
-                self.param.watch(partial(self.update_behavior, slot_idx=i, label_idx=idx), sensed, onlychanged=True)
-
-        self.update_parameter_list()
-        for p in self.panel_parameters:
-            if p in self.parameters:
-                self.parameters.remove(p)
+                self.param.watch(partial(self.update_behavior, slot_idx=i, subtype=label), sensed, onlychanged=True)
 
     @param.depends('update_from_server', watch=True)
     def update_from(self):
         super().update_from()
         self.allow_update_to = False
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
-            setattr(self, behavior_param_name(i), Behaviors(self.selected_entity_data.behavior[i]).name)
+            setattr(self, behavior_param_name(i), self.selected_entity_data.behaviors[i].label.name)
+            sensed = self.selected_entity_data.behaviors[i].sensed
             for idx, label in self.subtype_labels.items():
-                sensed = self.selected_entity_data.sensed[i][idx]
-                setattr(self, sensed_param_name(label, i), bool(sensed))
+                setattr(self, sensed_param_name(label, i), label in sensed)
         self.allow_update_to = True
 
 
-    def update_behavior(self, event, slot_idx, label_idx):
+    def update_behavior(self, event, slot_idx, subtype):
         for ag_idx in self.selection:
-            behavior = Behaviors[event.new].value if event.name.startswith('behavior_') else self.data[ag_idx].behavior[slot_idx]
-            behavior = int(behavior)
-            sensed = self.data[ag_idx].sensed[slot_idx]
-            sensed_indexes = [i for i, s in enumerate(sensed) if s == 1]
-            if event.name.startswith('sensed_'):
-                if event.new and label_idx not in sensed_indexes:
-                    sensed_indexes.append(label_idx)
-                elif not event.new and label_idx in sensed_indexes:
-                    sensed_indexes.remove(label_idx)
-            self.data[ag_idx].set_behavior(slot_idx, behavior, sensed_indexes)
+            if event.name.startswith('behavior_'):
+                self.data[ag_idx].behaviors[slot_idx].label = Behaviors[event.new]
+            elif event.name.startswith('sensed_'):
+                sensed = set(self.data[ag_idx].behaviors[slot_idx].sensed)
+                if event.new:
+                    sensed.add(subtype)
+                else:
+                    sensed.discard(subtype)
+                self.data[ag_idx].behaviors[slot_idx].sensed = list(sensed)
 
 
 class AgentRenderer(EntityRenderer):
