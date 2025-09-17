@@ -1,3 +1,5 @@
+from operator import attrgetter
+
 from vivarium.controllers.dataclass_wrapper import ChangeRecorder
 
 
@@ -31,14 +33,14 @@ class ComponentController:
 
     def __getattr__(self, attr):
         mapping = self._mapping[attr]
-        return mapping.jax_to_ctrl_fn(getattr(self._state, mapping.jax_attr)) #.item()
+        return mapping.jax_to_ctrl_fn(attrgetter(mapping.jax_attr)(self._state))
 
     def __setattr__(self, attr, value):
         if attr.startswith('_'):
             object.__setattr__(self, attr, value)
         else:
             attr, value = self.to_jax(attr, value)
-            getattr(self._change_recorder, attr).store_change(value)
+            attrgetter(attr)(self._change_recorder).store_change(value)
             
     def to_jax(self, attr, value=None):
         if attr in self._mapping:
@@ -59,3 +61,4 @@ class ComponentController:
 
     def step(self, time, catch_errors):
         pass
+    
