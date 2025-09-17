@@ -2,7 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.environment.components.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
-from vivarium.environment.components.entities.particle_lenia.controller import ParamParticleLenia
+from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
 from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
@@ -87,7 +87,6 @@ def controller_and_interfaces_from_config(scene_config, simulator_controller_fro
             config.environment.components.component_list,
             controller.controllers,
             controller.state,
-            controller.subtype_labels,
         )
         return controller, interfaces
     return fn
