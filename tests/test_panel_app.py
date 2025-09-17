@@ -15,4 +15,6 @@ def test_window_manager(simulator_from_config):
     
     wm.interfaces['agents'].parameters.visible = True
     
+    wm.update_plot_cb()
+    
     # assert False
