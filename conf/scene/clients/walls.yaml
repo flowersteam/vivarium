@@ -1,0 +1,2 @@
+controller_cls: vivarium.environment.components.entities.walls.WallController
+interface_cls: vivarium.environment.components.entities.walls.WallInterface
