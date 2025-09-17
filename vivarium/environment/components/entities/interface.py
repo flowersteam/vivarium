@@ -104,18 +104,11 @@ class EntityRenderer:
         :param old: (unused)
         :param new: The event containing the new positions of the entities
         """
-        for i, e in enumerate(self.entities):
-            e.x_position = new["x"][i]
-            e.y_position = new["y"][i]
-
-    @contextmanager
-    def no_drag_cb(self):
-        """Prevent the CDS from updating the configs when the change comes from the
-        server
-        """
-        self.cds.remove_on_change("data", self.drag_cb)
-        yield
-        self.cds.on_change("data", self.drag_cb)
+        
+        if not self._lock.locked():
+            for i, e in enumerate(self.entities):
+                e.x_position = new["x"][i]
+                e.y_position = new["y"][i]
 
     def get_cds_data(self, state):
         """Update the ColumnDataSource with the new data
@@ -134,13 +127,14 @@ class EntityRenderer:
         if self.shape == Shape.CIRCLE:
             data["radius"] = d / 2.0
         return data
-
+    
     def update_cds(self, state):
         """Updates the ColumnDataSource with new data from server
 
         :param state: The state coming from the server
         """
-        self.cds.data.update(self.get_cds_data(state))
+        with self._lock:
+            super().update_cds(state)
 
     def create_cds_view(self):
         """Creates a ColumnDataSource view for each visibility attribute
