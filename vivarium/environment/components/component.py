@@ -38,6 +38,9 @@ class Component:
                 kwargs[k] = v
         return kwargs
 
+    def update_state_cls(self, state_cls):
+        return state_cls
+
     def init_base_entity(self, entity_state):
         return entity_state
 
@@ -49,6 +52,3 @@ class Component:
         def step_fn(state, neighbors, key):
             return state
         return step_fn
-
-    def update_state_cls(self, state_cls):
-        return state_cls
