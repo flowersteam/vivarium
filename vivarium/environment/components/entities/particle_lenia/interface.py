@@ -1,6 +1,6 @@
 import param
-from vivarium.environment.components.entities.interface import ParamEntity
 from vivarium.environment.components.entities.particle_lenia.creatures import CREATURES
+from vivarium.environment.components.entities.interface import ParamEntity, EntityInterface
 
 class ParamParticleLenia(ParamEntity):
     mu_k = param.Number()
@@ -21,3 +21,9 @@ class ParamParticleLenia(ParamEntity):
         for i in self.selection:
             for attr in ['mu_k', 'sigma_k', 'w_k', 'mu_g', 'sigma_g', 'c_rep']:
                 setattr(self.data[i], attr, creature[attr])
+
+
+class ParticleLeniaInterface(EntityInterface):
+
+    param_cls = ParamParticleLenia
+    

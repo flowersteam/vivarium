@@ -1,2 +1,2 @@
 from .component import ParticleLeniaComponent
-# from .controller import ParticleLeniaController
+from .interface import ParticleLeniaInterface
