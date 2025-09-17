@@ -37,7 +37,7 @@ class ParamAgent(ParamEntity):
             behavior = behavior_param_name(i)
             self.param.add_parameter(behavior, param.Selector(objects=[b.name for b in Behaviors]))
             self.param.watch(partial(self.update_behavior, slot_idx=i, subtype=None), behavior, onlychanged=True)
-            for idx, label in subtype_labels.items():
+            for label in subtype_labels:
                 sensed = sensed_param_name(label, i)
                 self.param.add_parameter(sensed, param.Boolean())
                 self.param.watch(partial(self.update_behavior, slot_idx=i, subtype=label), sensed, onlychanged=True)
@@ -49,7 +49,7 @@ class ParamAgent(ParamEntity):
         for i in range(self.selected_entity_data.behavior_params.shape[0]):
             setattr(self, behavior_param_name(i), self.selected_entity_data.behaviors[i].label.name)
             sensed = self.selected_entity_data.behaviors[i].sensed
-            for idx, label in self.subtype_labels.items():
+            for label in self.subtype_labels:
                 setattr(self, sensed_param_name(label, i), label in sensed)
         self.allow_update_to = True
 

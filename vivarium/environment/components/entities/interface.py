@@ -1,15 +1,16 @@
 import param
 import panel as pn
 from enum import Enum
+from threading import Lock
 from dataclasses import asdict
 from panel.layout import Column
 from bokeh.plotting import figure
-from contextlib import contextmanager
-from bokeh.models import BooleanFilter, CDSView, ColumnDataSource
+from bokeh.models import BooleanFilter, CDSView
 
 import numpy as np
 
 from vivarium.controllers.panel_controller import ParameterizedData
+from vivarium.environment.components.interface import Interface, Renderer
 
 
 class Shape(Enum):
@@ -49,8 +50,7 @@ class ParamEntity(ParameterizedData):
     def __init__(self, entities, subtype_labels, **params):
 
         self.subtype_labels = subtype_labels
-        self.subtype_label_list = [self.subtype_labels[i] for i in sorted(self.subtype_labels)]
-        self.param.add_parameter('subtype', param.Selector(objects=self.subtype_label_list))
+        self.param.add_parameter('subtype', param.Selector(objects=self.subtype_labels))
 
         super().__init__(entities,
                          **params)
@@ -62,7 +62,7 @@ class ParamEntity(ParameterizedData):
         return self.data[self.selection[0]]
 
 
-class EntityRenderer:
+class EntityRenderer(Renderer):
     def __init__(
         self,
         entities,
@@ -71,18 +71,20 @@ class EntityRenderer:
         shape,
         line_width=1.0,
     ):
+        self.etype = etype
+        # TODO: for now only the shape of the first entity is considered
+        self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
         self.entities = entities
+        
+        super().__init__(state, use_point_draw_tool=True)
+        
         self.selected_param_entity = selected_param_entity
         self.selected = selected
-        self.etype = etype
         
         self.panel_visibility_parameters = [p for p in self.selected_param_entity.direct_mapping_parameters if p.startswith('visible')]
         
-        # TODO: for now only the shape of the first entity is considered
-        self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
         
         self.line_width = line_width
-        self.cds = ColumnDataSource(data=self.get_cds_data(state))
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
         selected.param.watch(
@@ -96,6 +98,8 @@ class EntityRenderer:
                                                ["exists", "hide_non_existing"],
                                                onlychanged=True)
         self.apply_visible_filter()
+        
+        self._lock = Lock()
 
     def drag_cb(self, attr, old, new):
         """Callback for the drag & drop of entities
@@ -225,40 +229,30 @@ class EntityRenderer:
             raise AttributeError('self.shape should be an instance of Shape')
 
 
-class EntityInterface:
+class EntityInterface(Interface):
     
     param_cls = ParamEntity
     renderer_cls = EntityRenderer
     
-    def __init__(self, controller, state, subtype_labels, panel_cls=Column):
+    def __init__(self, controller, state, panel_cls=Column):
         
-        self.parameters = self.param_cls(controller, subtype_labels, **asdict(controller.controller_parameters[0]))
-        self.parameters.update_from_server = True
+        parameters = self.param_cls(controller, controller.subtype_labels, **asdict(controller.controller_parameters[0]))
         
         self.selected = Selected()
         self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
         
-        self.renderer = self.renderer_cls(
+        renderer = self.renderer_cls(
                 entities = controller._entity_list,
-                selected_param_entity=self.parameters,
+                selected_param_entity=parameters,
                 selected=self.selected,
                 etype=controller.entity_type,
                 state=state,
                 shape=controller.controller_parameters.shape,
             )
-
-        self.widget = panel_cls(
-                pn.pane.Markdown(f"### {controller.entity_type}", align="center"),
-                self.selected,
-                pn.panel(
-                    self.parameters,
-                    name="State configuration",
-                ),
-                visible=True,
-                sizing_mode="scale_height",
-                scroll=True,
-                name=controller.entity_type,            
-            )
+        
+        super().__init__(controller, parameters, panel_cls=panel_cls, renderer=renderer)
+        
+        self.widget.insert(1, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))
         
 
         self.selected.param.watch(
@@ -272,6 +266,3 @@ class EntityInterface:
         """Pull the selected configurations"""
         self.parameters.selection = self.selected.selection
         self.parameters.update_from_server = True
-
-
-

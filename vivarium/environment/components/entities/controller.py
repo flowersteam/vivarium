@@ -311,7 +311,8 @@ class EntityListController(EntityList):
                  **kwargs
                  ):
         controller_cls = (EntityController if not notebook_control else NotebookControllerEntity) if controller_cls is None else controller_cls
-        
+        self.subtype_labels = subtype_labels
+        self.name = entity_type
         self.controller_parameters = create_dataclass_from_dict(
             'ControllerParameters',
             kwargs)
