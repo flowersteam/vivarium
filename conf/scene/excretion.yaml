@@ -1,0 +1,29 @@
+defaults:
+  - particle_lenia
+  - environment/components/entities/walls@environment.components.component_list.walls
+  - clients/walls@environment.components.component_list.walls.client
+
+scene_name: excretion
+
+environment:
+  components:
+    component_list:
+      particles:
+        n_max: 600
+        subtype:
+          _all_values_: particle
+        position:
+          _range_: [45., 55., 10., 40.]
+      walls:
+        wall_coordinates:
+          - [[45., 10.], [55., 10.]]
+          - [[55., 10.], [55., 40.]]
+          - [[45., 40.], [48., 40.]]
+          - [[52., 40.], [55., 40.]]
+          - [[45., 40.], [45., 10.]]
+          - [[48., 40.], [48., 45.]]
+          - [[52., 40.], [52., 45.]]
+
+subtype_labels:
+  - particle
+  - wall
