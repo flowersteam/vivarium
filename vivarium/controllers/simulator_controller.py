@@ -24,7 +24,7 @@ class SimulatorController:
         cp = asdict(client.controller_parameters)
         controllers = {}
         for name, c_config in config.component_list.items():
-            if 'client' in c_config:
+            if 'client' in c_config and 'controller_cls' in c_config.client:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
                 p = {} if cp[name] is None else cp[name]
                 controllers[name] = c_cls.from_config(name, c_config.client, state, notebook_control=notebook_control, **p)
