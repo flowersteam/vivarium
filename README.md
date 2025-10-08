@@ -8,7 +8,7 @@
 - **Educational Resources**: Learn multi-agent simulation concepts with a series of interactive educational sessions.
 
 ### **Development status**
-The main branch is functional, although very "alpha". Many new features and optimizations are currently under active development in the `dev` branch (hence the absence of commits in the main branch since several months). Vivarium v0.2 is expected early 2026. If you are interested by the project, get in touch by opening an issue or contacting Clément Moulin-Frier (<firstname>.<last-name>@inria.fr).
+The main branch is functional, although very "alpha". Many new features and optimizations are currently under active development in the `dev` branch (hence the absence of commits in the main branch since several months). Vivarium v0.2 is expected early 2026. If you are interested by the project, get in touch by opening an issue or contacting Clément Moulin-Frier (`<firstname>.<last-name>@inria.fr`).
 
 ![Vivarium demo](images/simulation.gif)
 
