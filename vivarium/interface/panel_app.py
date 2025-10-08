@@ -62,7 +62,6 @@ class WindowManager(Parameterized):
                 else {"name": "Start simulator", "value": False}
             ),
             align="center",
-            # sizing_mode="fixed",
         )
         self.plot_fps = pn.widgets.FloatInput(
             name="Plot FPS", value=25, width=80

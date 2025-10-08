@@ -60,8 +60,8 @@ class Simulator:
                     n_max = c_config.n_max
                     controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
                     kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
-                else:
-                    kwargs[name] = {}
+                # else:
+                #     kwargs[name] = {}
             cp = create_dataclass_from_dict('ControllerParameters', kwargs)
         except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
             logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")
@@ -272,6 +272,7 @@ class Simulator:
 
     def apply_changes(self, changes):
         self = update_dataclass_from_change_list(self, changes)
+        return self.controller_parameters
 
     def start(self):
         """Start the simulation"""

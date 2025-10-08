@@ -45,12 +45,16 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         changes = proto_to_changes(request)
         with self._lock:
             self.simulator.apply_changes(changes)
-        return Empty()
-    
+        return self.GetControllerParameters(None, None)
+
     def SetChangesAndStep(self, request, context):
-        self.SetChanges(request, context)
-        return self.Step(None, None)
-    
+        proto_cp = self.SetChanges(request, context)
+        proto_state = self.Step(None, None)
+        proto_dataclass = simulator_pb2.Dataclass()
+        proto_dataclass.nested_fields['controller_parameters'].CopyFrom(proto_cp)
+        proto_dataclass.nested_fields['state'].CopyFrom(proto_state)
+        return proto_dataclass
+
     def GetState(self, request, context):
         state = self.simulator.state
         p = dataclass_to_proto(state)

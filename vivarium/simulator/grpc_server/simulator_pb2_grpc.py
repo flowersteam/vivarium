@@ -49,7 +49,7 @@ class SimulatorServerStub(object):
         self.SetChanges = channel.unary_unary(
                 '/simulator.SimulatorServer/SetChanges',
                 request_serializer=simulator__pb2.StateChangeList.SerializeToString,
-                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                response_deserializer=simulator__pb2.Dataclass.FromString,
                 )
         self.GetSceneName = channel.unary_unary(
                 '/simulator.SimulatorServer/GetSceneName',
@@ -184,7 +184,7 @@ def add_SimulatorServerServicer_to_server(servicer, server):
             'SetChanges': grpc.unary_unary_rpc_method_handler(
                     servicer.SetChanges,
                     request_deserializer=simulator__pb2.StateChangeList.FromString,
-                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
             ),
             'GetSceneName': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSceneName,
@@ -332,7 +332,7 @@ class SimulatorServer(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/SetChanges',
             simulator__pb2.StateChangeList.SerializeToString,
-            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            simulator__pb2.Dataclass.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

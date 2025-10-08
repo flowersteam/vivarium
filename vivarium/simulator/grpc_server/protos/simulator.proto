@@ -23,7 +23,7 @@ service SimulatorServer {
   rpc SetControllerAtrributes(Dataclass) returns (google.protobuf.Empty) {}
 
   // send changes made on the client side to the simulator server
-  rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
+  rpc SetChanges(StateChangeList) returns (Dataclass) {}
 
   // send the labels of subtypes and scene name
   rpc GetSceneName(Scene) returns (Scene) {}

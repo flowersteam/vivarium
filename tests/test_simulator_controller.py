@@ -5,6 +5,7 @@ from vivarium.environment.components.entities.braitenberg.controller import Brai
 from vivarium.controllers.simulator_controller import SimulatorController
 from vivarium.simulator import Simulator
 
+
 NUM_STEPS = 10
 
 
@@ -92,3 +93,28 @@ def test_load_simulator_controller(scene_config):
     controller.apply_changes()
     assert controller.client.controller_parameters.agents.color[0] == 'pink'
     assert not controller.client.controller_parameters.objects.visible[2]
+    
+    
+def test_controller_parameter_sync(scene_config):
+    config = scene_config('braitenberg')
+    component_config = config.environment.components
+    simulator = Simulator.from_config(config.simulator)
+    controller_1 = SimulatorController.from_config(component_config, client=simulator)
+    controller_2 = SimulatorController.from_config(component_config, client=simulator)
+    
+    agents_1 = controller_1.controllers['agents']
+    agents_2 = controller_2.controllers['agents']
+    
+    # Empty potential changes from initialization
+    controller_1.fetch_changes()
+    controller_2.fetch_changes()
+
+    agents_1[0].color = 'pink'
+
+    assert agents_1[0].color != agents_2[0].color
+    
+    controller_1.apply_changes()
+    controller_2.apply_changes()
+    
+    assert agents_1[0].color == agents_2[0].color and agents_2[0].color == 'pink'
+    

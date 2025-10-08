@@ -341,3 +341,9 @@ class EntityListController(EntityList):
         # TODO : Add a check to ensure that the entity exists
         for entity in self._entity_list:
             entity.step(time, catch_errors=catch_errors)
+            
+    def set_controller_parameters(self, cp):
+        # TODO: can we do better than this?
+        self.controller_parameters = cp
+        for idx, entity in enumerate(self._entity_list):
+            entity.controller_parameters = cp[idx]

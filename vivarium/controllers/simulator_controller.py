@@ -1,5 +1,5 @@
 import hydra
-from dataclasses import asdict
+from dataclasses import asdict, fields
 
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.panel_controller import SimulatorParametersWrapper
@@ -26,7 +26,7 @@ class SimulatorController:
         for name, c_config in config.component_list.items():
             if 'client' in c_config and 'controller_cls' in c_config.client:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
-                p = {} if cp[name] is None else cp[name]
+                p = {} if name not in cp or cp[name] is None else cp[name]
                 controllers[name] = c_cls.from_config(name, c_config.client, state, notebook_control=notebook_control, **p)
         return cls(
             client=client,
@@ -78,7 +78,11 @@ class SimulatorController:
             changes.extend([change])
         return changes
 
-    def apply_changes(self):
-        changes = self.fetch_changes()
+    def apply_changes(self, changes=None):
+        changes = changes or self.fetch_changes()
         if len(changes) > 0:
-            self.client.apply_changes(changes)
+            cp = self.client.apply_changes(changes)
+        else:
+            cp = self.client.controller_parameters
+        for name in [f.name for f in fields(cp)]:
+            self.controllers[name].set_controller_parameters(getattr(cp, name))

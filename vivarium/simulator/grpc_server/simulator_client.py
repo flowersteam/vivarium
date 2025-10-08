@@ -32,7 +32,8 @@ class SimulatorGRPCClient(SimulatorClient):
 
     def apply_changes(self, changes):
         proto_changes = changes_to_proto(changes)
-        self.stub.SetChanges(proto_changes)
+        controller_parameters = proto_to_dataclass(self.stub.SetChanges(proto_changes))
+        return controller_parameters
 
     def start(self):
         """Start the simulator."""
@@ -80,10 +81,14 @@ class SimulatorGRPCClient(SimulatorClient):
         :return: simulation state
         """
         if len(changes) > 0:
-            self.state = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_cls)
+            # res will be a dataclass with fields state and controller_parameters
+            res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)))
+            self.state = res.state
         else:
-            self.state = proto_to_dataclass(self.stub.Step(Empty()), self.state_cls)
-        return self.state
+            # res will be the state
+            res = proto_to_dataclass(self.stub.Step(Empty()), self.state_cls)
+            self.state = res
+        return res
 
     def is_started(self):
         """Check if the simulator is started."""
