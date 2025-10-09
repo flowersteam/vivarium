@@ -8,7 +8,11 @@ import functools
 import numpy as np
 
 from vivarium.controllers.utils import RoutineHandler
+from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
+
+
 
 
 lg = logging.getLogger(__name__)
@@ -21,6 +25,12 @@ else:
     lg.setLevel(logging.WARNING)
 
 
+def start_session(scene_name):
+    start_server_and_interface(cmd_args=[f'scene={scene_name}'])
+    components_config = load_scene_config(scene_name).environment.components
+    controller = NotebookController.from_config(config=components_config)
+    return controller
+    
 class NotebookController(SimulatorController):
     """
     NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook
@@ -217,6 +227,12 @@ class NotebookController(SimulatorController):
         if not self._is_running:
             print("Simulator is already stopped")
         self._is_running = False
+
+    def stop_session(self, safe_mode=False):
+        """Stop the session: simulation, server and interface"""
+        if self._is_running:
+            self.stop()
+        stop_server_and_interface(safe_mode=safe_mode)
 
     def wait(self, seconds):
         """Wait for a given number of seconds

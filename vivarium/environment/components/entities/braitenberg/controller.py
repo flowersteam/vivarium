@@ -78,7 +78,7 @@ class PanelControllerAgent(AgentController):
             super().__setattr__(attr, val)
 
 
-class AgentNotebookController(NotebookControllerEntity):
+class AgentNotebookController(NotebookControllerEntity, AgentController):
     """Agent class that represents an agent in the simulation
     """
 
