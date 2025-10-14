@@ -15,14 +15,14 @@ from vivarium.environment.components.entities.braitenberg.behaviors import Behav
 SPACE_NDIMS = 2
 
 
-def linear_behavior(proxs, params):
+def linear_behavior(proxs, motors, params):
     """Compute the activation of motors with a linear combination of proximeters and parameters
 
     :param proxs: proximeter values of an agent
     :param params: parameters of an agent (mapping proxs to motor values)
     :return: motor values
     """
-    return params.dot(jnp.hstack((proxs, 1.0)))
+    return params.dot(jnp.hstack((1.0, proxs, motors)))
 
 
 v_linear_behavior = vmap(linear_behavior, in_axes=(0, 0))
@@ -37,6 +37,7 @@ def lr_2_fwd_rot(left_spd, right_spd, base_length, wheel_diameter):
     :param wheel_diameter: diameter of wheels
     :return: forward and angular speeds
     """
+    # TODO: Check if the constants are correct (4.0?) and if there would be a way to better vectorize this
     fwd = (wheel_diameter / 4.0) * (left_spd + right_spd)
     rot = 0.5 * (wheel_diameter / base_length) * (right_spd - left_spd)
     return fwd, rot
@@ -114,15 +115,14 @@ def motor_force(state, braitenberg_state, mask):
             / state.entity_state.mass.orientation[agent_idx]
         )
         rot_delta = rot - cur_rot_vel
-        rot_force = rot_delta  # * state.agent_state.theta_mul
+        # In this case of a rigid body, `orientation` below will be summed to the current orientation force
+        # in `sum_force_to_entities`
+        orientation = jnp.zeros_like(state.entity_state.position.orientation).at[agent_idx].set(rot_delta / state.dt)        
     else:
-        rot_force = state.dt * rot
-
-    orientation = (
-        jnp.zeros_like(state.entity_state.unified_orientation)
-        .at[agent_idx]
-        .set(rot_force)
-    )
+        # rot is a rotation speed.
+        # In this case of a non-rigid body, `orientation` below will be summed to the current orientation
+        # in `sum_force_to_entities`
+        orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(rot * state.dt)
 
     orientation = jnp.where(mask, orientation, 0.0)
     mask = jnp.stack([mask] * SPACE_NDIMS, axis=1)
@@ -149,7 +149,7 @@ def compute_motor(proxs, params, motors):
     :param motors: current motor values
     :return: new motor values
     """
-    motor_values = linear_behavior(proxs, params)
+    motor_values = linear_behavior(proxs, motors, params)
     return motor_values
 
 

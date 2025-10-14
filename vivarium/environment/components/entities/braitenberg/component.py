@@ -65,7 +65,7 @@ class BraitenbergComponent(EntityComponent):
                            prox=jnp.zeros((self.n_max, 2)),
                            prox_per_subtype=jnp.zeros((self.n_max, 2, self.n_subtypes)),
                            motor=jnp.zeros((self.n_max, 2)),
-                           behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 3)),
+                           behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 5)),
                            sensed_mask=jnp.ones((self.n_max, self.n_behaviors, self.n_subtypes), dtype=int),
                            wheel_diameter=jnp.full((self.n_max,), self.wheel_diameter),
                            proxs_dist_max=jnp.full((self.n_max,), self.proxs_dist_max),
