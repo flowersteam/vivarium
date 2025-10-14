@@ -1,5 +1,6 @@
 _target_: vivarium.simulator.Simulator
 scene_name: ${..scene_name}
 freq: 40.
+run_from_server: true
 env: ${..environment}
 clients: ${..clients.client_list}

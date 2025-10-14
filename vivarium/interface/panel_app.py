@@ -41,7 +41,9 @@ class WindowManager(Parameterized):
 
         client = client or SimulatorGRPCClient()
         self.scene_config = load_scene_config(client.scene_name)
-        self.controller = SimulatorController.from_config(self.scene_config.environment.components, client=client)
+        self.controller = SimulatorController.from_config(self.scene_config.environment.components,
+                                                          client=client,
+                                                          run_from_server=self.scene_config.simulator.run_from_server)
         self.controller_names = list(self.controller.controllers.keys())
         
         self.interfaces = create_interfaces(
@@ -122,13 +124,15 @@ class WindowManager(Parameterized):
     def drag_n_drop_cb(self, event):
         if event.new:
             self.plot.toolbar.active_tap = self.point_draw_tool
-            self.start_toggle.value = False
+            if self.controller.run_from_server:
+                self.start_toggle.value = False
             if self.pcb_plot.running:
                 self.pcb_plot.stop()
             self.drag_n_drop.name = "Stop Drag & Drop"
         else:
             self.plot.toolbar.active_tap = None
-            self.start_toggle.value = True
+            if self.controller.run_from_server:
+                self.start_toggle.value = True
             if not self.pcb_plot.running:
                 self.pcb_plot.start()
             self.drag_n_drop.name = "Start Drag & Drop"
