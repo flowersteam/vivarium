@@ -56,10 +56,10 @@ class SimulatorServerStub(object):
                 request_serializer=simulator__pb2.Scene.SerializeToString,
                 response_deserializer=simulator__pb2.Scene.FromString,
                 )
-        self.IsStarted = channel.unary_unary(
-                '/simulator.SimulatorServer/IsStarted',
+        self.IsRunning = channel.unary_unary(
+                '/simulator.SimulatorServer/IsRunning',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=simulator__pb2.IsStartedState.FromString,
+                response_deserializer=simulator__pb2.IsRunningState.FromString,
                 )
         self.Start = channel.unary_unary(
                 '/simulator.SimulatorServer/Start',
@@ -129,7 +129,7 @@ class SimulatorServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def IsStarted(self, request, context):
+    def IsRunning(self, request, context):
         """Handle the connection between the server and the clients
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -191,10 +191,10 @@ def add_SimulatorServerServicer_to_server(servicer, server):
                     request_deserializer=simulator__pb2.Scene.FromString,
                     response_serializer=simulator__pb2.Scene.SerializeToString,
             ),
-            'IsStarted': grpc.unary_unary_rpc_method_handler(
-                    servicer.IsStarted,
+            'IsRunning': grpc.unary_unary_rpc_method_handler(
+                    servicer.IsRunning,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=simulator__pb2.IsStartedState.SerializeToString,
+                    response_serializer=simulator__pb2.IsRunningState.SerializeToString,
             ),
             'Start': grpc.unary_unary_rpc_method_handler(
                     servicer.Start,
@@ -354,7 +354,7 @@ class SimulatorServer(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def IsStarted(request,
+    def IsRunning(request,
             target,
             options=(),
             channel_credentials=None,
@@ -364,9 +364,9 @@ class SimulatorServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/IsStarted',
+        return grpc.experimental.unary_unary(request, target, '/simulator.SimulatorServer/IsRunning',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            simulator__pb2.IsStartedState.FromString,
+            simulator__pb2.IsRunningState.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

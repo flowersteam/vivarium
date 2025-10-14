@@ -90,6 +90,6 @@ class SimulatorGRPCClient(SimulatorClient):
             self.state = res
         return res
 
-    def is_started(self):
+    def is_running(self):
         """Check if the simulator is started."""
-        return self.stub.IsStarted(Empty()).is_started
+        return self.stub.IsRunning(Empty()).is_running

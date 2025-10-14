@@ -80,8 +80,8 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         self.simulator.run(threaded=True)
         return Empty()
 
-    def IsStarted(self, request, context):
-        return simulator_pb2.IsStartedState(is_started=self.simulator.is_started())
+    def IsRunning(self, request, context):
+        return simulator_pb2.IsRunningState(is_running=self.simulator.is_running())
 
     def Stop(self, request, context):
         self.simulator.stop()
@@ -97,7 +97,7 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         return Empty()
 
     def Step(self, request, context):
-        assert not self.simulator.is_started()
+        assert not self.simulator.is_running()
         self.simulator.step()
         return dataclass_to_proto(self.simulator.state)
 

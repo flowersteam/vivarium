@@ -39,7 +39,7 @@ class Simulator:
         self.scene_name = scene_name
         self.state = state or env.init_state()
         self.freq = freq
-        self._is_started = False
+        self._is_running = False
         self._to_stop = False
 
         # Attributes to record simulation
@@ -97,7 +97,7 @@ class Simulator:
     #     """
     #     lg.info("Loading a new scene\n")
 
-    #     if self.is_started():
+    #     if self.is_running():
     #         self.stop(blocking=True)
     #     scene_config = SceneConfiguration(scene_name=scene_name)
     #     self.freq = scene_config.config.simulator.kwargs.freq
@@ -140,8 +140,8 @@ class Simulator:
         :raises ValueError: raise an error if the simulator is already running
         """
         # Check is the simulator isn't already running
-        if self._is_started:
-            raise ValueError("Simulator is already started")
+        if self._is_running:
+            raise ValueError("Simulator is already runnning")
         # Else run it either in a thread or not
         if threaded:
             # Set the _run attribute with a partial function to launch it in a thread
@@ -157,7 +157,7 @@ class Simulator:
 
         :param num_steps: number of simulation steps
         """
-        self._is_started = True
+        self._is_running = True
         lg.info("Simulation run starts")
 
         loop_count = 0
@@ -187,7 +187,7 @@ class Simulator:
             self.stop_recording()
 
         # Encode that the simulation isn't started anymore
-        self._is_started = False
+        self._is_running = False
         lg.info("Simulation run stops")
 
     def update_sleep_time(self, frequency, elapsed_time):
@@ -274,9 +274,9 @@ class Simulator:
         self = update_dataclass_from_change_list(self, changes)
         return self.controller_parameters
 
-    def start(self):
-        """Start the simulation"""
-        self.run(threaded=True)
+    # def start(self):
+    #     """Start the simulation"""
+    #     self.run(threaded=True)
 
     def stop(self, blocking=True):
         """Stop the simulation
@@ -285,17 +285,17 @@ class Simulator:
         """
         self._to_stop = True
         if blocking:
-            while self._is_started:
+            while self._is_running:
                 time.sleep(0.01)
-                lg.info("still started")
+                lg.info("still running")
             lg.info("now stopped")
 
-    def is_started(self):
-        """Check if simulation is started
+    def is_running(self):
+        """Check if simulation is running
 
-        :return: True if started else False
+        :return: True if running else False
         """
-        return self._is_started
+        return self._is_running
 
     @contextmanager
     def pause(self):

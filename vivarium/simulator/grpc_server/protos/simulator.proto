@@ -29,7 +29,7 @@ service SimulatorServer {
   rpc GetSceneName(Scene) returns (Scene) {}
 
   // Handle the connection between the server and the clients
-  rpc IsStarted(google.protobuf.Empty) returns (IsStartedState) {}
+  rpc IsRunning(google.protobuf.Empty) returns (IsRunningState) {}
   rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
@@ -117,8 +117,8 @@ message RigidBody {
   NDArray orientation = 2;
 }
 
-message IsStartedState {
-  bool is_started = 1;
+message IsRunningState {
+  bool is_running = 1;
 }
 
 message Scene {

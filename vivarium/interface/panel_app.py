@@ -58,7 +58,7 @@ class WindowManager(Parameterized):
         self.start_toggle = pn.widgets.Toggle(
             **(
                 {"name": "Pause simulator", "value": True}
-                if self.controller.is_started()
+                if self.controller.is_running()
                 else {"name": "Start simulator", "value": False}
             ),
             align="center",
@@ -86,12 +86,12 @@ class WindowManager(Parameterized):
 
         :param event: The event for the new value of the button
         """
-        if event.new != self.controller.is_started():
+        if event.new != self.controller.is_running():
             if event.new:
-                self.controller.start()
+                self.controller.run()
             else:
                 self.controller.stop()
-        self.start_toggle.name = "Pause simulator" if self.controller.is_started() else "Start simulator"
+        self.start_toggle.name = "Pause simulator" if self.controller.is_running() else "Start simulator"
 
     def controller_toggle_cb(self, event):
         for cc in self.config_columns:

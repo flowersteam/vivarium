@@ -144,11 +144,11 @@ class RigidBody(_message.Message):
     orientation: NDArray
     def __init__(self, center: _Optional[_Union[NDArray, _Mapping]] = ..., orientation: _Optional[_Union[NDArray, _Mapping]] = ...) -> None: ...
 
-class IsStartedState(_message.Message):
-    __slots__ = ("is_started",)
-    IS_STARTED_FIELD_NUMBER: _ClassVar[int]
-    is_started: bool
-    def __init__(self, is_started: bool = ...) -> None: ...
+class IsRunningState(_message.Message):
+    __slots__ = ("is_running",)
+    IS_RUNNING_FIELD_NUMBER: _ClassVar[int]
+    is_running: bool
+    def __init__(self, is_running: bool = ...) -> None: ...
 
 class Scene(_message.Message):
     __slots__ = ("scene_name",)
