@@ -24,13 +24,7 @@ if logging.root.handlers:
 else:
     lg.setLevel(logging.WARNING)
 
-
-def start_session(scene_name):
-    start_server_and_interface(cmd_args=[f'scene={scene_name}'])
-    components_config = load_scene_config(scene_name).environment.components
-    controller = NotebookController.from_config(config=components_config)
-    return controller
-    
+   
 class NotebookController(SimulatorController):
     """
     NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook

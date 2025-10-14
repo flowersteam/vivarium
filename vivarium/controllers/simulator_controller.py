@@ -4,9 +4,25 @@ import hydra
 import threading
 from dataclasses import asdict, fields
 
+from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.controllers.panel_controller import SimulatorParametersWrapper
 
+from vivarium.utils.scene_configs import load_scene_config
+
+
+logging.basicConfig(level=logging.INFO)
+lg = logging.getLogger(__name__)
+
+
+def start_session(scene_name, run=True):
+    start_server_and_interface(cmd_args=[f'scene={scene_name}'])
+    scene_config = load_scene_config(scene_name)
+    components_config = scene_config.environment.components
+    controller = SimulatorController.from_config(config=components_config, run_from_server=scene_config.simulator.run_from_server)
+    if run:
+        controller.run()
+    return controller
 
 class SimulatorController:
 
@@ -146,3 +162,9 @@ class SimulatorController:
             cp = self.client.controller_parameters
         for name in [f.name for f in fields(cp)]:
             self.controllers[name].set_controller_parameters(getattr(cp, name))
+
+    def stop_session(self, safe_mode=False):
+        """Stop the session: simulation, server and interface"""
+        if self._is_running:
+            self.stop()
+        stop_server_and_interface(safe_mode=safe_mode)
