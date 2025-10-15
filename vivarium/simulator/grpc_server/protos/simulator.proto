@@ -75,6 +75,7 @@ message Value {
     ListFloat list_float_value = 7;
     ListString list_string_value = 8;
     ListBool list_bool_value = 9;
+    ListBehaviors list_behaviors_value = 10;
   }
 }
 
@@ -88,6 +89,18 @@ message ListString {
 
 message ListBool {
   repeated bool list = 1;
+}
+
+message Behavior {
+  map<string, ListString> behavior_to_sensed = 1;
+}
+
+message Behaviors {
+  repeated Behavior behaviors = 1;
+}
+
+message ListBehaviors {
+  repeated Behaviors list = 1;
 }
 
 message Change {

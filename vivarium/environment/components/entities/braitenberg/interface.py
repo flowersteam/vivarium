@@ -31,6 +31,10 @@ class ParamAgent(ParamEntity):
 
     def __init__(self, entities, subtype_labels, **params):
         
+        # Behaviors are added dynamically below, dont't pass them to the parent class
+        # TODO: However, now that behaviors are part of the controller parameters, we could maybe simplify this 
+        params.pop('behaviors', None)
+        
         super().__init__(entities, subtype_labels, **params)
         
         for i in range(self.selected_entity_data.behavior_params.shape[0]):

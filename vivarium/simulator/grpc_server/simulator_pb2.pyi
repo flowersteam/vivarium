@@ -58,7 +58,7 @@ class Idx(_message.Message):
     def __init__(self, int_idx: _Optional[int] = ..., slice_idx: _Optional[_Union[Slice, _Mapping]] = ..., index_list: _Optional[_Union[IndexList, _Mapping]] = ..., is_none: bool = ...) -> None: ...
 
 class Value(_message.Message):
-    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value", "list_float_value", "list_string_value", "list_bool_value")
+    __slots__ = ("ndarray", "bool_value", "int_value", "float_value", "str_value", "list_float_value", "list_string_value", "list_bool_value", "list_behaviors_value")
     NDARRAY_FIELD_NUMBER: _ClassVar[int]
     BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
     INT_VALUE_FIELD_NUMBER: _ClassVar[int]
@@ -67,6 +67,7 @@ class Value(_message.Message):
     LIST_FLOAT_VALUE_FIELD_NUMBER: _ClassVar[int]
     LIST_STRING_VALUE_FIELD_NUMBER: _ClassVar[int]
     LIST_BOOL_VALUE_FIELD_NUMBER: _ClassVar[int]
+    LIST_BEHAVIORS_VALUE_FIELD_NUMBER: _ClassVar[int]
     ndarray: NDArray
     bool_value: bool
     int_value: int
@@ -75,7 +76,8 @@ class Value(_message.Message):
     list_float_value: ListFloat
     list_string_value: ListString
     list_bool_value: ListBool
-    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ..., list_float_value: _Optional[_Union[ListFloat, _Mapping]] = ..., list_string_value: _Optional[_Union[ListString, _Mapping]] = ..., list_bool_value: _Optional[_Union[ListBool, _Mapping]] = ...) -> None: ...
+    list_behaviors_value: ListBehaviors
+    def __init__(self, ndarray: _Optional[_Union[NDArray, _Mapping]] = ..., bool_value: bool = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., str_value: _Optional[str] = ..., list_float_value: _Optional[_Union[ListFloat, _Mapping]] = ..., list_string_value: _Optional[_Union[ListString, _Mapping]] = ..., list_bool_value: _Optional[_Union[ListBool, _Mapping]] = ..., list_behaviors_value: _Optional[_Union[ListBehaviors, _Mapping]] = ...) -> None: ...
 
 class ListFloat(_message.Message):
     __slots__ = ("list",)
@@ -94,6 +96,31 @@ class ListBool(_message.Message):
     LIST_FIELD_NUMBER: _ClassVar[int]
     list: _containers.RepeatedScalarFieldContainer[bool]
     def __init__(self, list: _Optional[_Iterable[bool]] = ...) -> None: ...
+
+class Behavior(_message.Message):
+    __slots__ = ("behavior_to_sensed",)
+    class BehaviorToSensedEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: ListString
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[ListString, _Mapping]] = ...) -> None: ...
+    BEHAVIOR_TO_SENSED_FIELD_NUMBER: _ClassVar[int]
+    behavior_to_sensed: _containers.MessageMap[str, ListString]
+    def __init__(self, behavior_to_sensed: _Optional[_Mapping[str, ListString]] = ...) -> None: ...
+
+class Behaviors(_message.Message):
+    __slots__ = ("behaviors",)
+    BEHAVIORS_FIELD_NUMBER: _ClassVar[int]
+    behaviors: _containers.RepeatedCompositeFieldContainer[Behavior]
+    def __init__(self, behaviors: _Optional[_Iterable[_Union[Behavior, _Mapping]]] = ...) -> None: ...
+
+class ListBehaviors(_message.Message):
+    __slots__ = ("list",)
+    LIST_FIELD_NUMBER: _ClassVar[int]
+    list: _containers.RepeatedCompositeFieldContainer[Behaviors]
+    def __init__(self, list: _Optional[_Iterable[_Union[Behaviors, _Mapping]]] = ...) -> None: ...
 
 class Change(_message.Message):
     __slots__ = ("idx", "value")

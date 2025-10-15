@@ -38,6 +38,10 @@ def load_config(rel_config_dir_path, config_name, overrides=[]):
 
     with hydra.initialize(config_path=path, version_base=None):
         cfg = hydra.compose(config_name=config_name, overrides=overrides)
+        
+        # Allow dynamically adding new fields to DictConfig
+        # OmegaConf.set_struct(cfg, False)
+        
         return cfg
 
 

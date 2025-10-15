@@ -229,6 +229,17 @@ def proto_to_dataclass(dataclass, dataclass_type=None):
         return dataclass.value.list_string_value.list
     elif dataclass.value.HasField('list_bool_value'):
         return dataclass.value.list_bool_value.list
+    elif dataclass.value.HasField('list_behaviors_value'):
+        list_behaviors = []
+        for behaviors in dataclass.value.list_behaviors_value.list:
+            list_behavior = []
+            for behavior in behaviors.behaviors:
+                behavior_dict = {}
+                for label, sensed in behavior.behavior_to_sensed.items():
+                    behavior_dict[label] = list(sensed.list)
+                list_behavior.append(behavior_dict)
+            list_behaviors.append(list_behavior)
+        return list_behaviors
     elif dataclass.value.HasField('ndarray'):
         return proto_to_ndarray(dataclass.value.ndarray)
     elif 'center' in dataclass.nested_fields and 'orientation' in dataclass.nested_fields:
@@ -262,7 +273,16 @@ def dataclass_to_proto(dataclass):
             value = simulator_pb2.Value(list_float_value=simulator_pb2.ListFloat(list=dataclass))
         elif isinstance(dataclass[0], str):
             value = simulator_pb2.Value(list_string_value=simulator_pb2.ListString(list=dataclass))
-
+        elif isinstance(dataclass[0], list) and isinstance(dataclass[0][0], dict):
+            value = simulator_pb2.Value(list_behaviors_value=simulator_pb2.ListBehaviors())
+            for item in dataclass:
+                behaviors = simulator_pb2.Behaviors()
+                for behavior in item:
+                    b = simulator_pb2.Behavior()
+                    for label, sensed in behavior.items():
+                        b.behavior_to_sensed[label].CopyFrom(simulator_pb2.ListString(list=sensed))
+                    behaviors.behaviors.append(b)
+                value.list_behaviors_value.list.append(behaviors)
         else:
             raise ValueError(f"List items of type {type(dataclass[0])} not supported yet.")
         message.value.CopyFrom(value)

@@ -15,6 +15,7 @@ class BehaviorController:
             
         @property
         def label(self):
+            #TODO: Better make use of self._controller.controller_parameters.behaviors here
             for b in Behaviors:
                 if np.equal(self._controller.behavior_params[self._slot], behavior_params[b]).all():
                     return b
@@ -325,3 +326,12 @@ class BraitenbergController(EntityListController):
             notebook_control=notebook_control,
             **kwargs
         )
+        
+        if 'behaviors' in kwargs:
+            assert len(kwargs['behaviors'][0]) <= len(self._entity_list[0].behavior_params), \
+                f"Number of behaviors per agent in the config ({len(kwargs['behaviors'][0])}) exceeds the max number of behaviors in state ({len(self._entity_list[0].behavior_params)})"
+            for i_agent, behaviors in enumerate(kwargs['behaviors']):
+                for i_behavior, behavior in enumerate(behaviors):
+                    for label, sensed in behavior.items():
+                        self._entity_list[i_agent].behaviors[i_behavior].label = getattr(Behaviors, label)
+                        self._entity_list[i_agent].behaviors[i_behavior].sensed = sensed
