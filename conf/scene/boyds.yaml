@@ -1,0 +1,62 @@
+defaults:
+  - base_scene
+  - environment/components/base_physics@environment.components.component_list
+  - environment/components/entities/braitenberg@environment.components.component_list.agents
+  - clients/braitenberg@environment.components.component_list.agents.client
+  - clients/collision@environment.components.component_list.collision.client
+
+scene_name: boyds
+
+environment:
+  kwargs:
+    box_size: 160.0
+    neighbor_radius: 8.0
+    dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
+    num_scan_steps: 40  
+  components:
+    component_list:
+      step:
+        dt: 0.2
+      agents:
+        n_max: 160
+        n_behaviors: 2
+        client:
+          controller_kwargs:
+            visible_wheels: 
+              _all_values_: false
+            visible_proxs: 
+              _all_values_: false
+        by_indices:
+          - prey:
+              indices: "${range: 0, 157}"
+              subtype: prey
+              diameter: 1.0
+              wheel_diameter: 6.0
+              proxs_cos_min: 0.9
+              proxs_dist_max: 10.0              
+              client:
+                color: green
+                behaviors:
+                  # - SHY: []
+                  - LOVE: [prey]
+                  - FEAR: [predator]
+          - predator:
+              indices: "${range: 157, 160}"
+              subtype: predator
+              diameter: 5.0
+              wheel_diameter: 8.0
+              proxs_cos_min: 0.0
+              proxs_dist_max: 10.0
+              client:
+                color: red
+                behaviors:
+                  - AGGRESSION: [prey]
+                  - LOVE: [prey]
+
+
+simulator:
+  freq: -1.0
+
+subtype_labels:
+  - prey
+  - predator
