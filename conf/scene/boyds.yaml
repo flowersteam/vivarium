@@ -37,7 +37,6 @@ environment:
               client:
                 color: green
                 behaviors:
-                  # - SHY: []
                   - LOVE: [prey]
                   - FEAR: [predator]
           - predator:
