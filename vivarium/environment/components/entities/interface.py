@@ -175,9 +175,8 @@ class EntityRenderer(Renderer):
 
 
     def apply_visible_filter(self, *args, **kwargs):
-        f = [e.visible for e in self.entities]
         for attr in self.panel_visibility_parameters:
-            self.cds_view[attr].filter = BooleanFilter(f)
+            self.cds_view[attr].filter = BooleanFilter([e.visible and getattr(e, attr) for e in self.entities])
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""
