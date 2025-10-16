@@ -128,19 +128,27 @@ class SimulatorController:
 
     def step(self):
         changes = self.fetch_changes()
-        self.state = self.client.step(changes)
-        self.update_controllers()
+        state_and_cp = self.client.step(changes)
+        self.state = state_and_cp.state
+        self.update_controllers(state=self.state, controller_parameters=state_and_cp.controller_parameters)
 
-    def update_controllers(self, state=None):
+    def update_controllers(self, state=None, controller_parameters=None):
         """Update the controllers."""
-        state = state or self.state
-        for _, controller in self.controllers.items():
-            controller.set_state(state)
+        if state is None and controller_parameters is None:
+            lg.warning("No state or controller parameters provided to update controllers")
+        if controller_parameters is not None:
+            cp_fields = [f.name for f in fields(controller_parameters)]
+        for name, controller in self.controllers.items():
+            if state is not None:
+                controller.set_state(state)
+            if controller_parameters is not None:
+                if name in cp_fields:
+                    controller.set_controller_parameters(getattr(controller_parameters, name))
 
     def update_state(self):
         """Update the state from server to client."""
         self.state = self.client.get_state()
-        self.update_controllers()
+        self.update_controllers(state=self.state)
         return self.state
 
     def fetch_changes(self):
@@ -160,9 +168,8 @@ class SimulatorController:
             cp = self.client.apply_changes(changes)
         else:
             cp = self.client.controller_parameters
-        for name in [f.name for f in fields(cp)]:
-            self.controllers[name].set_controller_parameters(getattr(cp, name))
-
+        self.update_controllers(controller_parameters=cp)
+            
     def stop_session(self, safe_mode=False):
         """Stop the session: simulation, server and interface"""
         if self._is_running:

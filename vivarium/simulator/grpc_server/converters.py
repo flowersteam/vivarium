@@ -42,7 +42,7 @@ def idx_to_proto(idx):
 
 
 def changes_to_proto(changes):
-    if isinstance(changes, list) and '__idx' in changes[0]:
+    if isinstance(changes, list) and len(changes) > 0 and '__idx' in changes[0]:
         proto_changes = simulator_pb2.Changes()
         for change in changes:
             proto_change = simulator_pb2.Change()

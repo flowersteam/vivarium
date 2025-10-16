@@ -8,6 +8,7 @@ import datetime
 import threading
 from functools import partial
 from omegaconf import OmegaConf
+from dataclasses import dataclass
 from contextlib import contextmanager
 from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
 
@@ -19,6 +20,10 @@ from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_
 
 lg = logging.getLogger(__name__)
 
+@dataclass
+class StateAndControllerParameters:
+    state: any
+    controller_parameters: any
 
 nested_fields_to_access = {
     'env': [
@@ -125,12 +130,16 @@ class Simulator:
         # return the next sim state (convert new env state)
         return new_state  # self.env_to_sim_state(new_env_state)
 
-    def step(self, changes=[]):
+    def step(self, changes=None):
         """Do a step in the simulation by calling _step"""
-        if len(changes) > 0:
+        
+        if changes is not None and len(changes) > 0:
             self.apply_changes(changes)
         self.state = self._step(self.state)
-        return self.state
+        if changes is None:
+            return self.state
+        else:
+            return StateAndControllerParameters(state=self.state, controller_parameters=self.controller_parameters)
 
     def run(self, threaded=False, num_steps=math.inf, save=False, saving_name=None):
         """Run the simulator for the desired number of timesteps, either in a separate thread or not. Return the final state

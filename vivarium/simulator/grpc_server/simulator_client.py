@@ -75,12 +75,12 @@ class SimulatorGRPCClient(SimulatorClient):
         return scene_name
 
 
-    def step(self, changes=[]):
+    def step(self, changes=None):
         """Step the simulator.
 
         :return: simulation state
         """
-        if len(changes) > 0:
+        if changes is not None:
             # res will be a dataclass with fields state and controller_parameters
             res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)))
             self.state = res.state
