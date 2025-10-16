@@ -22,6 +22,7 @@ class ParamAgent(ParamEntity):
     right_motor = param.Number()
     left_prox = param.Number()
     right_prox = param.Number()
+    max_speed = param.Number()
     wheel_diameter = param.Number()
     proxs_dist_max = param.Number()
     proxs_cos_min = param.Number()

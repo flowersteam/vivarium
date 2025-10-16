@@ -17,6 +17,8 @@ n_subtypes:
   _args_: ["${...subtype_labels}"]
 wheel_diameter:
   _all_values_: 3.0
+max_speed:
+  _all_values_: 1.0
 proxs_dist_max:
   _all_values_: 20.0
 proxs_cos_min:

@@ -171,6 +171,7 @@ def braitenberg(step):
         n_behaviors=4,
         n_subtypes=2,
         wheel_diameter=1.0,
+        max_speed=1.0,
         proxs_dist_max=20.0,
         proxs_cos_min=0.)
     return [*step, braitenberg]

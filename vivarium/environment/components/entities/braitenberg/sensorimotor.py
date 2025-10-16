@@ -57,7 +57,7 @@ def fwd_rot_2_lr(fwd, rot, base_length, wheel_diameter):
     return left, right
 
 
-def motor_command(wheel_activation, base_length, wheel_diameter):
+def motor_command(wheel_activation, max_speed, base_length, wheel_diameter):
     """Return the forward and angular speed according to wheels speeds
 
     :param wheel_activation: wheels speeds
@@ -65,13 +65,14 @@ def motor_command(wheel_activation, base_length, wheel_diameter):
     :param wheel_diameter: wheel diameters
     :return: forward and angular speeds
     """
+    wheel_activation = wheel_activation * max_speed
     fwd, rot = lr_2_fwd_rot(
         wheel_activation[0], wheel_activation[1], base_length, wheel_diameter
     )
     return fwd, rot
 
 
-motor_command = vmap(motor_command, (0, 0, 0))
+motor_command = vmap(motor_command, (0, 0, 0, 0))
 
 
 def motor_force(state, braitenberg_state, mask):
@@ -87,6 +88,7 @@ def motor_force(state, braitenberg_state, mask):
     n = normal(state.entity_state.unified_orientation[agent_idx])
 
     fwd, rot = motor_command(braitenberg_state.motor,
+                             braitenberg_state.max_speed,
                              state.entity_state.diameter[agent_idx],
                              braitenberg_state.wheel_diameter)
 
