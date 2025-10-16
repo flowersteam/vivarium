@@ -75,6 +75,8 @@ class WindowManager(Parameterized):
             align="center",
             value=self.controller_names,
         )
+        
+        #TODO: Obsolete, to remove here and all other modules using it
         self.notebook_mode = notebook_mode
 
         self.plot = self.create_plot()
@@ -186,7 +188,7 @@ class WindowManager(Parameterized):
         app = pn.Row(
             pn.Column(
                 pn.Row(
-                    self.start_toggle if not self.notebook_mode else None,
+                    self.start_toggle if self.controller.run_from_server else None,
                     self.plot_fps,
                     self.drag_n_drop,
                 ),
