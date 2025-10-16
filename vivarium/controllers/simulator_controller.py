@@ -58,6 +58,10 @@ class SimulatorController:
             **controllers
         )
 
+    def __getattr__(self, name):
+        if name in self.controllers:
+            return self.controllers[name]
+        raise AttributeError(f"'SimulatorController' object has no attribute '{name}'")
 
     def create_simulator_parameters_wrapper(self):
         self.simulator_parameters = SimulatorParametersWrapper(self.simulator_parameters)
