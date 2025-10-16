@@ -303,11 +303,14 @@ class Simulator:
 
         :yield: dummy self
         """
-        self.stop(blocking=True)
+        was_running = self.is_running()
+        if was_running:
+            self.stop(blocking=True)
         try:
             yield self
         finally:
-            self.run(threaded=True)
+            if was_running:
+                self.run(threaded=True)
 
     def get_state(self):
         """Get current simulation state

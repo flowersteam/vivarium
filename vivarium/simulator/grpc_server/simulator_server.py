@@ -44,7 +44,8 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def SetChanges(self, request, context):
         changes = proto_to_changes(request)
         with self._lock:
-            self.simulator.apply_changes(changes)
+            with self.simulator.pause():
+                self.simulator.apply_changes(changes)
         return self.GetControllerParameters(None, None)
 
     def SetChangesAndStep(self, request, context):
