@@ -60,6 +60,15 @@ class AgentController(EntityController):
     @property
     def behaviors(self):
         return BehaviorController(self)
+    
+    def stop_motors(self):
+        """Stop the motors of the agent"""
+        self.motor = [0, 0]
+        
+    def proximeters(self, sensed_entities=None):
+        """Return the proximeters values of the agent"""
+        #TODO: implement sensed_entities filtering (see AgentNotebookController)
+        return self.prox.tolist()
 
 
 # TODO: What's the purpose of this class? Not uses at the moment (May, 31, 2025) but the whole pipeline seems to work anyway.
