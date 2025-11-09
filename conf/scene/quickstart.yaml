@@ -1,36 +1,51 @@
-box_size: 200
-neighbor_radius: 200
-prox_dist_max: 60
+defaults:
+  - braitenberg_defaults
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-    - agents
-    - small_objects
-    - big_objects
+scene_name: quickstart
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 3
-      color: blue
-      diameter: 10
-      selective_behaviors:
-        aggr:
-          beh: MANUAL
-          sensed: 
-            - agents
-            - small_objects
-            - big_objects
-      
-    small_objects:
-      type: OBJECT
-      num: 8
-      diameter: 5
-      color: orange
+environment:
+  kwargs:
+    box_size: 100
+    neighbor_radius: 100
+  components:
+    component_list:
+      agents:
+        n_max: 3
+        n_behaviors: 1
+        subtype:
+          _all_values_: agent
+        diameter:
+          _all_values_: 5.0
+        proxs_dist_max:
+          _all_values_: 30.0
+        client:
+          controller_kwargs:
+            color:
+              _all_values_: blue
+            behaviors:
+              _all_values_:
+                - MANUAL: []
+      objects:
+        n_max: 12
+        by_indices:
+          - small_objects:
+              indices: "${range: 0, 8}"
+              subtype: small_object
+              diameter: 3.0
+              client:
+                color: orange
+          - big_objects:
+              indices: "${range: 8, 12}"
+              subtype: big_object
+              diameter: 10.0
+              client:
+                color: red
 
-    big_objects:
-      type: OBJECT
-      num: 4
-      diameter: 15
-      color: red
+
+simulator:
+  freq: 20.0
+
+subtype_labels:
+  - agent
+  - small_object
+  - big_object
