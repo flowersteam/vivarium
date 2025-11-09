@@ -1,5 +1,6 @@
 import param
 import logging
+from dataclasses import asdict
 
 from vivarium.controllers.dataclass_wrapper import ChangeRecorder, update_dataclass
 
@@ -25,7 +26,10 @@ class ParameterizedData(param.Parameterized):
         self.allow_update_to = False  # Prevents to call update_to callback for each updated parameter
         data = self.controller if self.selection is None else self.controller[self.selection[0]]
         for p in self.direct_mapping_parameters:
-            setattr(self, p, getattr(data, p))
+            if isinstance(getattr(self, p), ParameterizedData):
+                getattr(self, p).update_from()
+            else:
+                setattr(self, p, getattr(data, p))
         self.allow_update_to = True
 
     def update_to(self, event):
@@ -71,13 +75,24 @@ class ParameterizedData(param.Parameterized):
         """
         return self.param.serialize_parameters(subset=self.param_names())
 
-
-class ParamSimulator(ParameterizedData):
+class ParamEnvironment(ParameterizedData):
     box_size = param.Number()
     num_scan_steps = param.Integer()
-    freq = param.Number()
     neighbor_radius = param.Number()
     to_jit = param.Boolean()
+
+    def __init__(self, environment_controller):
+        
+        super().__init__(environment_controller, 
+                         **asdict(environment_controller._obj))
+
+class ParamSimulator(ParameterizedData):
+    freq = param.Number()
+    scene_name = param.String()
+    simulation_running = param.Boolean()
+    run_from = param.String()
+
+    # client_names = param.Selector()
     # config_update = param.Boolean(False)
 
     env = param.ClassSelector(class_=ParamEnvironment)
