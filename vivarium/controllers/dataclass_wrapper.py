@@ -83,7 +83,8 @@ def update_dataclass(dataclass_instance, changes):
                             dataclass_instance[change['__idx']] = change['__value']
     else:
         for attr, child in changes.items():
-            if is_dataclass(dataclass_instance):
+            if is_dataclass(dataclass_instance) and hasattr(dataclass_instance, 'set') and callable(getattr(dataclass_instance, 'set')):
+                # dataclass_instance is a jax-md dataclass
                 dataclass_instance = dataclass_instance.set(**{attr: update_dataclass(getattr(dataclass_instance, attr), child)})
             else:
                 setattr(dataclass_instance, attr, update_dataclass(getattr(dataclass_instance, attr), child))
@@ -225,3 +226,77 @@ class DataclassWrapper:
         if self._dataclass_instance is not None:
             self._dataclass_instance = dataclass_instance
         return dataclass_instance
+
+
+class Remote: # TODO: use this class instead of ChangeRecorder everywhere
+    def __init__(self, obj, root=None, path=()):
+        self._obj = obj  # Local copy of the data
+        self._path = path  # Path to this object from the root (for operations)
+
+        # Root proxy handles batching and network calls
+        if root is None:
+            self._root = self
+            self._pending_ops = {}
+        else:
+            self._root = root
+
+    def __getattr__(self, name):
+        try:
+            attr = getattr(self._obj, name)
+        except AttributeError as e:
+            raise AttributeError(f"{type(self._obj).__name__} has no attribute '{name}'") from e
+        return self._wrap(attr, self._path + (name,))
+
+    def __setattr__(self, name, value):
+        if name.startswith('_'):
+            super().__setattr__(name, value)
+        else:
+            setattr(self._obj, name, value)
+            full_path = self._path + (name,)
+            self._root._record_operation(full_path, value)
+
+    def __getitem__(self, key):
+        try:
+            item = self._obj[key]
+        except (IndexError, KeyError, TypeError) as e:
+            raise type(e)(f"Invalid access at path {self._path}: {e}") from e
+        return self._wrap(item, self._path + (key,))
+
+    def __setitem__(self, key, value):
+        full_path = self._path + (key,)
+        self._root._record_operation(full_path, value)
+
+    def _wrap(self, obj, path):
+        # Wrap nested objects to propagate proxy behavior
+        if isinstance(obj, (list, dict, Remote)) or hasattr(obj, '__dict__'):
+            return Remote(obj, root=self._root, path=path)
+        return obj  # Primitives don't need wrapping
+
+    def _record_operation(self, path, value):
+        operation = self._rec(path, value, self._pending_ops)
+        self._pending_ops.update(operation)
+        pass
+
+    def _rec(self, path, value, pending_ops):
+        if len(path) == 0:
+            return [{'__idx': None, '__value': value}]
+        else:
+            if path[0] in pending_ops:
+                if len(path) > 1:
+                    pending_ops[path[0]].update(self._rec(path[1:], value, pending_ops[path[0]]))
+                else:
+                    pending_ops[path[0]].extend(self._rec(path[1:], value, pending_ops[path[0]]))
+            else:
+                pending_ops[path[0]] = self._rec(path[1:], value, pending_ops[path[0]] if path[0] in pending_ops else {})
+            return pending_ops
+
+    def set_state(self, state):
+        pass
+
+    def fetch_changes(self):
+        pending_ops = self._pending_ops
+        self._pending_ops = {}
+        return [pending_ops] if len(pending_ops) > 0 else []
+
+    def set_controller_parameters(self, controller_parameters):
+        self._obj = controller_parameters
