@@ -28,13 +28,14 @@ def test_state_de_serialization(state):
     assert state.entity_state.position_center[0, 1] == state_2.entity_state.position_center[0, 1]
 
 
-def test_parameters_de_serialization(simulator):
-    simulator_parameters = simulator.get_simulator_parameters()
+def test_parameters_de_serialization(simulator_from_config):
+    simulator = simulator_from_config(scene_name)
+    simulator_parameters = simulator.controller_parameters.simulator
     p_parameters = dataclass_to_proto(simulator_parameters)
     simulator_parameters_2 = proto_to_dataclass(p_parameters)
 
     assert simulator_parameters.freq == simulator_parameters_2.freq
-    assert simulator_parameters.box_size == simulator_parameters_2.box_size
+    assert simulator_parameters.env.box_size == simulator_parameters_2.env.box_size
 
 
 def test_changes(state):

@@ -174,11 +174,11 @@ def test_on_simulator_instance(simulator_from_config):
 
 def test_simulator_apply_change(simulator_from_config):
     simulator = simulator_from_config(scene_name)
-    dw = DataclassWrapper()
-    dw.box_size = 42.
-    dw.freq = -10.
+    dw = Remote(simulator)
+    dw.controller_parameters.simulator.env.box_size = 42.
+    dw.controller_parameters.simulator.freq = -10.
     changes = dw.fetch_changes()
-    simulator.apply_changes([changes])
+    simulator.apply_changes(changes)
     assert simulator.env.box_size == 42.
     assert simulator.freq == -10.
 

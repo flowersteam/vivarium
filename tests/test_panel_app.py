@@ -1,9 +1,9 @@
 from vivarium.interface.panel_app import WindowManager
 
 
-def test_window_manager(simulator_from_config):
-    simulator = simulator_from_config('braitenberg')
-    wm = WindowManager(client=simulator, testing_mode=True)
+def test_window_manager(simulator_controller_from_config):
+    controller = simulator_controller_from_config('braitenberg')
+    wm = WindowManager(controller=controller, testing_mode=True)
     
     wm.interfaces['agents'].parameters.subtype = 'predator'
     wm.controller.step()

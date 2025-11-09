@@ -30,11 +30,9 @@ def test_base_entity(environment_and_state, braitenberg):
     assert changes['color'][0]['__value'] == 'pink'
 
 
-def test_load_simulator_controller(scene_config):
-    config = scene_config('braitenberg')
-    component_config = config.environment.components
-    simulator = Simulator.from_config(config.simulator)
-    controller = SimulatorController.from_config(component_config, client=simulator)
+def test_load_simulator_controller(simulator_from_config):
+    simulator = simulator_from_config('braitenberg')
+    controller = SimulatorController.from_client(client=simulator)
     controllers = controller.controllers
     controller.step()
 
@@ -72,6 +70,14 @@ def test_load_simulator_controller(scene_config):
         controller.step()
         assert (not jnp.equal(pos, ag.position_center).all())
 
+    for ag in controllers['agents']:
+        ag.behaviors[0] = Behaviors.MANUAL
+        ag.motor = [1., 0.]
+
+    controller.step()
+
+    controller.apply_changes()
+    controller.update_state()
 
     controllers['collision'].epsilon = 42.
     controllers['collision'].alpha = 43.
@@ -80,13 +86,18 @@ def test_load_simulator_controller(scene_config):
     assert controller.state.collision_eps.item() == 42.
     assert controller.state.collision_alpha.item() == 43.
 
-    controller.simulator_parameters.freq = -10
-    controller.simulator_parameters.box_size = 42.
+    controllers['simulator'].freq = -10
+    controllers['simulator'].env.box_size = 41.
+    controllers['simulator'].env.box_size = 42.
+    controllers['simulator'].env.num_scan_steps = 42
     controller.apply_changes()
 
+    assert controllers['simulator'].freq == -10
+    assert controllers['simulator'].env.box_size == 42.
+    assert controllers['simulator'].env.num_scan_steps == 42
     assert controller.client.freq == -10
-    assert controller.client.box_size == 42.
     assert controller.client.env.box_size == 42.
+    assert controller.client.env.num_scan_steps == 42
 
     controllers['agents'][0].color = 'pink'
     controllers['objects'][2].visible = False
@@ -95,13 +106,11 @@ def test_load_simulator_controller(scene_config):
     assert not controller.client.controller_parameters.objects.visible[2]
     
     
-def test_controller_parameter_sync(scene_config):
-    config = scene_config('braitenberg')
-    component_config = config.environment.components
-    simulator = Simulator.from_config(config.simulator)
-    controller_1 = SimulatorController.from_config(component_config, client=simulator)
-    controller_2 = SimulatorController.from_config(component_config, client=simulator)
-    
+def test_controller_parameter_sync(simulator_from_config):
+    simulator = simulator_from_config('braitenberg')
+    controller_1 = SimulatorController.from_client(client=simulator)
+    controller_2 = SimulatorController.from_client(client=simulator)
+
     agents_1 = controller_1.controllers['agents']
     agents_2 = controller_2.controllers['agents']
     

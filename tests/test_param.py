@@ -83,15 +83,19 @@ def test_simulator_state_param(simulator_controller_from_config):
 
     controller = simulator_controller_from_config('braitenberg')
 
-    simulator_param = ParamSimulator(controller.client)
+    simulator_param = ParamSimulator(controller.simulator)
     simulator_param.update_from_server = True
-    assert simulator_param.freq == controller.client.freq
-    assert simulator_param.box_size == controller.client.box_size
+    assert simulator_param.freq == controller.simulator.freq
+    assert simulator_param.env.box_size == controller.simulator.env.box_size
 
     simulator_param.freq = -10
 
-    assert controller.client.freq == -10
-    assert controller.client.box_size == simulator_param.box_size
+    assert controller.simulator.freq == -10
+    assert controller.simulator.env.box_size == simulator_param.env.box_size
+    
+    simulator_param.env.box_size = 41.
+    assert controller.simulator.env.box_size == 41.
+    assert controller.simulator.freq == -10
 
 
 def test_controller_parameters(simulator_controller_from_config):

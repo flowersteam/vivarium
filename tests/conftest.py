@@ -66,13 +66,12 @@ def simulator_from_config(scene_config):
     def fn(scene_name):
         return Simulator.from_config(scene_config(scene_name).simulator)
     return fn
-    
+
 
 @pytest.fixture
 def simulator_controller_from_config(scene_config, simulator_from_config):
     def fn(scene_name, controller_cls=SimulatorController):
-        return controller_cls.from_config(
-            config=scene_config(scene_name).environment.components, 
+        return controller_cls.from_client(
             client=simulator_from_config(scene_name)
         )
     return fn
