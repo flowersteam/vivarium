@@ -234,7 +234,7 @@ class EntityList:
             c = e._change_recorder.fetch_changes()
             if c:
                 changes.append(c)
-        changes = [{'state': c} for c in changes]
+        changes = [{'state': c} for c in changes] #TODO: maybe not optimal, better to regroup by key?
         for e in self._entity_list:
             c = e._controller_change_recorder.fetch_changes()
             if c:
