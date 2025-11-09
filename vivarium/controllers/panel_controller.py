@@ -80,102 +80,14 @@ class ParamSimulator(ParameterizedData):
     to_jit = param.Boolean()
     # config_update = param.Boolean(False)
 
-    def __init__(self, simulator_state_wrapper, **params):
+    env = param.ClassSelector(class_=ParamEnvironment)
+
+
+    def __init__(self, simulator_controller):
         
-        super().__init__(simulator_state_wrapper, 
+        params = asdict(simulator_controller._obj)
+        params.pop('client_names', None)
+        params['env'] = ParamEnvironment(simulator_controller.env)
+        
+        super().__init__(simulator_controller, 
                          **params)
-
-
-class SimulatorParametersWrapper:
-    def __init__(self, simulator_parameters):
-        object.__setattr__(self, '_simulator_parameters', simulator_parameters)
-        object.__setattr__(self, '_change_recorder', ChangeRecorder())
-
-    def __getattr__(self, attr):
-        return getattr(self._simulator_parameters, attr)
-
-    def _setitem(self, attr, value, *idx):
-        setattr(self._change_recorder, attr, value)
-
-    def __setattr__(self, attr, value):
-        if attr in self.__dict__:
-            self.__dict__[attr] = value
-            return
-        self._setitem(attr, value)
-
-    def fetch_changes(self):
-        changes = self._change_recorder.fetch_changes()
-        return changes
-
-    def apply_to_state(self, simulator):  # TODO: change method name
-        changes = self.fetch_changes()
-        self._simulator = update_dataclass(simulator, changes)
-        self._change_recorder = ChangeRecorder()
-        return self._simulator
-
-
-
-class PanelSimulatorParametersWrapper(SimulatorParametersWrapper):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        object.__setattr__(self, 'config_update', False)
-        object.__setattr__(self, 'panel_parameters', ['config_update'])
-
-    def __getattr__(self, attr):
-        if attr in self.panel_parameters:
-            return object.__getattr__(self, attr)
-        return super().__getattr__(attr)
-
-    def __setattr__(self, attr, val):
-        if attr in self.panel_parameters:
-            object.__setattr__(self, attr, val)
-        else:
-            super().__setattr__(attr, val)
-            
-       
-# class PanelController_: #(SimulatorController):
-#     """Controller for the panel interface"""
-#     def __init__(self, client=None, subtypes=[], **controllers):
-        
-#         super().__init__(client=client, subtypes=subtypes, **controllers)
-
-#         # self.selected = {etype: Selected() for etype in controllers.keys()}
-        
-#         # self.selected_entities = {etype: controller.param_cls(self.entity_lists[etype], self.subtype_labels) 
-#         #                           for etype, controller in controllers.items()}
-
-#         # self.param_simulator = ParamSimulator(self.simulator_parameters)
-        
-#         # for s_ent in self.selected_entities.values():
-#         #     s_ent.update_from_server = True
-#         # self.param_simulator.update_from_server = True
-
-#         # self.update_selected()
-#         # for selected in self.selected.values():
-#         #     selected.param.watch(
-#         #         self.pull_selected_entities,
-#         #         ["selection"],
-#         #         onlychanged=True,
-#         #         precedence=1,
-#         #     )
-    
-#     def create_simulator_parameters_wrapper(self):
-#         self.simulator_parameters = PanelSimulatorParametersWrapper(self.simulator_parameters)
-
-#     # def update_selected(self, *events):
-#     #     """Update the entity list"""
-#     #     state = self.state
-#     #     for etype, selected in self.selected.items():
-#     #         selected.param.selection.objects = state.entity_type_idx(etype).tolist()
-
-#     # def pull_selected_entities(self, *events):
-#     #     """Pull the selected configurations"""
-#     #     for etype, selected in self.selected.items():
-#     #         self.selected_entities[etype].selection = selected.selection
-#     #         self.selected_entities[etype].update_from_server = True
-
-#     def pull_all_data(self):  # TODO: No longer needed?
-#         """Pull all the data from the simulator"""
-#         self.update_state()
-#         self.update_entity_lists()
-#         self.pull_selected_entities()

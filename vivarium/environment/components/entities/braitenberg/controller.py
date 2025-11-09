@@ -71,23 +71,6 @@ class AgentController(EntityController):
         return self.prox.tolist()
 
 
-# TODO: What's the purpose of this class? Not uses at the moment (May, 31, 2025) but the whole pipeline seems to work anyway.
-class PanelControllerAgent(AgentController):
-    def __init__(self, state, ent_idx, entity_type, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, controller_parameters)
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return object.__getattr__(self, attr)
-        return super().__getattr__(attr)
-
-    def __setattr__(self, attr, val):
-        if attr in self.__dict__:
-            object.__setattr__(self, attr, val)
-        else:
-            super().__setattr__(attr, val)
-
-
 class AgentNotebookController(NotebookControllerEntity, AgentController):
     """Agent class that represents an agent in the simulation
     """
