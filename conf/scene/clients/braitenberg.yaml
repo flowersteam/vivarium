@@ -5,6 +5,9 @@ controller_cls: vivarium.environment.components.entities.braitenberg.Braitenberg
 interface_cls: vivarium.environment.components.entities.braitenberg.BraitenbergInterface
 
 controller_kwargs:
+  behaviors:
+    _all_values_:
+      - NOOP: []
   color:
     _all_values_: red
   visible_wheels:
@@ -13,3 +16,4 @@ controller_kwargs:
     _all_values_: true
   shape:
     _all_values_: square
+
