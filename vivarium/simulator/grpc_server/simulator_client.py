@@ -2,7 +2,6 @@ import grpc
 from hydra.utils import get_class
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
-from vivarium.simulator.grpc_server.simulator_client_abc import SimulatorClient
 from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 
 from vivarium.utils.scene_configs import load_scene_config
@@ -14,7 +13,7 @@ Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
 
 
 # @access_nested_fields(nested_fields_to_access)
-class SimulatorGRPCClient(SimulatorClient):
+class SimulatorGRPCClient:
     """A client for the simulator server that uses gRPC.
     """
 
