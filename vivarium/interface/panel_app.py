@@ -10,13 +10,14 @@ from bokeh.models import (
     Range1d,
 )
 
-from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.controllers.panel_controller import ParamSimulator
-from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers import SimulatorController
+from vivarium.utils.scene_configs import load_scene_config
+from vivarium.controllers.panel_controller import ParamSimulator
+from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 
 
 lg = logging.getLogger(__name__)
+
 
 def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Column):
     interfaces = {}
@@ -34,16 +35,19 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-
-    def __init__(self, client=None, notebook_mode=False, testing_mode=False, **kwargs):
+    def __init__(self, controller=None, notebook_mode=False, testing_mode=False, **kwargs):
         super().__init__(**kwargs)
         pn.config.theme = 'dark'
 
-        client = client or SimulatorGRPCClient()
-        self.scene_config = load_scene_config(client.scene_name)
-        self.controller = SimulatorController.from_config(self.scene_config.environment.components,
-                                                          client=client,
-                                                          run_from_server=self.scene_config.simulator.run_from_server)
+        if controller is None:
+            client = SimulatorGRPCClient()
+            self.scene_config = load_scene_config(client.scene_name)
+            self.controller = SimulatorController.from_client(client=client)
+        else:
+            self.controller = controller
+            client = self.controller.client
+            self.scene_config = load_scene_config(client.scene_name)
+
         self.controller_names = list(self.controller.controllers.keys())
         
         self.interfaces = create_interfaces(
@@ -54,13 +58,13 @@ class WindowManager(Parameterized):
         )
         
         # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
-        self.param_simulator = ParamSimulator(self.controller.simulator_parameters)
+        self.param_simulator = ParamSimulator(self.controller.controllers['simulator'])
         self.param_simulator.update_from_server = True
 
         self.start_toggle = pn.widgets.Toggle(
             **(
                 {"name": "Pause simulator", "value": True}
-                if self.controller.is_running()
+                if self.controller.simulator.simulation_running
                 else {"name": "Start simulator", "value": False}
             ),
             align="center",
@@ -90,12 +94,8 @@ class WindowManager(Parameterized):
 
         :param event: The event for the new value of the button
         """
-        if event.new != self.controller.is_running():
-            if event.new:
-                self.controller.run()
-            else:
-                self.controller.stop()
-        self.start_toggle.name = "Pause simulator" if self.controller.is_running() else "Start simulator"
+        self.controller.simulator.simulation_running = event.new
+        self.start_toggle.name = "Pause simulator" if event.new else "Start simulator"
 
     def controller_toggle_cb(self, event):
         for cc in self.config_columns:
@@ -114,7 +114,7 @@ class WindowManager(Parameterized):
         for interface in self.interfaces.values():
             if interface.renderer is not None:
                 interface.renderer.update()
-        self.controller.apply_changes()
+        self.controller.apply_changes()  # Could this line and the one below be done in a single grpc call?
         state = self.controller.update_state()
         # if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
         #     self.controller.pull_selected_entities()
@@ -126,17 +126,16 @@ class WindowManager(Parameterized):
     def drag_n_drop_cb(self, event):
         if event.new:
             self.plot.toolbar.active_tap = self.point_draw_tool
-            if self.controller.run_from_server:
-                self.start_toggle.value = False
+            self.start_toggle.value = False
+            self.controller.apply_changes()
             if self.pcb_plot.running:
                 self.pcb_plot.stop()
             self.drag_n_drop.name = "Stop Drag & Drop"
         else:
             self.plot.toolbar.active_tap = None
-            if self.controller.run_from_server:
-                self.start_toggle.value = True
             if not self.pcb_plot.running:
                 self.pcb_plot.start()
+            self.start_toggle.value = True
             self.drag_n_drop.name = "Start Drag & Drop"
 
     def create_plot(self):
@@ -153,8 +152,8 @@ class WindowManager(Parameterized):
         p.grid.visible = False
         hover = HoverTool(tooltips=None)
         p.add_tools(hover)
-        p.x_range = Range1d(0, self.controller.simulator_parameters.box_size)
-        p.y_range = Range1d(0, self.controller.simulator_parameters.box_size)
+        p.x_range = Range1d(0, self.controller.controllers['simulator'].env.box_size)
+        p.y_range = Range1d(0, self.controller.controllers['simulator'].env.box_size)
         self.point_draw_tool = PointDrawTool(
             renderers=[interface.renderer.plot(p) for interface in self.interfaces.values() if interface.renderer is not None and interface.renderer.use_point_draw_tool],
             add=False,
@@ -188,7 +187,7 @@ class WindowManager(Parameterized):
         app = pn.Row(
             pn.Column(
                 pn.Row(
-                    self.start_toggle if self.controller.run_from_server else None,
+                    self.start_toggle,
                     self.plot_fps,
                     self.drag_n_drop,
                 ),
@@ -211,7 +210,6 @@ class WindowManager(Parameterized):
         )
         self.controller_toggle.param.watch(self.controller_toggle_cb, "value")
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
-        # self.update_switch.param.watch(self.update_switch_cb, "value")
         self.plot_fps.param.watch(self.update_plot_fps, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
 
