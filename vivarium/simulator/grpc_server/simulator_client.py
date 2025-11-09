@@ -49,13 +49,8 @@ class SimulatorGRPCClient:
         """
         state = self.stub.GetState(Empty())
         return proto_to_dataclass(state, self.state_cls)
-    
-    def get_simulator_parameters(self):
-        parameters = self.stub.GetSimulatorParameters(Empty())
-        return proto_to_dataclass(parameters) #, SimulatorConfiguration)
 
-    @property
-    def controller_parameters(self):
+    def get_controller_parameters(self):
         """Get the controller parameters of the simulator.
 
         :return: controller parameters
@@ -72,7 +67,6 @@ class SimulatorGRPCClient:
         response = self.stub.GetSceneName(Empty())
         scene_name = response.scene_name
         return scene_name
-
 
     def step(self, changes=None):
         """Step the simulator.
