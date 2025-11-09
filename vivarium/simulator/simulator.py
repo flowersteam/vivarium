@@ -199,21 +199,20 @@ class Simulator:
         self._is_running = False
         lg.info("Simulation run stops")
 
-    def update_sleep_time(self, frequency, elapsed_time):
-        """Compute the time we need to sleep to respect the update frequency
-
-        :param frequency: update state frequency
-        :param elapsed_time: time already used to compute the state
-        :return: time needed to sleep in addition to elapsed time to respect the frequency
-        """
-        # if we use the freq, compute the correct sleep time
-        if float(frequency) > 0.0:
-            perfect_time = 1.0 / float(frequency)
-            sleep_time = max(perfect_time - elapsed_time, 0)
-        # Else set it to zero
+            
+    def register_client(self, client_name):
+        if client_name not in self.controller_parameters.simulator.client_names:
+            self.controller_parameters.simulator.client_names.append(client_name)
+            lg.info(f"Client {client_name} registered to simulator.")
         else:
-            sleep_time = 0
-        return sleep_time
+            lg.warning(f"Client {client_name} is already registered.")
+
+    def unregister_client(self, client_name):
+        if client_name in self.controller_parameters.simulator.client_names:
+            self.controller_parameters.simulator.client_names.remove(client_name)
+            lg.info(f"Client {client_name} unregistered from simulator.")
+        else:
+            lg.warning(f"Client {client_name} is not registered.")
 
     def start_recording(self, saving_name):
         """Start the recording of the simulation

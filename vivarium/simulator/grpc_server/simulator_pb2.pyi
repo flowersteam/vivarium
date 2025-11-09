@@ -182,3 +182,9 @@ class Scene(_message.Message):
     SCENE_NAME_FIELD_NUMBER: _ClassVar[int]
     scene_name: str
     def __init__(self, scene_name: _Optional[str] = ...) -> None: ...
+
+class Client(_message.Message):
+    __slots__ = ("name",)
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    def __init__(self, name: _Optional[str] = ...) -> None: ...

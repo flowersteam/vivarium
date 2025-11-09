@@ -61,10 +61,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         p = dataclass_to_proto(state)
         return p
     
-    def GetSimulatorParameters(self, request, context):
-        parameters = SimulatorConfiguration.from_simulator(self.simulator)
-        return dataclass_to_proto(parameters)
-    
     def GetControllerParameters(self, request, context):
         return dataclass_to_proto(self.simulator.controller_parameters)
 
@@ -77,6 +73,18 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
             self.simulator.controller_parameters = proto_to_dataclass(request)
         return Empty()
     
+    def RegisterClient(self, request, context):
+        lg.info(f"Registering client: {request.name}")
+        with self._lock:
+            self.simulator.register_client(request.name)
+        return Empty()
+
+    def UnregisterClient(self, request, context):
+        lg.info(f"Unregistering client: {request.name}")
+        with self._lock:
+            self.simulator.unregister_client(request.name)
+        return Empty()
+
     def Start(self, request, context):
         self.simulator.run(threaded=True)
         return Empty()

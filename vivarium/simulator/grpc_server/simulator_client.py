@@ -93,3 +93,11 @@ class SimulatorGRPCClient(SimulatorClient):
     def is_running(self):
         """Check if the simulator is started."""
         return self.stub.IsRunning(Empty()).is_running
+    
+    def register_client(self, name):
+        """Register a client with the simulator."""
+        self.stub.RegisterClient(simulator_pb2.Client(name=name))
+        
+    def unregister_client(self, name):
+        """Unregister a client from the simulator."""
+        self.stub.UnregisterClient(simulator_pb2.Client(name=name))
