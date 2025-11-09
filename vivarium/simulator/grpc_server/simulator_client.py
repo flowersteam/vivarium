@@ -1,4 +1,5 @@
 import grpc
+import uuid
 from hydra.utils import get_class
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
@@ -18,9 +19,10 @@ class SimulatorGRPCClient:
     """
 
     def __init__(self, name=None):
-        self.name = name
+        self.name = name if name is not None else str(uuid.uuid4())
         channel = grpc.insecure_channel("localhost:50051")
         self.stub = simulator_pb2_grpc.SimulatorServerStub(channel)
+        self.register_client(self.name)
         config = load_scene_config(self.scene_name)
         update_fns = [f.update_state_cls for f in component_factories_from_config(config.environment.components)]
         self.state_cls = create_state_cls(
