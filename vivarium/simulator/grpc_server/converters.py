@@ -267,7 +267,7 @@ def dataclass_to_proto(dataclass):
                     simulator_pb2.Value(bool_value=dataclass)
                 )
     elif isinstance(dataclass, list):
-        if isinstance(dataclass[0], bool):
+        if len(dataclass) == 0 or isinstance(dataclass[0], bool):
             value = simulator_pb2.Value(list_bool_value=simulator_pb2.ListBool(list=dataclass))
         elif isinstance(dataclass[0], (float, int)):
             value = simulator_pb2.Value(list_float_value=simulator_pb2.ListFloat(list=dataclass))
