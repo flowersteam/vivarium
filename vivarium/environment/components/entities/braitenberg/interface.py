@@ -62,14 +62,14 @@ class ParamAgent(ParamEntity):
     def update_behavior(self, event, slot_idx, subtype):
         for ag_idx in self.selection:
             if event.name.startswith('behavior_'):
-                self.data[ag_idx].behaviors[slot_idx].label = Behaviors[event.new]
+                self.controller[ag_idx].behaviors[slot_idx].label = Behaviors[event.new]
             elif event.name.startswith('sensed_'):
-                sensed = set(self.data[ag_idx].behaviors[slot_idx].sensed)
+                sensed = set(self.controller[ag_idx].behaviors[slot_idx].sensed)
                 if event.new:
                     sensed.add(subtype)
                 else:
                     sensed.discard(subtype)
-                self.data[ag_idx].behaviors[slot_idx].sensed = list(sensed)
+                self.controller[ag_idx].behaviors[slot_idx].sensed = list(sensed)
 
 
 class AgentRenderer(EntityRenderer):

@@ -20,7 +20,7 @@ class ParamParticleLenia(ParamEntity):
         creature = CREATURES[event.new]
         for i in self.selection:
             for attr in ['mu_k', 'sigma_k', 'w_k', 'mu_g', 'sigma_g', 'c_rep']:
-                setattr(self.data[i], attr, creature[attr])
+                setattr(self.controller[i], attr, creature[attr])
 
 
 class ParticleLeniaInterface(EntityInterface):

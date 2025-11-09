@@ -13,9 +13,9 @@ lg = logging.getLogger(__name__)
 class ParameterizedData(param.Parameterized):
     update_from_server = param.Event()
 
-    def __init__(self, data, **params):
+    def __init__(self, controller, **params):
         super().__init__(**params)
-        self.data = data
+        self.controller = controller
         self.selection = None
         self.direct_mapping_parameters = self._direct_mapping_parameters()
         self.param.watch(self.update_to, self.direct_mapping_parameters, onlychanged=True)
@@ -23,7 +23,7 @@ class ParameterizedData(param.Parameterized):
     @param.depends('update_from_server', watch=True)
     def update_from(self):
         self.allow_update_to = False  # Prevents to call update_to callback for each updated parameter
-        data = self.data if self.selection is None else self.data[self.selection[0]]
+        data = self.controller if self.selection is None else self.controller[self.selection[0]]
         for p in self.direct_mapping_parameters:
             setattr(self, p, getattr(data, p))
         self.allow_update_to = True
@@ -31,11 +31,11 @@ class ParameterizedData(param.Parameterized):
     def update_to(self, event):
         if self.allow_update_to:
             if self.selection is None:
-                setattr(self.data,
+                setattr(self.controller,
                         event.name, event.new)
                 return
             for idx in self.selection:
-                setattr(self.data[idx],
+                setattr(self.controller[idx],
                         event.name, event.new)
 
 

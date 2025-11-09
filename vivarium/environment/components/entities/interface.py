@@ -59,7 +59,7 @@ class ParamEntity(ParameterizedData):
 
     @property
     def selected_entity_data(self):
-        return self.data[self.selection[0]]
+        return self.controller[self.selection[0]]
 
 
 class EntityRenderer(Renderer):

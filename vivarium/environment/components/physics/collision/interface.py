@@ -10,7 +10,7 @@ class CollisionParam(ParameterizedData):
     alpha = param.Number()
 
     def __init__(self, controller, **params):
-        super().__init__(data=controller, **params)
+        super().__init__(controller=controller, **params)
 
 
 class CollisionInterface(Interface):
