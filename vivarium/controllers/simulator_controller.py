@@ -96,7 +96,9 @@ class SimulatorController:
         # Add a local time for the run function independant from the controller time
         run_time = 0
         while run_time < num_steps and self._is_running:
-            # self.execute_routines_and_behaviors(catch_errors=catch_errors)
+            # Step through controllers (e.g. routines and behaviors)
+            for _, controller in self.controllers.items():
+                controller.step(time=self.time, catch_errors=catch_errors)
 
             with sleep_timer(freq=self.controllers['simulator'].freq):
                 self.step()
