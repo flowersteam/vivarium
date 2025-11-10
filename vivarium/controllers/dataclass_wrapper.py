@@ -290,13 +290,16 @@ class Remote: # TODO: use this class instead of ChangeRecorder everywhere
                 pending_ops[path[0]] = self._rec(path[1:], value, pending_ops[path[0]] if path[0] in pending_ops else {})
             return pending_ops
 
-    def set_state(self, state):
-        pass
-
     def fetch_changes(self):
         pending_ops = self._pending_ops
         self._pending_ops = {}
         return [pending_ops] if len(pending_ops) > 0 else []
 
+    def set_state(self, state):
+        pass
+
     def set_controller_parameters(self, controller_parameters):
         self._obj = controller_parameters
+        
+    def step(self, time, catch_errors=True):
+        pass
