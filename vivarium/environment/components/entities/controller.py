@@ -157,6 +157,7 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         object.__setattr__(self, 'internal', InternalData())
         object.__setattr__(self, '_subtype_labels', subtype_labels)
         object.__setattr__(self, '_mapping', get_entity_parameter_mapping(subtype_labels))
+        object.__setattr__(self, 'routine_handler', RoutineHandler())
         self._hide_non_existing()
 
     def __getattr__(self, item):
@@ -196,58 +197,6 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         exists = self.exists if exists is None else exists
         if hide_non_existing:
             self.visible = exists
-
-class EntityList:
-    def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
-        self._state = state
-        self.entity_type = entity_type
-        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type_idx]
-
-    def __getitem__(self, idx):
-        return self._entity_list[idx]
-
-    def __setitem__(self, idx, value):
-        raise NotImplementedError('Setting values directly is not supported.')
-
-    def __iter__(self):
-        return iter(self._entity_list)
-
-    def __len__(self):
-        return len(self._entity_list)
-
-    def __repr__(self):
-        return repr(self._entity_list)
-
-    def apply_to_state(self, state):
-        for entity in self._entity_list:
-            state = entity.apply_to_state(state)
-        return state
-
-    def set_state(self, state):
-        self._state = state
-        for entity in self._entity_list:  # TODO: Is this loop really needed? If it makes a copy of the state of each entity, might take a lot of space..
-            entity.set_state(state)
-
-    def fetch_changes(self):
-        changes = []
-        for e in self._entity_list:
-            c = e._change_recorder.fetch_changes()
-            if c:
-                changes.append(c)
-        changes = [{'state': c} for c in changes] #TODO: maybe not optimal, better to regroup by key?
-        for e in self._entity_list:
-            c = e._controller_change_recorder.fetch_changes()
-            if c:
-                changes.append({'controller_parameters': {self.entity_type: c}})
-        return changes
-
-
-class NotebookControllerEntity(EntityController):
-    """Entity class that represents an entity in the simulation"""
-
-    def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, subtype_labels, controller_parameters)
-        object.__setattr__(self, 'routine_handler', RoutineHandler())
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
@@ -301,7 +250,51 @@ class NotebookControllerEntity(EntityController):
     def print_routines(self):
         """Print the entity's routines"""
         self.routine_handler.print_routines()
-    
+
+
+class EntityList:
+    def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
+        self._state = state
+        self.entity_type = entity_type
+        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type_idx]
+
+    def __getitem__(self, idx):
+        return self._entity_list[idx]
+
+    def __setitem__(self, idx, value):
+        raise NotImplementedError('Setting values directly is not supported.')
+
+    def __iter__(self):
+        return iter(self._entity_list)
+
+    def __len__(self):
+        return len(self._entity_list)
+
+    def __repr__(self):
+        return repr(self._entity_list)
+
+    def apply_to_state(self, state):
+        for entity in self._entity_list:
+            state = entity.apply_to_state(state)
+        return state
+
+    def set_state(self, state):
+        self._state = state
+        for entity in self._entity_list:  # TODO: Is this loop really needed? If it makes a copy of the state of each entity, might take a lot of space..
+            entity.set_state(state)
+
+    def fetch_changes(self):
+        changes = []
+        for e in self._entity_list:
+            c = e._change_recorder.fetch_changes()
+            if c:
+                changes.append(c)
+        changes = [{'state': c} for c in changes] #TODO: maybe not optimal, better to regroup by key?
+        for e in self._entity_list:
+            c = e._controller_change_recorder.fetch_changes()
+            if c:
+                changes.append({'controller_parameters': {self.entity_type: c}})
+        return changes
 
 class EntityListController(EntityList):
     def __init__(self, entity_type, state, 
@@ -310,7 +303,7 @@ class EntityListController(EntityList):
                  notebook_control=False,
                  **kwargs
                  ):
-        controller_cls = (EntityController if not notebook_control else NotebookControllerEntity) if controller_cls is None else controller_cls
+        controller_cls = EntityController if controller_cls is None else controller_cls
         self.subtype_labels = subtype_labels
         self.name = entity_type
         self.controller_parameters = create_dataclass_from_dict(
