@@ -36,7 +36,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     def __init__(self, simulator):
         self.simulator = simulator
         self.simulator.init_state()
-        self.recorded_change_dict = defaultdict(dict)
         self._lock = Lock()
 
     def SetChanges(self, request, context):
