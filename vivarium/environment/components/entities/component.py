@@ -61,10 +61,14 @@ class EntityComponent(Component):
     def get_kwargs(config, exclude=[]):
         kwargs = super(EntityComponent, EntityComponent).get_kwargs(config)
                             
+        if 'n_exists' in config:
+            n_exists = config.n_exists
+            kwargs['exists'] = [i < n_exists for i in range(config['n_max'])]
+        
         config.update(kwargs)
         kwargs.update(compute_parameters(config))
 
-        exclude = exclude + ['_target_', 'n_max', 'subtype_labels', 'by_indices', 'client']
+        exclude = exclude + ['_target_', 'n_max', 'n_exists', 'subtype_labels', 'by_indices', 'client']
         kwargs = {k: v for k, v in config.items()
                     if k not in exclude}
 

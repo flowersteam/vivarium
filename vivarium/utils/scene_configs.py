@@ -67,9 +67,12 @@ def extend_kwargs(kwargs, n):
             for each in val:
                 for label, data in each.items():
                     for k, v in data.items():
-                        if k != 'indices' and k != 'client':
+                        if k != 'indices' and k != 'client' and k != 'n_exists':
                             for idx in data.indices:
                                 kwargs[k][idx] = v
+                        elif k == 'n_exists':
+                            for i, idx in enumerate(data.indices):
+                                kwargs['exists'][idx] = i < data.n_exists
             
     return kwargs
 
