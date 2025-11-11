@@ -229,17 +229,16 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
 
         :return: entity's infos
         """
-        dict_infos = self.config.to_dict()
 
         info_lines = []
         info_lines.append("Entity Overview:")
         info_lines.append(f"{'-' * 20}")
-        info_lines.append(f"Type: {self.etype.name}")
-        info_lines.append(f"Subtype: {self.subtype_label}")
-        info_lines.append(f"Idx: {self.idx}")
-        info_lines.append(f"Exists: {self.exists}")
+        info_lines.append(f"Type: {self._entity_type}")
+        info_lines.append(f"Subtype: {self._subtype_labels[self.entity_subtype]}")
+        info_lines.append(f"Idx: {self._entity_type_idx}")
+        info_lines.append(f"Exists: {bool(self.exists)}")
         info_lines.append(
-            f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}"
+            f"Position: x={self.x_position:.2f}, y={self.y_position:.2f}"
         )
         info_lines.append(f"Diameter: {self.diameter:.2f}")
         info_lines.append(f"Color: {self.color}")

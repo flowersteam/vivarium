@@ -159,33 +159,11 @@ class AgentController(EntityController):
         """
         super().print_infos()
         info_lines = []
-        sensors = self.sensors()
+        sensors = self.proximeters()
         info_lines.append(f"Sensors: Left={sensors[0]:.2f}, Right={sensors[1]:.2f}")
         info_lines.append(
             f"Motors: Left={self.left_motor:.2f}, Right={self.right_motor:.2f}"
         )
-
-        dict_infos = self.config.to_dict()
-        if full_infos:
-            info_lines.append(
-                ""
-            )  # add a space between other infos and eating infos atm
-            info_lines.append(f"Diet: {self.diet}")
-            info_lines.append(f"Eating range: {self.eating_range}")
-            info_lines.append("\nConfiguration Details:")
-            for k, v in dict_infos.items():
-                if k not in [
-                    "x_position",
-                    "y_position",
-                    "diameter",
-                    "color",
-                    "behavior",
-                    "left_motor",
-                    "right_motor",
-                    "params",
-                    "sensed",
-                ]:
-                    info_lines.append(f"  - {k}: {v}")
 
         info_lines.append("")
 
