@@ -69,7 +69,9 @@ class AgentController(EntityController):
         
     def proximeters(self, sensed_entities=None):
         """Return the proximeters values of the agent"""
-        #TODO: implement sensed_entities filtering (see AgentNotebookController)
+        if sensed_entities is not None:
+            sensed = [self._subtype_labels.index(label) for label in sensed_entities]
+            return np.max(self.prox_per_subtype[:, sensed], axis=1).tolist()
         return self.prox.tolist()
 
     def attach_behavior(
