@@ -158,7 +158,6 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         object.__setattr__(self, '_subtype_labels', subtype_labels)
         object.__setattr__(self, '_mapping', get_entity_parameter_mapping(subtype_labels))
         object.__setattr__(self, 'routine_handler', RoutineHandler())
-        self._hide_non_existing()
 
     def __getattr__(self, item):
         if item in self.__dict__:
@@ -187,16 +186,6 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         else:
             pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
             super().__setattr__(pm.jax_attr, pm.ctrl_to_jax_fn(val))
-        if item == 'hide_non_existing':
-            self._hide_non_existing(hide_non_existing=val)
-        elif item == 'exists':
-            self._hide_non_existing(exists=val)
-
-    def _hide_non_existing(self, hide_non_existing=None, exists=None):
-        hide_non_existing = self.hide_non_existing if hide_non_existing is None else hide_non_existing
-        exists = self.exists if exists is None else exists
-        if hide_non_existing:
-            self.visible = exists
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity

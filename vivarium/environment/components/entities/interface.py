@@ -33,6 +33,9 @@ class Selected(param.Parameterized):
     def __len__(self):
         return len(self.selection)
 
+class ParamGlobal(param.Parameterized):
+    hide_non_existing = param.Boolean()
+
 
 class ParamEntity(ParameterizedData):
     x_position = param.Number()
@@ -45,7 +48,6 @@ class ParamEntity(ParameterizedData):
     color = param.Color()
     shape = param.String()
     visible = param.Boolean()
-    hide_non_existing = param.Boolean()
 
     def __init__(self, entities, subtype_labels, **params):
 
@@ -70,6 +72,7 @@ class EntityRenderer(Renderer):
         selected, etype, state,
         shape,
         line_width=1.0,
+        hide_non_existing=True,
     ):
         self.etype = etype
         # TODO: for now only the shape of the first entity is considered
@@ -85,6 +88,8 @@ class EntityRenderer(Renderer):
         
         
         self.line_width = line_width
+        self.hide_non_existing = hide_non_existing
+        
         self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
         selected.param.watch(
@@ -94,9 +99,7 @@ class EntityRenderer(Renderer):
         self.selected_param_entity.param.watch(self.update_cds_view,
                                                self.panel_visibility_parameters,
                                                onlychanged=True)
-        self.selected_param_entity.param.watch(self.apply_visible_filter,
-                                               ["exists", "hide_non_existing"],
-                                               onlychanged=True)
+        
         self.apply_visible_filter()
         
         self._lock = Lock()
@@ -174,15 +177,16 @@ class EntityRenderer(Renderer):
         self.cds.selected.indices = event.new
 
 
-    def apply_visible_filter(self, *args, **kwargs):
+    def apply_visible_filter(self):
         for attr in self.panel_visibility_parameters:
-            self.cds_view[attr].filter = BooleanFilter([e.visible and getattr(e, attr) for e in self.entities])
+            self.cds_view[attr].filter = BooleanFilter([(e.exists if self.hide_non_existing else e.visible) and getattr(e, attr) for e in self.entities])
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""
         indices = self.cds.selected.indices
         if len(indices) > 0 and indices != self.selected.selection:
             self.selected.selection = indices
+        self.apply_visible_filter()
 
     def plot(self, fig: figure):
         """Plot the objects on the bokeh figure
@@ -251,7 +255,10 @@ class EntityInterface(Interface):
         
         super().__init__(controller, parameters, panel_cls=panel_cls, renderer=renderer)
         
-        self.widget.insert(1, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))
+        self.global_params = ParamGlobal(hide_non_existing=self.renderer.hide_non_existing)
+        
+        self.widget.insert(1, pn.panel(self.global_params))
+        self.widget.insert(2, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))
         
 
         self.selected.param.watch(
@@ -260,8 +267,18 @@ class EntityInterface(Interface):
             onlychanged=True,
             precedence=1,
         )
-
+        
+        self.global_params.param.watch(
+            self.set_hide_non_existing,
+            ["hide_non_existing"],
+            onlychanged=True,
+            precedence=1,
+        )
+    def set_hide_non_existing(self, event):
+        self.renderer.hide_non_existing = event.new
+        
     def pull_selected_entities(self, *events):
         """Pull the selected configurations"""
         self.parameters.selection = self.selected.selection
         self.parameters.update_from_server = True
+        
