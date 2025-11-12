@@ -19,4 +19,4 @@ class CollisionController(ComponentController):
             )
         }
 
-        super().__init__(name, state, mapping=mapping)
+        super().__init__(name, state, mapping=mapping, path=('state',))

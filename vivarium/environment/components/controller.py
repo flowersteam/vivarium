@@ -1,6 +1,6 @@
 from operator import attrgetter
 
-from vivarium.controllers.dataclass_wrapper import ChangeRecorder
+from vivarium.controllers.dataclass_wrapper import Remote
 
 
 class AttributeMapping:
@@ -8,16 +8,15 @@ class AttributeMapping:
         self.jax_attr = jax_attr
         self.ctrl_attr = ctrl_attr if ctrl_attr is not None else jax_attr
         self.jax_to_ctrl_fn = jax_to_ctrl_fn if jax_to_ctrl_fn is not None else lambda x: x
-        self.ctrl_to_jax_fn = ctrl_to_jax_fn if ctrl_to_jax_fn is not None else lambda x: x
-        
+        self.ctrl_to_jax_fn = ctrl_to_jax_fn if ctrl_to_jax_fn is not None else lambda x: x        
 
 
 class ComponentController:
-    def __init__(self, name, state, mapping):
+    def __init__(self, name, state, mapping, path=()):
         self._name = name
         self._state = state
         self._mapping = mapping
-        self._change_recorder = ChangeRecorder()
+        self._remote = Remote(self._state, path=path)
 
     @classmethod
     def from_config(cls, name, client_config, state, mapping={}, notebook_control=False, **controller_kwargs):
@@ -40,7 +39,7 @@ class ComponentController:
             object.__setattr__(self, attr, value)
         else:
             attr, value = self.to_jax(attr, value)
-            attrgetter(attr)(self._change_recorder).store_change(value)
+            setattr(self._remote, attr, value)
             
     def to_jax(self, attr, value=None):
         if attr in self._mapping:
@@ -54,10 +53,8 @@ class ComponentController:
         self._state = state
 
     def fetch_changes(self):
-        changes = self._change_recorder.fetch_changes()
-        if changes:
-            return [{'state': changes}]
-        return []
+        changes = self._remote.fetch_changes()
+        return changes
 
     def step(self, time, catch_errors):
         pass
