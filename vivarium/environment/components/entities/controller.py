@@ -3,7 +3,7 @@ import numpy as np
 from vivarium.controllers.utils import RoutineHandler
 from vivarium.controllers.dataclass_wrapper import ChangeRecorder, create_dataclass_from_dict, update_dataclass
 
-from ..controller import AttributeMapping
+from ....controllers.controller import AttributeMapping
 
 class InternalData:
     pass

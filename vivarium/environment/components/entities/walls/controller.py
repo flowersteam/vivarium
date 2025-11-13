@@ -1,9 +1,11 @@
 import numpy as np
 
-from ...controller import ComponentController, AttributeMapping
+from .....controllers.controller import Controller
+
+from .....controllers.controller import AttributeMapping
 
 
-class WallController(ComponentController):
+class WallController(Controller):
     def __init__(self, name, state, mapping=None):
         
         mapping = mapping or {

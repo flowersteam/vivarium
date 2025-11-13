@@ -1,6 +1,13 @@
-from ...controller import ComponentController
+from .....controllers.controller import Controller
 
 
-class SpawnController(ComponentController):
-    def __init__(self, name, state, mapping=None):
-        super().__init__(name, getattr(state, f'{name}_state'), mapping=mapping, path=('state', f'{name}_state'))
+class SpawnController(Controller):
+
+    def __getattr__(self, attr):
+        return getattr(self._remote.state, f'{self._name}_state').__getattr__(attr).obj()
+    
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            object.__setattr__(self, attr, value)
+        else:
+            getattr(self._remote.state, f'{self._name}_state').__setattr__(attr, value)
