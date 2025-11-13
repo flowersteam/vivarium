@@ -1,13 +1,15 @@
 import grpc
 import uuid
 from hydra.utils import get_class
-from vivarium.simulator.grpc_server import simulator_pb2_grpc
-import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
-from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 
+from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
+import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
+from vivarium.simulator.grpc_server import simulator_pb2_grpc
+
+from vivarium.environment.state import create_state_cls
+from vivarium.controllers.dataclass_wrapper import Remote
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.utils.scene_configs import component_factories_from_config
-from vivarium.environment.state import create_state_cls
 
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
@@ -30,6 +32,8 @@ class SimulatorGRPCClient:
             update_fns=update_fns
         )
         self.state = self.get_state()
+        self.controller_parameters = self.get_controller_parameters()
+        self.remote = Remote(self)
 
     def apply_changes(self, changes):
         proto_changes = changes_to_proto(changes)
