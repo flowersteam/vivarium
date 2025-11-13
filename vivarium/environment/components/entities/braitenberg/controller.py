@@ -171,14 +171,14 @@ class AgentController(EntityController):
 
 
 class BraitenbergController(EntityListController):
-    def __init__(self, entity_type, state, 
+    def __init__(self, entity_type, remote, 
                  subtype_labels=None, 
                  notebook_control=False,
                  **kwargs
                  ):
         super().__init__(
             entity_type=entity_type,
-            state=state,
+            remote=remote,
             subtype_labels=subtype_labels,
             controller_cls=AgentController,
             notebook_control=notebook_control,

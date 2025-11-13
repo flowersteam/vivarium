@@ -285,12 +285,13 @@ class EntityList:
         return changes
 
 class EntityListController(EntityList):
-    def __init__(self, entity_type, state, 
+    def __init__(self, entity_type, remote, 
                  subtype_labels=None,  # TODO: not used yet but should be to access/change it from the SimulatorController
                  controller_cls=None,
                  notebook_control=False,
                  **kwargs
                  ):
+        state = remote.state.obj()
         controller_cls = EntityController if controller_cls is None else controller_cls
         self.subtype_labels = subtype_labels
         self.name = entity_type
@@ -309,10 +310,10 @@ class EntityListController(EntityList):
         )
         
     @classmethod
-    def from_config(cls, name, client_config, state, notebook_control=False, **controller_kwargs):
+    def from_config(cls, name, client_config, remote, notebook_control=False, **controller_kwargs):
         return cls(
             entity_type=name,
-            state=state,
+            remote=remote,
             subtype_labels=client_config['subtype_labels'],
             notebook_control=notebook_control,
             **controller_kwargs

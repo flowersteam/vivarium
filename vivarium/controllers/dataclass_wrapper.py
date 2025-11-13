@@ -269,6 +269,9 @@ class Remote: # TODO: use this class instead of ChangeRecorder everywhere
         full_path = self._path + (key,)
         self._root._record_operation(full_path, value)
 
+    def obj(self):
+        return self._obj
+
     def _wrap(self, obj, path):
         # Wrap nested objects to propagate proxy behavior
         if isinstance(obj, (list, dict, Remote)) or hasattr(obj, '__dict__'):
