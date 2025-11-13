@@ -1,13 +1,14 @@
 import jax.numpy as jnp
 
 from jax_md import energy, partition, quantity, smap, space
+from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environment.utils import neighbors_entity_mask
 from vivarium.environment.components.component import Component
 from vivarium.environment.components.utils import f32, handle_rigid_body
 
 
-def collision_force_fn(displacement):
+def collision_force_fn(displacement, state_attr):
 
     def coll_force_fn(sigma, epsilon, alpha):
         """Compute the collision force on the system
@@ -38,11 +39,13 @@ def collision_force_fn(displacement):
         :return: collision force function
         """
 
+        collision_state = getattr(state, state_attr)
+
         #TODO: filter sources and targets based on their existence
         fn = coll_force_fn(
             sigma=(state.entity_state.diameter[:, jnp.newaxis] + state.entity_state.diameter[neighbor.idx]) / 2.,
-            epsilon=state.collision_eps,
-            alpha=state.collision_alpha
+            epsilon=collision_state.epsilon,
+            alpha=collision_state.alpha
         )
 
 
@@ -68,6 +71,10 @@ def collision_force_fn(displacement):
 
     return force_fn
 
+@md_dataclass
+class CollisionState:
+    epsilon: jnp.ndarray
+    alpha: jnp.ndarray
 
 class CollisionComponent(Component):
     def __init__(self, name, precedence, epsilon, alpha, mask_fn):
@@ -75,6 +82,7 @@ class CollisionComponent(Component):
         self.epsilon = epsilon
         self.alpha = alpha
         self.mask_fn = mask_fn
+        self.state_attr = f'{self.name}_state'
 
     def to_config(self, state):
         config = super().to_config(state)
@@ -87,20 +95,20 @@ class CollisionComponent(Component):
 
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
-            collision_eps=jnp.array(self.epsilon),
-            collision_alpha=jnp.array(self.alpha)
-            )
+            **{self.state_attr: CollisionState(
+                epsilon=jnp.array(self.epsilon),
+                alpha=jnp.array(self.alpha)
+            )}
+        )
 
     def update_state_cls(self, state_cls):
-        state_cls.__annotations__['collision_eps'] = f32
-        state_cls.__annotations__['collision_alpha'] = f32
-        state_cls.collision_eps = None
-        state_cls.collision_alpha = None
-        return state_cls
+        state_cls.__annotations__[self.state_attr] = CollisionState
+        setattr(state_cls, self.state_attr, None)
+        return state_cls        
 
     def get_step_function(self, state, neighbor_manager, key):
         self.displacement = neighbor_manager.displacement
-        coll_fn = collision_force_fn(self.displacement)
+        coll_fn = collision_force_fn(self.displacement, self.state_attr)
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
             force = coll_fn(state, neighbor, mask)
