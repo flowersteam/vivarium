@@ -10,7 +10,7 @@ from bokeh.models import (
     Range1d,
 )
 
-from vivarium.controllers import SimulatorController
+from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers.panel_controller import ParamSimulator
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -42,7 +42,7 @@ class WindowManager(Parameterized):
         if controller is None:
             client = SimulatorGRPCClient()
             self.scene_config = load_scene_config(client.scene_name)
-            self.controller = SimulatorController.from_client(client=client)
+            self.controller = VivariumController.from_client(client=client)
         else:
             self.controller = controller
             client = self.controller.client

@@ -11,7 +11,7 @@ from vivarium.environment.components.physics.step.component import StepComponent
 from vivarium.environment import Environment, NeighborManager, MaskFunction
 from vivarium.environment.state import BaseState, create_state_cls
 from vivarium.interface.panel_app import create_interfaces
-from vivarium.controllers import SimulatorController
+from vivarium.controllers import VivariumController
 from vivarium.environment import Environment
 from vivarium.simulator import Simulator
 
@@ -70,7 +70,7 @@ def simulator_from_config(scene_config):
 
 @pytest.fixture
 def simulator_controller_from_config(scene_config, simulator_from_config):
-    def fn(scene_name, controller_cls=SimulatorController):
+    def fn(scene_name, controller_cls=VivariumController):
         return controller_cls.from_client(
             client=simulator_from_config(scene_name)
         )

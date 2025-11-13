@@ -9,7 +9,7 @@ import numpy as np
 
 from vivarium.controllers.utils import RoutineHandler
 from vivarium.utils.scene_configs import load_scene_config
-from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.controllers.vivarium_controller import VivariumController
 from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 
 
@@ -25,7 +25,7 @@ else:
     lg.setLevel(logging.WARNING)
 
    
-class NotebookController(SimulatorController):
+class NotebookController(VivariumController):
     """
     NotebookController class that enables the user to control the simulation on the client side, typically from a Jupyter Notebook
     """

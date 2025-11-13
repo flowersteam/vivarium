@@ -2,7 +2,7 @@ import jax.numpy as jnp
 
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 from vivarium.environment.components.entities.braitenberg.controller import BraitenbergController
-from vivarium.controllers.simulator_controller import SimulatorController
+from vivarium.controllers.vivarium_controller import VivariumController
 from vivarium.simulator import Simulator
 
 
@@ -32,7 +32,7 @@ def test_base_entity(environment_and_state, braitenberg):
 
 def test_load_simulator_controller(simulator_from_config):
     simulator = simulator_from_config('braitenberg')
-    controller = SimulatorController.from_client(client=simulator)
+    controller = VivariumController.from_client(client=simulator)
     controllers = controller.controllers
     controller.step()
 
@@ -108,8 +108,8 @@ def test_load_simulator_controller(simulator_from_config):
     
 def test_controller_parameter_sync(simulator_from_config):
     simulator = simulator_from_config('braitenberg')
-    controller_1 = SimulatorController.from_client(client=simulator)
-    controller_2 = SimulatorController.from_client(client=simulator)
+    controller_1 = VivariumController.from_client(client=simulator)
+    controller_2 = VivariumController.from_client(client=simulator)
 
     agents_1 = controller_1.controllers['agents']
     agents_2 = controller_2.controllers['agents']

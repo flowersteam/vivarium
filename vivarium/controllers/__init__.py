@@ -1,2 +1,2 @@
-from .simulator_controller import SimulatorController
+from .vivarium_controller import VivariumController
 from .notebook_controller import NotebookController

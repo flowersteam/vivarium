@@ -6,6 +6,7 @@ from dataclasses import asdict, fields
 
 from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+from vivarium.simulator.controller import SimulatorController
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers.dataclass_wrapper import Remote
 from vivarium.utils.timer import sleep_timer
@@ -17,14 +18,15 @@ lg = logging.getLogger(__name__)
 
 def start_session(scene_name, run=True):
     start_server_and_interface(cmd_args=[f'scene={scene_name}'])
-    controller = SimulatorController.from_client()
+    controller = VivariumController.from_client()
     controller.simulator.run_from = controller.client.name
     if run:
         controller.simulator.simulation_running = True
         controller.apply_changes()
     return controller
 
-class SimulatorController:
+
+class VivariumController:
 
     def __init__(self, client=None, subtypes=[], **controllers):
         self.client = client or SimulatorGRPCClient()
@@ -37,7 +39,7 @@ class SimulatorController:
         self._is_running = False
         
         cp = self.client.get_controller_parameters()
-        self.controllers['simulator'] = Remote(cp.simulator, path=('controller_parameters', 'simulator'))
+        self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
 
     @classmethod
     def from_client(cls, client=None):
@@ -51,7 +53,7 @@ class SimulatorController:
             if 'client' in c_config and 'controller_cls' in c_config.client:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
                 p = {} if name not in cp or cp[name] is None else cp[name]
-                controllers[name] = c_cls.from_config(name, c_config.client, state, **p)
+                controllers[name] = c_cls.from_config(name, c_config.client, client.remote, **p)
         return cls(
             client=client,
             subtypes=components_config.subtype_labels,
@@ -129,16 +131,19 @@ class SimulatorController:
 
     def update_controllers(self, state=None, controller_parameters=None):
         """Update the controllers."""
-        if state is None and controller_parameters is None:
-            lg.warning("No state or controller parameters provided to update controllers")
-        if controller_parameters is not None:
-            cp_fields = [f.name for f in fields(controller_parameters)]
-        for name, controller in self.controllers.items():
-            if state is not None:
-                controller.set_state(state)
-            if controller_parameters is not None:
-                if name in cp_fields:
-                    controller.set_controller_parameters(getattr(controller_parameters, name))
+        
+        # TODO: block below to be removed?
+        # if state is None and controller_parameters is None:
+        #     lg.warning("No state or controller parameters provided to update controllers")
+        # if controller_parameters is not None:
+        #     cp_fields = [f.name for f in fields(controller_parameters)]
+        # for name, controller in self.controllers.items():
+        #     if state is not None:
+        #         controller.set_state(state)
+        #     if controller_parameters is not None:
+        #         if name in cp_fields:
+        #             controller.set_controller_parameters(getattr(controller_parameters, name))
+        
         if self.simulator.run_from == self.client.name:
             if self.is_running() != self.simulator.simulation_running:
                 if self.simulator.simulation_running:
@@ -155,12 +160,13 @@ class SimulatorController:
         return self.state
 
     def fetch_changes(self):
-        changes = []
-        for _, controller in self.controllers.items():
-            change = controller.fetch_changes()
-            changes.extend(change)
+        return self.client.remote.fetch_changes()
+        # changes = []
+        # for _, controller in self.controllers.items():
+        #     change = controller.fetch_changes()
+        #     changes.extend(change)
 
-        return changes
+        # return changes
 
     def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
