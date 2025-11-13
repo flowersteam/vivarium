@@ -25,12 +25,12 @@ class SpawnComponent(Component):
 
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
-            spawn_state=SpawnState(
+            **{self.state_attr: SpawnState(
                 subtype=jnp.array(self.subtype),
                 period=jnp.array(self.period),
                 position_range=jnp.array(self.position_range),
                 orientation_range=jnp.array(self.orientation_range)
-            )
+            )}
         )
 
     def update_state_cls(self, state_cls):
