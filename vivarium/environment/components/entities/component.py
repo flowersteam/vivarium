@@ -1,6 +1,5 @@
 import jax.numpy as jnp
 
-from vivarium.environment.components.entities.controller import EntityController
 from vivarium.environment.components.component import Component
 from vivarium.utils.scene_configs import compute_parameters
 
@@ -11,8 +10,6 @@ from vivarium.utils.scene_configs import compute_parameters
 
 
 class EntityComponent(Component):
-
-    controller_cls = EntityController
 
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction, exists, subtype_labels=None
