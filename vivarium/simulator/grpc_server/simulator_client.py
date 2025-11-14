@@ -20,10 +20,10 @@ class SimulatorGRPCClient:
     """A client for the simulator server that uses gRPC.
     """
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, server=None):
         self.name = name if name is not None else str(uuid.uuid4())
-        channel = grpc.insecure_channel("localhost:50051")
-        self.stub = simulator_pb2_grpc.SimulatorServerStub(channel)
+        self.channel = grpc.insecure_channel(server or "localhost:50051")
+        self.stub = simulator_pb2_grpc.SimulatorServerStub(self.channel)
         self.register_client(self.name)
         config = load_scene_config(self.scene_name)
         update_fns = [f.update_state_cls for f in component_factories_from_config(config.environment.components)]
@@ -96,3 +96,7 @@ class SimulatorGRPCClient:
     def unregister_client(self, name):
         """Unregister a client from the simulator."""
         self.stub.UnregisterClient(simulator_pb2.Client(name=name))
+        
+    def close(self):
+        """Close the gRPC channel."""
+        self.channel.close()
