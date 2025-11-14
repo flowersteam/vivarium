@@ -19,7 +19,7 @@ service SimulatorServer {
   
   rpc GetControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
-  rpc SetControllerAtrributes(Dataclass) returns (google.protobuf.Empty) {}
+  rpc GetStateAndControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
   // send changes made on the client side to the simulator server
   rpc SetChanges(StateChangeList) returns (Dataclass) {}

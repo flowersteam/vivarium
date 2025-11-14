@@ -37,21 +37,30 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         self.simulator = simulator
         self.simulator.init_state()
         self._lock = Lock()
-
-    def SetChanges(self, request, context):
-        changes = proto_to_changes(request)
+    
+    def _step(self):
+        assert not self.simulator.is_running()
+        self.simulator.step()
+        
+    def _apply_changes(self, changes):
         with self._lock:
             with self.simulator.pause():
-                self.simulator.apply_changes(changes)
-        return self.GetControllerParameters(None, None)
+                self.simulator.apply_changes(changes)           
+    
+    def Step(self, request, context):
+        self._step()
+        return dataclass_to_proto(self.simulator.state)
+    
+    def SetChanges(self, request, context):
+        changes = proto_to_changes(request)
+        self._apply_changes(changes)
+        return self.GetStateAndControllerParameters(None, None)
 
     def SetChangesAndStep(self, request, context):
-        proto_cp = self.SetChanges(request, context)
-        proto_state = self.Step(None, None)
-        proto_dataclass = simulator_pb2.Dataclass()
-        proto_dataclass.nested_fields['controller_parameters'].CopyFrom(proto_cp)
-        proto_dataclass.nested_fields['state'].CopyFrom(proto_state)
-        return proto_dataclass
+        changes = proto_to_changes(request)
+        self._apply_changes(changes)
+        self._step()
+        return self.GetStateAndControllerParameters(None, None)
 
     def GetState(self, request, context):
         state = self.simulator.state
@@ -60,15 +69,14 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
     
     def GetControllerParameters(self, request, context):
         return dataclass_to_proto(self.simulator.controller_parameters)
+    
+    def GetStateAndControllerParameters(self, request, context):
+        state_and_cp = self.simulator.get_state_and_controller_parameters()
+        return dataclass_to_proto(state_and_cp)
 
     def GetSceneName(self, request, context):
         scene_name = self.simulator.scene_name
         return simulator_pb2.Scene(scene_name=scene_name)
-
-    def SetControllerAtrributes(self, request, context):
-        with self._lock:
-            self.simulator.controller_parameters = proto_to_dataclass(request)
-        return Empty()
     
     def RegisterClient(self, request, context):
         lg.info(f"Registering client: {request.name}")
@@ -101,11 +109,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
                 request.nested_field, ent_idx, col_idx, proto_to_ndarray(request.value)
             )
         return Empty()
-
-    def Step(self, request, context):
-        assert not self.simulator.is_running()
-        self.simulator.step()
-        return dataclass_to_proto(self.simulator.state)
 
 
 def serve(simulator):

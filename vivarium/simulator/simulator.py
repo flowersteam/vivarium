@@ -250,6 +250,9 @@ class Simulator:
 
     def get_controller_parameters(self):
         return self.controller_parameters
+    
+    def get_state_and_controller_parameters(self):
+        return StateAndControllerParameters(state=self.state, controller_parameters=self.controller_parameters)
 
     def stop(self, blocking=True):
         """Stop the simulation
