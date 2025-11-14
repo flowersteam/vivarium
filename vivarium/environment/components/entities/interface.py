@@ -123,10 +123,11 @@ class EntityRenderer(Renderer):
         :param state: The state coming from the server
         :return: Data dictionary for the ColumnDataSource
         """
-        pos = state.position_center(self.etype)
+        etype_state = getattr(state, self.etype)
+        pos = state.entity_state.position[etype_state.entity_idx]
         x, y = pos[:, 0], pos[:, 1]
-        o = state.position_orientation(self.etype)
-        d = state.diameter(self.etype)
+        o = state.entity_state.orientation[etype_state.entity_idx]
+        d = state.entity_state.diameter[etype_state.entity_idx]
 
         colors = [e.color for e in self.entities]
 
