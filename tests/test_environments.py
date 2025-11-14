@@ -39,8 +39,9 @@ def test_load_save_env_config(scene_config):
 
     env.box_size = 42.
     state = state.set(
-        collision_eps=42.,
-    )
+        collision_state = state.collision_state.set(
+            epsilon=42.,
+    ))
 
     new_env_config = env.to_config(state)
 
@@ -53,4 +54,4 @@ def test_load_save_env_config(scene_config):
     
     assert new_env.box_size == 42.
     assert new_env.get_factory_by_name('collision').epsilon == 42.
-    assert new_state.collision_eps == 42.
+    assert new_state.collision_state.epsilon == 42.
