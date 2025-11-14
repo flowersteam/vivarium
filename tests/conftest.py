@@ -1,5 +1,8 @@
+import grpc
 import pytest
 import jax.numpy as jnp
+from concurrent import futures
+
 
 from vivarium.environment.components.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
 from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
@@ -7,9 +10,12 @@ from vivarium.environment.components.entities.braitenberg.component import Brait
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
 from vivarium.environment.components.entities.braitenberg.interface import ParamAgent
+from vivarium.simulator.grpc_server.simulator_server import SimulatorServerServicer
 from vivarium.environment.components.physics.step.component import StepComponent
+from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.environment import Environment, NeighborManager, MaskFunction
 from vivarium.environment.state import BaseState, create_state_cls
+from vivarium.simulator.grpc_server import simulator_pb2_grpc
 from vivarium.interface.panel_app import create_interfaces
 from vivarium.controllers import VivariumController
 from vivarium.environment import Environment
@@ -69,27 +75,62 @@ def simulator_from_config(scene_config):
 
 
 @pytest.fixture
-def simulator_controller_from_config(scene_config, simulator_from_config):
-    def fn(scene_name, controller_cls=VivariumController):
+def simulator_controller():
+    def fn(client, controller_cls=VivariumController):
         return controller_cls.from_client(
-            client=simulator_from_config(scene_name)
+            client=client
         )
     return fn
 
 
 @pytest.fixture
-def controller_and_interfaces_from_config(scene_config, simulator_controller_from_config):
-    def fn(scene_name):
-        controller = simulator_controller_from_config(scene_name)
-        config = scene_config(scene_name)
+def controller_and_interfaces_from_config(scene_config, simulator_controller):
+    def fn(client):
+        controller = simulator_controller(client)
+        config = scene_config(controller.client.scene_name)
         interfaces = create_interfaces(
             config.environment.components.component_list,
             controller.controllers,
-            controller.state,
+            controller.client.state,
         )
         return controller, interfaces
     return fn
 
+
+@pytest.fixture#(scope="module")
+def grpc_server(simulator_from_config):
+    
+    servers = []
+    
+    def fn(scene_name):
+        simulator = simulator_from_config(scene_name)
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        simulator_pb2_grpc.add_SimulatorServerServicer_to_server(
+            SimulatorServerServicer(simulator), server
+        )
+        port = server.add_insecure_port('[::]:0')  # Random available port
+        server.start()
+        servers.append(server)
+        
+        return f'localhost:{port}'
+       
+    yield fn
+    
+    for server in servers:
+        server.stop(grace=5)
+
+
+@pytest.fixture
+def grpc_client(grpc_server):
+    clients = []
+    def fn(scene_name):
+        client = SimulatorGRPCClient(server=grpc_server(scene_name))
+        return client
+    
+    yield fn
+    
+    for client in clients:
+        client.close()
 
 def factory_names(factories):
     return [f.name for f in factories]
