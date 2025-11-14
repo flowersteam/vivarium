@@ -2,8 +2,6 @@ import param
 import logging
 from dataclasses import asdict
 
-from vivarium.controllers.dataclass_wrapper import ChangeRecorder, update_dataclass
-
 
 # TODO: (2025-08-26) Rename this file, which will only contain code for param<->simulator/state communication
 
