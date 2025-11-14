@@ -224,11 +224,11 @@ def proto_to_dataclass(dataclass, dataclass_type=None):
     elif dataclass.value.HasField('str_value'):
         return dataclass.value.str_value
     elif dataclass.value.HasField('list_float_value'):
-        return dataclass.value.list_float_value.list
+        return list(dataclass.value.list_float_value.list)
     elif dataclass.value.HasField('list_string_value'):
-        return dataclass.value.list_string_value.list
+        return list(dataclass.value.list_string_value.list)
     elif dataclass.value.HasField('list_bool_value'):
-        return dataclass.value.list_bool_value.list
+        return list(dataclass.value.list_bool_value.list)
     elif dataclass.value.HasField('list_behaviors_value'):
         list_behaviors = []
         for behaviors in dataclass.value.list_behaviors_value.list:
