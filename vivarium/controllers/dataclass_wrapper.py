@@ -1,12 +1,9 @@
+from omegaconf import DictConfig
 from dataclasses import field, make_dataclass
 
 import jax.numpy as jnp
 import numpy as np
 
-from omegaconf import DictConfig
-from jax_md.dataclasses import is_dataclass
-
-from vivarium.environment.state import field_accessors
 from vivarium.environment.utils import is_jax_md_dataclass
 
 
@@ -92,157 +89,22 @@ def update_dataclass(dataclass_instance, changes):
     return dataclass_instance
 
 
-class ChangeRecorder:
-    def __init__(self, name=None, idx=None):   
-        self._name = name
-        self.__idx = idx
-        self._changes = []
-        self._children = {}
-
-    @property
-    def _idx(self):
-        return self.__idx
-
-    @_idx.setter
-    def _idx(self, value):
-        if isinstance(value, jnp.ndarray):
-            if len(value.shape) > 0:
-                value = value.tolist()
-            else:
-                value = value.item()
-        self.__idx = value
-
-    def store_change(self, value):
-        self._changes.append({'__idx': self._idx, '__value': value})
-
-    def fetch_changes(self):
-        
-        if self._changes:
-            changes = self._changes
-            self._changes = []
-        else:
-            changes = {}
-            for attr, child in self._children.items():
-                changes[attr] = child.fetch_changes()
-            self._children = {}
-        return changes
-
-    def __getitem__(self, idx):
-        self._idx = idx
-        return self
-
-    def __setitem__(self, idx, value):
-        self._idx = idx
-        self.store_change(value)
-
-    def __getattr__(self, attr):
-        if attr.startswith('_'):
-            return super().__getattribute__(attr)
-        if attr not in self._children and attr != '__iter__':
-            if attr == '__iter__':
-                print('__iter__!!')
-            self._children[attr] = ChangeRecorder(name=attr)
-        return self._children[attr]
-    
-    def __setattr__(self, attr, value):
-        if attr.startswith('_'):
-            super().__setattr__(attr, value)
-        else:
-            getattr(self, attr).store_change(value)
-
-
-@field_accessors
-class DataclassWrapper:
-    def __init__(self, dataclass_instance=None):
-        object.__setattr__(self, '_root_change_recorder', ChangeRecorder())
-        object.__setattr__(self, '_last_change_recorder', self._root_change_recorder)
-        object.__setattr__(self, '_dataclass_instance', dataclass_instance)
-        object.__setattr__(self, '_nested_fields', [])
-
-    def _reinit(self):
-        object.__setattr__(self, '_last_change_recorder', self._root_change_recorder)
-        object.__setattr__(self, '_nested_fields', [])
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return self.__dict__[attr]
-        
-        #TODO: The possibility to use this class with an internal state might not be needed, 
-        # EntityState does this (but its usecase is the notebook controller, not raw state as here)
-        if self._dataclass_instance is not None:
-            if attr in self._dataclass_instance.__dict__:
-                self._reinit()
-            leaf = self._get_if_leaf(attr)
-            if leaf is not None:
-                print(f"Returning leaf {attr}")
-                return leaf
-            self._nested_fields.append(attr)
-        
-        self._last_change_recorder = getattr(self._last_change_recorder, attr)
-        return self
-
-    def __setattr__(self, attr, value):
-        if attr in self.__dict__:
-            self.__dict__[attr] = value
-            return
-        getattr(self._last_change_recorder, attr).store_change(value)
-    
-    def __getitem__(self, idx):
-        self._last_change_recorder = self._last_change_recorder[idx]
-        return self
-    
-    def __setitem__(self, idx, value):
-        self._last_change_recorder[idx] = value
-
-    def _get_if_leaf(self, attr):
-        dataclass_instance = self._dataclass_instance
-        for field in self._nested_fields:
-            dataclass_instance = getattr(dataclass_instance, field)
-        if isinstance(getattr(dataclass_instance, attr), (np.ndarray, jnp.ndarray)):
-            self._reinit()
-            return getattr(dataclass_instance, attr)
-        else:
-            return None
-
-    def set(self, value):
-        self._last_change_recorder.store_change(value)
-        return self
-
-    def update_dataclass(self, dataclass_instance, changes):
-        dataclass_instance = update_dataclass(dataclass_instance, changes)
-        return dataclass_instance
-    
-    def fetch_changes(self):
-        changes = self._root_change_recorder.fetch_changes()
-        self._root_change_recorder = ChangeRecorder()
-        self._last_change_recorder = self._root_change_recorder
-        return changes
-
-    def apply(self, dataclass_instance=None):
-        dataclass_instance = dataclass_instance or self._dataclass_instance
-        assert dataclass_instance is not None, 'A dataclass instance must be provided either in the constructor or as argument of this method.'
-        changes = self.fetch_changes()
-        dataclass_instance = update_dataclass(dataclass_instance, changes)
-        if self._dataclass_instance is not None:
-            self._dataclass_instance = dataclass_instance
-        return dataclass_instance
-
-
-class Remote: # TODO: use this class instead of ChangeRecorder everywhere
-    def __init__(self, obj, root=None, path=()):
+class Remote:
+    def __init__(self, obj=None, set_obj=False, root=None, path=()):
         self._obj = obj  # Local copy of the data
+        self._set_obj = set_obj  # Whether to set self._obj on assignment
         self._path = path  # Path to this object from the root (for operations)
 
-        # Root proxy handles batching and network calls
+        # Root proxy handles batching
         if root is None:
-            self._root = self
+            self._root = self # Needed?
             self._pending_ops = {}
         else:
             self._root = root
 
     def __getattr__(self, name):
         try:
-            attr = getattr(self._obj, name)
+            attr = getattr(self._obj, name) if self._obj is not None else None
         except AttributeError as e:
             raise AttributeError(f"{type(self._obj).__name__} has no attribute '{name}'") from e
         return self._wrap(attr, self._path + (name,))
@@ -251,60 +113,62 @@ class Remote: # TODO: use this class instead of ChangeRecorder everywhere
         if name.startswith('_'):
             super().__setattr__(name, value)
         else:
-            if is_jax_md_dataclass(self._obj):
-                self._obj = self._obj.set(**{name: value})
-            else:
-                setattr(self._obj, name, value)
+            if self._obj is not None and self._set_obj:
+                if is_jax_md_dataclass(self._obj):
+                    self._obj = self._obj.set(**{name: value})
+                else:
+                    setattr(self._obj, name, value)
             full_path = self._path + (name,)
             self._root._record_operation(full_path, value)
 
     def __getitem__(self, key):
         try:
-            item = self._obj[key]
+            item = self._obj[key] if self._obj is not None else None
         except (IndexError, KeyError, TypeError) as e:
             raise type(e)(f"Invalid access at path {self._path}: {e}") from e
         return self._wrap(item, self._path + (key,))
 
-    def __setitem__(self, key, value):
-        full_path = self._path + (key,)
-        self._root._record_operation(full_path, value)
+    def __setitem__(self, idx, value):
+        self._root._record_operation(self._path, value, idx=idx)
 
     def obj(self):
         return self._obj
 
     def _wrap(self, obj, path):
         # Wrap nested objects to propagate proxy behavior
-        if isinstance(obj, (list, dict, Remote)) or hasattr(obj, '__dict__'):
-            return Remote(obj, root=self._root, path=path)
+        if isinstance(obj, (np.ndarray, jnp.ndarray)) and len(obj.shape) == 0:
+            # for consistency with numpy scalars
+            return obj.item()
+        if isinstance(obj, (list, dict, np.ndarray, Remote)) or (hasattr(obj, '__dict__')) or obj is None:
+            return Remote(obj, set_obj=self._set_obj, root=self._root, path=path)
         return obj  # Primitives don't need wrapping
 
-    def _record_operation(self, path, value):
-        operation = self._rec(path, value, self._pending_ops)
-        self._pending_ops.update(operation)
+    def _record_operation(self, path, value, idx=None):
+        self._rec(path, value, self._pending_ops, idx)
 
-    def _rec(self, path, value, pending_ops):
+    def _rec(self, path, value, pending_ops, idx):
         if len(path) == 0:
-            return [{'__idx': None, '__value': value}]
+            return [{'__idx': idx, '__value': value}]
         else:
             if path[0] in pending_ops:
                 if len(path) > 1:
-                    pending_ops[path[0]].update(self._rec(path[1:], value, pending_ops[path[0]]))
+                    pending_ops[path[0]].update(self._rec(path[1:], value, pending_ops[path[0]], idx))
                 else:
-                    pending_ops[path[0]].extend(self._rec(path[1:], value, pending_ops[path[0]]))
+                    pending_ops[path[0]].extend(self._rec(path[1:], value, pending_ops[path[0]], idx))
             else:
-                pending_ops[path[0]] = self._rec(path[1:], value, pending_ops[path[0]] if path[0] in pending_ops else {})
+                pending_ops[path[0]] = self._rec(path[1:], value, pending_ops[path[0]] if path[0] in pending_ops else {}, idx)
             return pending_ops
 
     def fetch_changes(self):
         pending_ops = self._pending_ops
         self._pending_ops = {}
         return [pending_ops] if len(pending_ops) > 0 else []
-
-    def set_state(self, state):
-        pass
-
-    def set_controller_parameters(self, controller_parameters):
-        self._obj = controller_parameters
-        
-    def step(self, time, catch_errors=True):
-        pass
+    
+    def apply(self, obj=None, changes=None):
+        changes = changes or self.fetch_changes()
+        if obj is None:
+            assert self._obj is not None, 'An object must be provided either in the constructor or as argument of this method.'
+            self._obj = update_dataclass_from_change_list(self._obj, changes)
+            return self._obj
+        obj = update_dataclass_from_change_list(obj, changes)
+        return obj
