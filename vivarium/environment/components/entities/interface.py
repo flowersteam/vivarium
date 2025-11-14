@@ -75,8 +75,8 @@ class EntityRenderer(Renderer):
         hide_non_existing=True,
     ):
         self.etype = etype
-        # TODO: for now only the shape of the first entity is considered
-        self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
+        
+        self.shape = getattr(Shape, shape.upper()) if isinstance(shape, str) else shape
         self.entities = entities
         
         super().__init__(state, use_point_draw_tool=True)
@@ -239,7 +239,7 @@ class EntityInterface(Interface):
     
     def __init__(self, controller, state, panel_cls=Column):
         
-        parameters = self.param_cls(controller, controller.subtype_labels, **asdict(controller.controller_parameters[0]))
+        parameters = self.param_cls(controller, controller.subtype_labels)
         
         self.selected = Selected()
         self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
@@ -250,7 +250,7 @@ class EntityInterface(Interface):
                 selected=self.selected,
                 etype=controller.entity_type,
                 state=state,
-                shape=controller.controller_parameters.shape,
+                shape=controller[0].shape, # TODO: for now only the shape of the first entity is considered
             )
         
         super().__init__(controller, parameters, panel_cls=panel_cls, renderer=renderer)
