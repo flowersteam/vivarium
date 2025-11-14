@@ -108,6 +108,7 @@ class Simulator:
                 OmegaConf.create(
                     {'client': {
                         'controller_kwargs': {
+                            'subtype_labels': self.controller_parameters.simulator.subtype_labels,
                             'freq': self.freq,
                             'scene_name': self.scene_name
                             }
