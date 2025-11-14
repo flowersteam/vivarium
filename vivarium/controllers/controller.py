@@ -10,7 +10,7 @@ class AttributeMapping:
         
 
 class Controller:
-    def __init__(self, name, remote, mapping={}, path=()):
+    def __init__(self, name, remote, mapping={}):
         self._name = name
         self._remote = remote
         self._mapping = mapping
@@ -46,15 +46,6 @@ class Controller:
                 value = mapping.ctrl_to_jax_fn(value)
         return (attr, value) if value is not None else attr
 
-    def set_state(self, state):
-        pass
-    
-    def set_controller_parameters(self, controller_parameters):
-        pass
-
-    def fetch_changes(self):
-        changes = self._remote.fetch_changes()
-        return changes
 
     def step(self, time, catch_errors):
         pass
