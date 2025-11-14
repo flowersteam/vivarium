@@ -16,7 +16,7 @@ class Controller:
         self._mapping = mapping
 
     @classmethod
-    def from_config(cls, name, client_config, remote, mapping={}, **controller_kwargs):
+    def from_config(cls, name, remote, mapping={}):
         return cls(
             name=name,
             remote=remote,

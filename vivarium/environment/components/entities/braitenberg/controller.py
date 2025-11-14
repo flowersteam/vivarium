@@ -173,22 +173,20 @@ class AgentController(EntityController):
 class BraitenbergController(EntityListController):
     def __init__(self, entity_type, remote, 
                  subtype_labels=None, 
-                 notebook_control=False,
-                 **kwargs
                  ):
         super().__init__(
             entity_type=entity_type,
             remote=remote,
             subtype_labels=subtype_labels,
             controller_cls=AgentController,
-            notebook_control=notebook_control,
-            **kwargs
         )
         
-        if 'behaviors' in kwargs:
-            assert len(kwargs['behaviors'][0]) <= len(self._entity_list[0].behavior_params), \
-                f"Number of behaviors per agent in the config ({len(kwargs['behaviors'][0])}) exceeds the max number of behaviors in state ({len(self._entity_list[0].behavior_params)})"
-            for i_agent, behaviors in enumerate(kwargs['behaviors']):
+        cp = getattr(remote.controller_parameters, entity_type, {}).obj()
+        
+        if hasattr(cp, 'behaviors'):
+            assert len(cp.behaviors[0]) <= len(self._entity_list[0].behavior_params), \
+                f"Number of behaviors per agent in the config ({len(cp.behaviors[0])}) exceeds the max number of behaviors in state ({len(self._entity_list[0].behavior_params)})"
+            for i_agent, behaviors in enumerate(cp.behaviors):
                 for i_behavior, behavior in enumerate(behaviors):
                     for label, sensed in behavior.items():
                         self._entity_list[i_agent].behaviors[i_behavior].label = getattr(Behaviors, label)

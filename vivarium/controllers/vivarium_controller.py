@@ -2,7 +2,6 @@ import math
 import hydra
 import logging
 import threading
-from dataclasses import asdict, fields
 
 from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -46,14 +45,11 @@ class VivariumController:
         client = client or SimulatorGRPCClient()
         scene_config = load_scene_config(client.scene_name)
         components_config = scene_config.environment.components       
-        state = client.get_state()
-        cp = asdict(client.get_controller_parameters())
         controllers = {}
         for name, c_config in components_config.component_list.items():
             if 'client' in c_config and 'controller_cls' in c_config.client:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
-                p = {} if name not in cp or cp[name] is None else cp[name]
-                controllers[name] = c_cls.from_config(name, c_config.client, client.remote, **p)
+                controllers[name] = c_cls.from_config(name, client.remote)
         return cls(
             client=client,
             subtypes=components_config.subtype_labels,
