@@ -53,7 +53,7 @@ class WindowManager(Parameterized):
         self.interfaces = create_interfaces(
             self.scene_config.environment.components.component_list,
             self.controller.controllers,
-            self.controller.state,
+            self.controller.client.state,
             panel_cls=pn.Column
         )
         
@@ -114,8 +114,8 @@ class WindowManager(Parameterized):
         for interface in self.interfaces.values():
             if interface.renderer is not None:
                 interface.renderer.update()
-        self.controller.apply_changes()  # Could this line and the one below be done in a single grpc call?
-        state = self.controller.update_state()
+        self.controller.apply_changes()
+        state = self.controller.client.state
         # if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
         #     self.controller.pull_selected_entities()
         for interface in self.interfaces.values():
