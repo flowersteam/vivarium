@@ -7,7 +7,6 @@ from vivarium.utils.handle_server_interface import start_server_and_interface, s
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.simulator.controller import SimulatorController
 from vivarium.utils.scene_configs import load_scene_config
-from vivarium.controllers.dataclass_wrapper import Remote
 from vivarium.utils.timer import sleep_timer
 
 
@@ -29,7 +28,6 @@ class VivariumController:
 
     def __init__(self, client=None, subtypes=[], **controllers):
         self.client = client or SimulatorGRPCClient()
-        self.state = self.client.get_state()
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
@@ -37,7 +35,6 @@ class VivariumController:
         self.time = 0
         self._is_running = False
         
-        cp = self.client.get_controller_parameters()
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
 
     @classmethod
@@ -121,25 +118,14 @@ class VivariumController:
 
     def step(self):
         changes = self.fetch_changes()
-        state_and_cp = self.client.step(changes)
-        self.state = state_and_cp.state
-        self.update_controllers(state=self.state, controller_parameters=state_and_cp.controller_parameters)
+        self.client.step(changes)
 
-    def update_controllers(self, state=None, controller_parameters=None):
-        """Update the controllers."""
-        
-        # TODO: block below to be removed?
-        # if state is None and controller_parameters is None:
-        #     lg.warning("No state or controller parameters provided to update controllers")
-        # if controller_parameters is not None:
-        #     cp_fields = [f.name for f in fields(controller_parameters)]
-        # for name, controller in self.controllers.items():
-        #     if state is not None:
-        #         controller.set_state(state)
-        #     if controller_parameters is not None:
-        #         if name in cp_fields:
-        #             controller.set_controller_parameters(getattr(controller_parameters, name))
-        
+    def fetch_changes(self):
+        return self.client.remote.fetch_changes()
+
+    def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
+        changes = changes or self.fetch_changes()
+        self.client.apply_changes(changes)
         if self.simulator.run_from == self.client.name:
             if self.is_running() != self.simulator.simulation_running:
                 if self.simulator.simulation_running:
@@ -147,34 +133,12 @@ class VivariumController:
                 else:
                     self.stop()
         elif self.is_running():
-            self.stop()
-
-    def update_state(self):
-        """Update the state from server to client."""
-        self.state = self.client.get_state()
-        self.update_controllers(state=self.state)
-        return self.state
-
-    def fetch_changes(self):
-        return self.client.remote.fetch_changes()
-        # changes = []
-        # for _, controller in self.controllers.items():
-        #     change = controller.fetch_changes()
-        #     changes.extend(change)
-
-        # return changes
-
-    def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
-        changes = changes or self.fetch_changes()
-        if len(changes) > 0:
-            cp = self.client.apply_changes(changes)
-        else:
-            cp = self.client.get_controller_parameters()
-        self.update_controllers(controller_parameters=cp)
+            self.stop()        
             
     def stop_session(self, safe_mode=False):
         """Stop the session: simulation, server and interface"""
         if self._is_running:
             self.stop()
+        self.client.close()
         stop_server_and_interface(safe_mode=safe_mode)
         
