@@ -27,7 +27,8 @@ class ParameterizedData(param.Parameterized):
             if isinstance(getattr(self, p), ParameterizedData):
                 getattr(self, p).update_from()
             else:
-                setattr(self, p, getattr(data, p))
+                if not getattr(self.param, p).constant:
+                    setattr(self, p, getattr(data, p))
         self.allow_update_to = True
 
     def update_to(self, event):
@@ -89,6 +90,7 @@ class ParamSimulator(ParameterizedData):
     scene_name = param.String()
     simulation_running = param.Boolean()
     run_from = param.String()
+    subtype_labels = param.List(constant=True)
 
     # client_names = param.Selector()
     # config_update = param.Boolean(False)
