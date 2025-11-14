@@ -77,7 +77,7 @@ class EntityComponent(Component):
         return kwargs
 
     def init_base_entity(self, entity_state):
-        self.entity_type_int = entity_state.entity_type.max() + 1 if len(entity_state.entity_type) > 0 else 0
+        self.entity_type_int = jnp.array(entity_state.entity_type.max() + 1 if len(entity_state.entity_type) > 0 else 0)
         self.offset = entity_state.exists.shape[0]
         return entity_state.add_new_entities(
             positions=self.position,
