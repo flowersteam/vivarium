@@ -2,6 +2,7 @@ _target_: vivarium.simulator.Simulator
 client:
   controller_kwargs:
     scene_name: ${....scene_name}
+    subtype_labels: ${....subtype_labels}
     freq: 40.
     client_names: []
     run_from: server
