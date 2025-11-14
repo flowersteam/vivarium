@@ -86,9 +86,10 @@ class CollisionComponent(Component):
 
     def to_config(self, state):
         config = super().to_config(state)
+        collision_state = getattr(state, self.state_attr)
         config.update({
-            'epsilon': state.collision_eps.item() if isinstance(state.collision_eps, jnp.ndarray) else state.collision_eps,
-            'alpha': state.collision_alpha.item() if isinstance(state.collision_alpha, jnp.ndarray) else state.collision_alpha,
+            'epsilon': collision_state.epsilon.item() if isinstance(collision_state.epsilon, jnp.ndarray) else collision_state.epsilon,
+            'alpha': collision_state.alpha.item() if isinstance(collision_state.alpha, jnp.ndarray) else collision_state.alpha,
             'mask_fn': self.mask_fn.to_config(state)
         })
         return config
