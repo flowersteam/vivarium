@@ -114,23 +114,23 @@ def get_entity_parameter_mapping(subtype_labels):
     return {
         '_default_': lambda attr: AttributeMapping(
             attr,
-            jax_to_ctrl_fn=lambda x: x.item() if len(x.shape) == 0 else np.array(x),
-            ctrl_to_jax_fn=lambda x: np.array(x)
+            remote_to_ctrl_fn=lambda x: x.item() if len(x.shape) == 0 else np.array(x),
+            ctrl_to_remote_fn=lambda x: np.array(x)
         ),
         'mass': AttributeMapping(
             'mass',
-            jax_to_ctrl_fn=lambda x: x[0].item(),
-            ctrl_to_jax_fn=lambda x: np.array([x])
+            remote_to_ctrl_fn=lambda x: x[0].item(),
+            ctrl_to_remote_fn=lambda x: np.array([x])
         ),
         'exists': AttributeMapping(
             'exists',
-            jax_to_ctrl_fn=lambda x: bool(x.item()),
-            ctrl_to_jax_fn=lambda x: np.array(int(x))
+            remote_to_ctrl_fn=lambda x: bool(x.item()),
+            ctrl_to_remote_fn=lambda x: np.array(int(x))
         ),
         'subtype': AttributeMapping(
             'entity_subtype',
-            jax_to_ctrl_fn=lambda x: subtype_labels[x.item()],
-            ctrl_to_jax_fn=lambda x: np.array(subtype_labels.index(x), dtype=int)
+            remote_to_ctrl_fn=lambda x: subtype_labels[x.item()],
+            ctrl_to_remote_fn=lambda x: np.array(subtype_labels.index(x), dtype=int)
         )
     }
 
@@ -158,7 +158,7 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         if item in self._controller_parameters_fields:
             return getattr(getattr(self._remote.controller_parameters, self._entity_type), item)[self._entity_type_idx]
         pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
-        return pm.jax_to_ctrl_fn(super().__getattr__(pm.jax_attr))
+        return pm.remote_to_ctrl_fn(super().__getattr__(pm.remote_attr))
 
     def __setattr__(self, item, val):
         if item in self._controller_parameters_fields:
@@ -171,7 +171,7 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
             return
         else:
             pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
-            super().__setattr__(pm.jax_attr, pm.ctrl_to_jax_fn(val))
+            super().__setattr__(pm.remote_attr, pm.ctrl_to_remote_fn(val))
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
