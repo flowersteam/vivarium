@@ -4,7 +4,8 @@ import jax.numpy as jnp
 from concurrent import futures
 
 
-from vivarium.environment.components.eco_evo import ConsumptionComponent, EnergyComponent, ReproductionComponent
+from vivarium.environment.components.eco_evo import EnergyComponent, ReproductionComponent
+from vivarium.environment.components.eco_evo.consumption.component import ConsumptionComponent
 from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
 from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
