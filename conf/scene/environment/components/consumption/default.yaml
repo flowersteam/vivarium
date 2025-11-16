@@ -1,0 +1,3 @@
+_target_: vivarium.environment.components.eco_evo.ConsumptionComponent
+precedence: 20
+start: true

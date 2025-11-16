@@ -1,0 +1,2 @@
+controller_cls: vivarium.environment.components.eco_evo.ConsumptionController
+interface_cls: vivarium.environment.components.eco_evo.ConsumptionInterface
