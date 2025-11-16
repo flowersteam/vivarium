@@ -4,8 +4,9 @@ import jax.numpy as jnp
 from concurrent import futures
 
 
-from vivarium.environment.components.eco_evo import EnergyComponent, ReproductionComponent
-from vivarium.environment.components.eco_evo.consumption.component import ConsumptionComponent
+from vivarium.environment.components.eco_evo import (
+    EnergyComponent, ReproductionComponent, ConsumptionComponent, SpawnComponent
+)
 from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
 from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
@@ -148,7 +149,21 @@ def remove_duplicates(factories):
 @pytest.fixture
 def proximity_map(step, braitenberg):
     return [*step, *braitenberg, ProximityMapComponent('proximity_map', 0)]
-    
+
+
+@pytest.fixture
+def spawn(braitenberg):
+    spawn = SpawnComponent(
+        name='spawn', 
+        precedence=1, 
+        subtype=0, 
+        period=1, 
+        start=True,
+        position_range=[50., 60., 50., 60.],
+        orientation_range=[3., 3.2]
+    )
+    return [*braitenberg, spawn]
+
 
 @pytest.fixture
 def consumption(proximity_map):
@@ -232,7 +247,7 @@ def environment():
             neighbor_manager=nm,
             base_state_cls=BaseState,
             factories=remove_duplicates(factories),
-            to_jit=False
+            to_jit=True
         )
         return env
     return fn

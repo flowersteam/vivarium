@@ -173,7 +173,7 @@ class Environment:
         return self.factories[self.factories_names_to_idx[name]]
     
     def _step_env(
-        self, state, neighbors, num_scan_steps=1
+        self, state, neighbors, num_scan_steps, env_key
     ):
         def step_fn(carry, _):
             """Apply a step function to return new state and neighbors in a jax.lax.scan update
@@ -190,7 +190,7 @@ class Environment:
             state = state.set(time=state.time + 1)
             carry = (state, neighbors, key)
             return carry, carry
-        (state, neighbors, key), _ = lax.scan(step_fn, (state, neighbors, self.key), xs=None, length=num_scan_steps)
+        (state, neighbors, key), _ = lax.scan(step_fn, (state, neighbors, env_key), xs=None, length=num_scan_steps)
         return state, neighbors, key
         
 
@@ -199,7 +199,7 @@ class Environment:
         neighbors = self.neighbor_manager.neighbors
 
         if scan:
-            new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps)
+            new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps, self.key)
         else:  # For debugging purpose
             new_state = state
             for fn in self.step_functions:

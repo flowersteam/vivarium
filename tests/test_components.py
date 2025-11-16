@@ -1,4 +1,3 @@
-import hydra
 import jax.numpy as jnp
 
 from vivarium.environment.utils import type_mask
@@ -72,6 +71,32 @@ def test_proximity_map(environment_and_state, proximity_map):
     env, state = environment_and_state(proximity_map)
     state = env.step(state)
 
+
+def test_spawn(environment_and_state, spawn):
+    env, state = environment_and_state(spawn)
+    assert state.spawn_state.start
+    
+    for _ in range(4):
+        assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0]
+        state  = state.set(
+            entity_state=state.entity_state.set(
+                exists=state.entity_state.exists.at[0].set(0)
+            )
+        )
+        assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0] - 1
+        prev_pos_0 = state.entity_state.position[0]
+        prev_orientation_0 = state.entity_state.orientation[0]
+        state = env.step(state)
+        assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0]
+        assert state.entity_state.position[0, 0] >= state.spawn_state.position_range[0]
+        assert state.entity_state.position[0, 0] <= state.spawn_state.position_range[1]
+        assert state.entity_state.position[0, 1] >= state.spawn_state.position_range[2]
+        assert state.entity_state.position[0, 1] <= state.spawn_state.position_range[3]
+        assert state.entity_state.orientation[0] >= state.spawn_state.orientation_range[0]
+        assert state.entity_state.orientation[0] <= state.spawn_state.orientation_range[1]
+        assert not jnp.equal(prev_pos_0, state.entity_state.position[0]).all()
+        assert not jnp.equal(prev_orientation_0, state.entity_state.orientation[0]).all()
+    
 
 def test_consumption(environment_and_state, consumption):
 
