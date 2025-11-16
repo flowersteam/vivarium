@@ -6,7 +6,7 @@ from vivarium.environment.components.interface import Interface
 
 
 class SpawnParam(ParameterizedData):
-    subtype = param.String()
+    subtype = param.Selector()
     period = param.Number()
     start = param.Boolean()
     position_range = param.Tuple(default=(0, 0, 0, 0))
@@ -14,6 +14,7 @@ class SpawnParam(ParameterizedData):
 
     def __init__(self, controller, **params):
         super().__init__(controller=controller, **params)
+        self.param.subtype.objects = controller._subtype_labels
 
 
 class SpawnInterface(Interface):

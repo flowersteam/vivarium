@@ -6,13 +6,15 @@ from vivarium.environment.components.interface import Interface
 
 
 class ConsumptionParam(ParameterizedData):
-    source_subtype = param.String()
-    target_subtype = param.String()
+    source_subtype = param.Selector()
+    target_subtype = param.Selector()
     range = param.Number()
     start = param.Boolean()    
 
     def __init__(self, controller, **params):
         super().__init__(controller=controller, **params)
+        self.param.source_subtype.objects = controller._subtype_labels
+        self.param.target_subtype.objects = controller._subtype_labels
 
 
 class ConsumptionInterface(Interface):
