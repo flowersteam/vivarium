@@ -157,7 +157,8 @@ def consumption(proximity_map):
         precedence=1, 
         source_subtype=0, 
         target_subtype=1, 
-        range=20.0
+        range=20.0,
+        start=True
     )
     return [*proximity_map, consumption]
 
