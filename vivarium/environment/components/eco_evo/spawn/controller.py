@@ -30,7 +30,7 @@ class SpawnController(Controller):
 
     def __getattr__(self, attr):
         if self.to_deal_with(attr):
-            return getattr(self._remote.state, f'{self._name}_state').__getattr__(attr)#obj()
+            return getattr(self._remote.state, f'{self._name}_state').__getattr__(attr)
         else:            
             return super().__getattr__(attr)
     
