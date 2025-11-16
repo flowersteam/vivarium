@@ -14,13 +14,13 @@ logging.basicConfig(level=logging.INFO)
 lg = logging.getLogger(__name__)
 
 
-def start_session(scene_name, run=True):
+def start_session(scene_name, step_on_server=True):
     start_server_and_interface(cmd_args=[f'scene={scene_name}'])
     controller = VivariumController.from_client()
     controller.simulator.run_from = controller.client.name
-    if run:
-        controller.simulator.simulation_running = True
-        controller.apply_changes()
+    controller.step_on_server = step_on_server
+    controller.start()
+    controller.simulator.simulation_running = True
     return controller
 
 
@@ -32,8 +32,10 @@ class VivariumController:
         
         self.controllers = controllers
         
+        self.step_on_server = False
+        
         self.time = 0
-        self._is_running = False
+        self._is_started = False
         
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
 
@@ -58,20 +60,20 @@ class VivariumController:
             return self.controllers[name]
         raise AttributeError(f"'SimulatorController' object has no attribute '{name}'")
 
-    def run(self, threaded=True, num_steps=math.inf, debug_mode=False):
+    def start(self, threaded=True, num_steps=math.inf, debug_mode=False):
         """
         Execute the simulation loop from this client.
         :param threaded: Whether to run the simulation in a thread or not, defaults to True
         :raises RuntimeError: if the simulator is already started
         """
-        if self.is_running():
+        if self.is_started():
             lg.info("Simulator is already started")
             return
 
         # automatically catch errors only if not in debug mode
         catch_errors = not debug_mode
         
-        self._is_running = True
+        self._is_started = True
         if threaded:
             run_thread = threading.Thread(
                 target=self._run, args=(num_steps, catch_errors)
@@ -90,35 +92,40 @@ class VivariumController:
         """
         # Add a local time for the run function independant from the controller time
         run_time = 0
-        while run_time < num_steps and self._is_running:
-            # Step through controllers (e.g. routines and behaviors)
-            for _, controller in self.controllers.items():
-                controller.step(time=self.time, catch_errors=catch_errors)
+        while run_time < num_steps and self._is_started:
 
             with sleep_timer(freq=self.controllers['simulator'].freq):
-                self.step()
+                # Step through controllers (e.g. routines and behaviors)
+                for _, controller in self.controllers.items():
+                    controller.step(time=self.time, catch_errors=catch_errors)
+                
+                if self.step_on_server:
+                    self.step()
+                else:
+                    self.apply_changes()
 
                 self.time += 1
                 run_time += 1
 
         # finally stop the simulation
-        if self.is_running():
+        if self.is_started():
             self.stop()
 
 
     def stop(self):
         """Stop simulation loop on this client."""
-        if not self.is_running():
+        if not self.is_started():
             lg.info("Simulator is already stopped")
-        self._is_running = False
+        self._is_started = False
 
-    def is_running(self):
+    def is_started(self):
         """Check if the simulation loop is started on this client."""
-        return self._is_running
+        return self._is_started
 
     def step(self):
         changes = self.fetch_changes()
         self.client.step(changes)
+        self.update_step_on_server()
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
@@ -126,18 +133,17 @@ class VivariumController:
     def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
         self.client.apply_changes(changes)
+        self.update_step_on_server()
+            
+    def update_step_on_server(self):
         if self.simulator.run_from == self.client.name:
-            if self.is_running() != self.simulator.simulation_running:
-                if self.simulator.simulation_running:
-                    self.run(threaded=True)
-                else:
-                    self.stop()
-        elif self.is_running():
-            self.stop()        
+            self.step_on_server = self.simulator.simulation_running      
+        else:
+            self.step_on_server = False        
             
     def stop_session(self, safe_mode=False):
         """Stop the session: simulation, server and interface"""
-        if self._is_running:
+        if self._is_started:
             self.stop()
         self.client.close()
         stop_server_and_interface(safe_mode=safe_mode)
