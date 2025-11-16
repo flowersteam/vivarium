@@ -14,11 +14,10 @@ logging.basicConfig(level=logging.INFO)
 lg = logging.getLogger(__name__)
 
 
-def start_session(scene_name, step_on_server=True):
+def start_session(scene_name):
     start_server_and_interface(cmd_args=[f'scene={scene_name}'])
     controller = VivariumController.from_client()
     controller.simulator.run_from = controller.client.name
-    controller.step_on_server = step_on_server
     controller.start()
     controller.simulator.simulation_running = True
     return controller
@@ -31,8 +30,6 @@ class VivariumController:
         self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
         
         self.controllers = controllers
-        
-        self.step_on_server = False
         
         self.time = 0
         self._is_started = False
@@ -99,7 +96,7 @@ class VivariumController:
                 for _, controller in self.controllers.items():
                     controller.step(time=self.time, catch_errors=catch_errors)
                 
-                if self.step_on_server:
+                if self.simulator.run_from == self.client.name and self.simulator.simulation_running:
                     self.step()
                 else:
                     self.apply_changes()
@@ -125,7 +122,6 @@ class VivariumController:
     def step(self):
         changes = self.fetch_changes()
         self.client.step(changes)
-        self.update_step_on_server()
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
@@ -133,13 +129,6 @@ class VivariumController:
     def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
         self.client.apply_changes(changes)
-        self.update_step_on_server()
-            
-    def update_step_on_server(self):
-        if self.simulator.run_from == self.client.name:
-            self.step_on_server = self.simulator.simulation_running      
-        else:
-            self.step_on_server = False        
             
     def stop_session(self, safe_mode=False):
         """Stop the session: simulation, server and interface"""
