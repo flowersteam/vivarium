@@ -89,10 +89,9 @@ class ParamSimulator(ParameterizedData):
     freq = param.Number()
     scene_name = param.String()
     simulation_running = param.Boolean()
-    run_from = param.String()
+    run_from = param.Selector()
     subtype_labels = param.List(constant=True)
 
-    # client_names = param.Selector()
     # config_update = param.Boolean(False)
 
     env = param.ClassSelector(class_=ParamEnvironment)
@@ -100,9 +99,12 @@ class ParamSimulator(ParameterizedData):
 
     def __init__(self, simulator_controller):
         
-        params = asdict(simulator_controller._obj)
+        params = asdict(simulator_controller._remote.controller_parameters.simulator.obj())
         params.pop('client_names', None)
         params['env'] = ParamEnvironment(simulator_controller.env)
         
         super().__init__(simulator_controller, 
                          **params)
+        
+        self.param.run_from.objects = simulator_controller.client_names + ['server']
+        self.param.run_from.default = params['run_from']
