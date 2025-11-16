@@ -18,7 +18,7 @@ class ConsumptionParam(ParameterizedData):
 
 
 class ConsumptionInterface(Interface):
-    def __init__(self, controller, state, panel_cls=Column):
+    def __init__(self, controller, panel_cls=Column):
         
         parameters = ConsumptionParam(controller=controller)
 

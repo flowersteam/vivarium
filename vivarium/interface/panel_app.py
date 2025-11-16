@@ -27,7 +27,6 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
                 interface_cls = hydra.utils.get_class(component.client.interface_cls)
                 interfaces[name] = interface_cls(
                     controllers[name],
-                    state,
                     panel_cls=panel_cls
                 )
     return interfaces

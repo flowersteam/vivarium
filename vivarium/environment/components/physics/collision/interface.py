@@ -14,7 +14,7 @@ class CollisionParam(ParameterizedData):
 
 
 class CollisionInterface(Interface):
-    def __init__(self, controller, state, panel_cls=Column):
+    def __init__(self, controller, panel_cls=Column):
         
         parameters = CollisionParam(controller=controller)
 

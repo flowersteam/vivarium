@@ -238,11 +238,14 @@ class EntityInterface(Interface):
     param_cls = ParamEntity
     renderer_cls = EntityRenderer
     
-    def __init__(self, controller, state, panel_cls=Column):
+    def __init__(self, controller, panel_cls=Column):
         
         parameters = self.param_cls(controller, controller.subtype_labels)
         
         self.selected = Selected()
+        
+        state = controller._remote.state.obj()
+        
         self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
         
         renderer = self.renderer_cls(
