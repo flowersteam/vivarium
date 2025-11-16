@@ -48,7 +48,7 @@ class Controller:
             object.__setattr__(self, attr, value)
         elif attr in self._mapping:
             attr, value = self.ctrl_to_remote(attr, value)
-            setattr(self._remote, attr, value)
+            set_nested_attr(self._remote, attr, value)
         else:
             pass
 
