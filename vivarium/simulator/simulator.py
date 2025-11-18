@@ -294,7 +294,7 @@ class Simulator:
         try:
             yield self
         finally:
-            if self._was_running and self.simulation_running and not self.is_running():
+            if self._was_running and self.simulation_running and not self._is_running:
                 self.run(threaded=True)
             self._was_running = False
                 
