@@ -20,6 +20,7 @@ from vivarium.utils.scene_configs import extend_controller_kwargs
 from vivarium.utils.timer import SleepTimer, sleep_timer
 
 lg = logging.getLogger(__name__)
+# lg.setLevel(logging.DEBUG)
 
 
 def update_from_dataclass(obj, dataclass_instance, exclude_fields=[]):
@@ -195,6 +196,7 @@ class Simulator:
 
         :param num_steps: number of simulation steps
         """
+        lg.debug("Starting simulator _run")
         self._is_running = True
         lg.info("Simulation run starts")
 
@@ -208,6 +210,7 @@ class Simulator:
             with sleep_timer(timer=self.sleep_timer):
             
                 if self._to_stop:
+                    lg.debug("Stopping simulator _run as requested")
                     self._to_stop = False
                     break
 
@@ -224,6 +227,8 @@ class Simulator:
         return self._is_running or self._was_running
 
     def apply_changes(self, changes):
+        lg.debug("Applying changes to simulator")
+        lg.debug(f"Changes: {changes}")
         self = update_dataclass_from_change_list(self, changes)
 
         self = update_from_dataclass(self, self.controller_parameters.simulator, exclude_fields=['scene_name'])
@@ -231,13 +236,13 @@ class Simulator:
         if self.run_from == self.name:
             if self.is_running() != self.simulation_running:
                 if self.simulation_running:
-                    lg.info("Starting simulator from server apply_changes")
+                    lg.debug("Starting simulator from server apply_changes")
                     self.run(threaded=True)
                 else:
-                    lg.info("Stopping simulator from server apply_changes")
+                    lg.debug("Stopping simulator from server apply_changes")
                     self.stop()
         elif self.is_running():
-            lg.info("Stopping simulator from server apply_changes (2nd case)")
+            lg.debug("Stopping simulator from server apply_changes (2nd case)")
             self.stop()                    
 
         return self.controller_parameters
@@ -288,13 +293,17 @@ class Simulator:
 
         :yield: dummy self
         """
+        lg.debug("Pausing simulator")
         self._was_running = self.is_running()
+        lg.debug(f"Was running: {self._was_running}")
         if self._was_running:
             self.stop(blocking=True)
         try:
             yield self
         finally:
+            lg.debug(f"Resuming simulator: was_running={self._was_running}, simulation_running={self.simulation_running}, _is_running={self._is_running}")
             if self._was_running and self.simulation_running and not self._is_running:
+                lg.debug("Running simulator from pause context manager")
                 self.run(threaded=True)
             self._was_running = False
                 
