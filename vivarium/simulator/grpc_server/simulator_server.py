@@ -43,6 +43,8 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         self.simulator.step()
         
     def _apply_changes(self, changes):
+        if len(changes) == 0:
+            return
         with self._lock:
             with self.simulator.pause():
                 self.simulator.apply_changes(changes)           
