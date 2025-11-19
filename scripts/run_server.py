@@ -17,7 +17,7 @@ def main(cfg: DictConfig = None) -> None:
     
     logging.basicConfig(level=cfg.log_level)
 
-    lg.info(f"Scene running: {cfg.scene.scene_name}")
+    lg.info(f"Scene loading: {cfg.scene.scene_name}")
 
     # Create the simulator
     simulator = Simulator.from_config(cfg.scene.simulator)
