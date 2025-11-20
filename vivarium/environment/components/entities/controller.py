@@ -77,13 +77,15 @@ class EntityWrapper:
         object.__setattr__(self, '_entity_type_idx', remote.state.entity_state.entity_type_idx.obj()[ent_idx].item())
         object.__setattr__(self, '_is_rigid_body', remote.state.entity_state.obj().is_rigid_body())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_fields', ['entity_subtype', 'diameter', 'friction',
-                               'exists', 'entity_idx', 'entity_type',
-                               'position', 'orientation', 'momentum', 'force', 'mass',
-                               'position_center', 'position_orientation',
-                               'momentum_center', 'momentum_orientation',
-                               'force_center', 'force_orientation',
-                               'mass_center', 'mass_orientation'])
+        object.__setattr__(self, '_entity_fields', 
+                           list(remote.state.entity_state.obj().__dataclass_fields__.keys()) + \
+                               [
+                                   'position_center', 'position_orientation',
+                                   'momentum_center', 'momentum_orientation',
+                                   'force_center', 'force_orientation',
+                                   'mass_center', 'mass_orientation'
+                               ]
+                        )
 
     def __getattr__(self, attr):
         if attr in self._entity_fields:
@@ -278,9 +280,65 @@ class EntityListController(EntityList):
         # TODO : Add a check to ensure that the entity exists
         for entity in self._entity_list:
             entity.step(time, catch_errors=catch_errors)
+
+
+# class NotebookControllerEntity(EntityController):
+#     """Entity class that represents an entity in the simulation"""
+
+#     def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
+#         super().__init__(state, ent_idx, entity_type, subtype_labels, controller_parameters)
+#         object.__setattr__(self, 'routine_handler', RoutineHandler())
+
+#     def attach_routine(self, routine_fn, name=None, interval=1):
+#         """Attach a routine to the entity
+
+#         :param routine_fn: routine_fn
+#         :param name: routine name, defaults to None
+#         :param interval: routine execution interval, defaults to 1
+#         """
+#         self.routine_handler.attach_routine(routine_fn, name, interval)
+
+#     def detach_routine(self, name):
+#         """Detach a routine from the entity
+
+#         :param name: routine name
+#         """
+#         self.routine_handler.detach_routine(name)
+
+#     def detach_all_routines(self):
+#         """Detach all routines from the entity"""
+#         self.routine_handler.detach_all_routines()
+
+#     def step(self, time, catch_errors):
+#         """Execute the entity's routines with their corresponding execution intervals"""
+#         # Give self object as parameter to the routine function so it executes functions on the entity
+#         self.routine_handler.routine_step(self, time, catch_errors)
+
+#     def print_infos(self):
+#         # TODO: to fix according to recent refactoring
+#         """Print the entity's infos
+
+#         :return: entity's infos
+#         """
+#         dict_infos = self.config.to_dict()
+
+#         info_lines = []
+#         info_lines.append("Entity Overview:")
+#         info_lines.append(f"{'-' * 20}")
+#         info_lines.append(f"Type: {self.etype.name}")
+#         info_lines.append(f"Subtype: {self.subtype_label}")
+#         info_lines.append(f"Idx: {self.idx}")
+#         info_lines.append(f"Exists: {self.exists}")
+#         info_lines.append(
+#             f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}"
+#         )
+#         info_lines.append(f"Diameter: {self.diameter:.2f}")
+#         info_lines.append(f"Color: {self.color}")
+#         info_lines.append("")
+
+#         return print("\n".join(info_lines))
+
+#     def print_routines(self):
+#         """Print the entity's routines"""
+#         self.routine_handler.print_routines()
             
-    def set_controller_parameters(self, cp):
-        # TODO: can we do better than this?
-        self.controller_parameters = cp
-        for idx, entity in enumerate(self._entity_list):
-            entity.controller_parameters = cp[idx]
