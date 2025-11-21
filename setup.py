@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from setuptools.command.develop import develop
 from setuptools.command.install import install
 import subprocess
 import sys
@@ -6,21 +7,44 @@ import sys
 # Specific versions/commits
 JAX_VERSION = "0.7.2"  # Replace with your desired version
 JAX_MD_COMMIT = "6bd17d29ce5f9fe35a5582a42a9973b1ecd0859f"  # Replace with your specific commit hash
+JAX_MD_URL = f"jax-md @ git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
 
 
-class CustomInstallCommand(install):
-    """Custom install command to handle JAX-MD from GitHub."""
-    
+# JAX-MD dependencies (from its pyproject.toml, excluding jax/jaxlib)
+JAX_MD_DEPS = [
+    "absl-py",
+    "numpy",
+    "flax",
+    "jraph",
+    "einops",
+    "ml_collections",
+    "e3nn-jax",
+    "dm-haiku",
+    "optax",
+    "frozendict",
+    "pymatgen",
+]
+
+def install_jax_md():
+    """Install JAX-MD from GitHub without dependencies."""
+    jax_md_url = f"git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
+    print(f"\nInstalling JAX-MD from commit {JAX_MD_COMMIT} (without deps)...")
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", 
+        "--no-deps", jax_md_url
+    ])
+
+class PostDevelopCommand(develop):
+    """Post-installation for development mode."""
     def run(self):
-        # First, run the standard install (this installs JAX)
+        develop.run(self)
+        install_jax_md()
+
+class PostInstallCommand(install):
+    """Post-installation for installation mode."""
+    def run(self):
         install.run(self)
-        
-        # Then install JAX-MD from the specific commit
-        jax_md_url = f"git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
-        print(f"\nInstalling JAX-MD from commit {JAX_MD_COMMIT}...")
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install", jax_md_url
-        ])
+        install_jax_md()
 
 setup(
     name="vivarium",
@@ -32,6 +56,7 @@ setup(
     install_requires=[
         f"jax=={JAX_VERSION}",
         f"jaxlib=={JAX_VERSION}",
+        # JAX_MD_URL,
         "protobuf==5.29.5",
         "grpcio==1.76.0",
         "grpcio-tools==1.71.2",
@@ -40,7 +65,7 @@ setup(
         "hydra-core==1.3.2",
         "psutil"
         # Add other dependencies here
-    ],
+    ] + JAX_MD_DEPS,
     
     # Optional dependencies for CUDA support
     extras_require={
@@ -56,9 +81,10 @@ setup(
         # You can add more variants as needed
     },
     
-    # Use custom install command
+    # Custom commands to install JAX-MD after other dependencies
     cmdclass={
-        'install': CustomInstallCommand,
+        'develop': PostDevelopCommand,
+        'install': PostInstallCommand,
     },
     
 
