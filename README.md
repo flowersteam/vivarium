@@ -32,11 +32,10 @@ env_vivarium\Scripts\Activate.ps1 #(for Windows users)
 3- Install the dependencies:
 
 ```bash
-pip install -r requirements.txt
 pip install -e . 
 ```
 
-If your are a UPF student, continue from [here](notebooks/sessions/README.md).
+If you are a UPF student, continue from [here](notebooks/sessions/README.md).
 
 ## 🚀 Usage
 
