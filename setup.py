@@ -10,7 +10,7 @@ JAX_MD_COMMIT = "6bd17d29ce5f9fe35a5582a42a9973b1ecd0859f"  # Replace with your 
 JAX_MD_URL = f"jax-md @ git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
 
 
-# JAX-MD dependencies (from its pyproject.toml, excluding jax/jaxlib)
+# JAX-MD dependencies (from its pyproject.toml, excluding jax/jaxlib) 
 # JAX_MD_DEPS = [
 #     "absl-py",
 #     "numpy",
