@@ -11,40 +11,29 @@ JAX_MD_URL = f"jax-md @ git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}
 
 
 # JAX-MD dependencies (from its pyproject.toml, excluding jax/jaxlib)
-JAX_MD_DEPS = [
-    "absl-py",
-    "numpy",
-    "flax",
-    "jraph",
-    "einops",
-    "ml_collections",
-    "e3nn-jax",
-    "dm-haiku",
-    "optax",
-    "frozendict",
-    "pymatgen",
-]
+# JAX_MD_DEPS = [
+#     "absl-py",
+#     "numpy",
+#     "flax",
+#     "jraph",
+#     "einops",
+#     "ml_collections",
+#     "e3nn-jax",
+#     "dm-haiku",
+#     "optax",
+#     "frozendict",
+#     "pymatgen",
+# ]
 
-def install_jax_md():
-    """Install JAX-MD from GitHub without dependencies."""
-    jax_md_url = f"git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
-    print(f"\nInstalling JAX-MD from commit {JAX_MD_COMMIT} (without deps)...")
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", 
-        "--no-deps", jax_md_url
-    ])
+# def install_jax_md():
+#     """Install JAX-MD from GitHub without dependencies."""
+#     jax_md_url = f"git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
+#     print(f"\nInstalling JAX-MD from commit {JAX_MD_COMMIT} (without deps)...")
+#     subprocess.check_call([
+#         sys.executable, "-m", "pip", "install", 
+#         "--no-deps", jax_md_url
+#     ])
 
-class PostDevelopCommand(develop):
-    """Post-installation for development mode."""
-    def run(self):
-        develop.run(self)
-        install_jax_md()
-
-class PostInstallCommand(install):
-    """Post-installation for installation mode."""
-    def run(self):
-        install.run(self)
-        install_jax_md()
 
 setup(
     name="vivarium",
@@ -54,8 +43,10 @@ setup(
         
     # Base JAX installation (CPU-only)
     install_requires=[
-        f"jax=={JAX_VERSION}",
-        f"jaxlib=={JAX_VERSION}",
+        "jax",
+        "jaxlib",
+        # f"jax=={JAX_VERSION}",
+        # f"jaxlib=={JAX_VERSION}",
         # JAX_MD_URL,
         "protobuf==5.29.5",
         "grpcio==1.76.0",
@@ -65,29 +56,22 @@ setup(
         "hydra-core==1.3.2",
         "psutil"
         # Add other dependencies here
-    ] + JAX_MD_DEPS,
+    ], # + JAX_MD_DEPS,
     
     # Optional dependencies for CUDA support
     extras_require={
         "cuda11": [
-            f"jax[cuda11]=={JAX_VERSION}",
+            f"jax[cuda11]", #=={JAX_VERSION}",
         ],
         "cuda12": [
-            f"jax[cuda12]=={JAX_VERSION}",
+            f"jax[cuda12]", #=={JAX_VERSION}",
         ],
         "cuda13": [
-            f"jax[cuda13]=={JAX_VERSION}",
+            f"jax[cuda13]", #=={JAX_VERSION}",
         ],
         # You can add more variants as needed
     },
     
-    # Custom commands to install JAX-MD after other dependencies
-    cmdclass={
-        'develop': PostDevelopCommand,
-        'install': PostInstallCommand,
-    },
-    
-
     author="Clément Moulin-Frier",
     author_email="clement.moulinfrier@gmail.com",
     python_requires=">=3.10",
