@@ -22,6 +22,30 @@ class CustomInstallCommand(install):
         ])
 
 setup(
+from setuptools import setup, find_packages
+from setuptools.command.install import install
+import subprocess
+import sys
+
+# Specific versions/commits
+JAX_VERSION = "0.7.2"  # Replace with your desired version
+JAX_MD_COMMIT = "6bd17d29ce5f9fe35a5582a42a9973b1ecd0859f"  # Replace with your specific commit hash
+
+class CustomInstallCommand(install):
+    """Custom install command to handle JAX-MD from GitHub."""
+    
+    def run(self):
+        # First, run the standard install (this installs JAX)
+        install.run(self)
+        
+        # Then install JAX-MD from the specific commit
+        jax_md_url = f"git+https://github.com/jax-md/jax-md.git@{JAX_MD_COMMIT}"
+        print(f"\nInstalling JAX-MD from commit {JAX_MD_COMMIT}...")
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", jax_md_url
+        ])
+
+setup(
     name="vivarium",
     version="0.2.0",
     license="MIT",
