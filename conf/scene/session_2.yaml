@@ -1,23 +1,8 @@
-box_size: 200
-neighbor_radius: 200
-prox_dist_max: 60
+defaults:
+  - session_defaults
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-    - agents
-    - objects
+scene_name: session_2
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 1
-      color: blue
-      diameter: 10
-      prox_dist_max: 80.0
-      
-    objects:
-      type: OBJECT
-      num: 13
-      color: orange
-      diamter: 8
+subtype_labels:
+  - agent
+  - object

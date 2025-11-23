@@ -1,38 +1,51 @@
-seed: 42
-box_size: 300
-neighbor_radius: 300
-prox_dist_max: 60
+defaults:
+  - session_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn.client
+  - clients/consumption@environment.components.component_list.consumption.client
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-  ## Care : make sure to order entities in a good order (first the agents and then the objects) ...
-    - agents
-    - resources
-    - s_obstacles
-    - b_obstacles
+scene_name: session_3
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 3
-      color: blue
-      diameter: 10
-      
-    resources:
-      type: OBJECT
-      num: 15
-      existing: 7
-      color: green
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 3
+      objects:
+        n_max: 29
+        by_indices:
+          - resource:
+              indices: "${range: 0, 15}"
+              n_exists: 3
+              subtype: resource
+              diameter: 3.0
+              client:
+                color: green
+          - small_obstacle:
+              indices: "${range: 15, 22}"
+              subtype: small_obstacle
+              diameter: 5.0
+          - big_obstacle:
+              indices: "${range: 22, 29}"
+              subtype: big_obstacle
+              diameter: 7.0
+              client:
+                color: red
+      spawn:
+        subtype: 1
+        period: 400
+        start: false
+        position_range: [0., 100., 0., 100.]
+        orientation_range: [0., 6.3]
+      consumption:
+        source_subtype: 0
+        target_subtype: 1
+        range: 12.5
+        start: false
 
-    s_obstacles:
-      type: OBJECT
-      num: 7
-      color: orange
-      diameter: 3
-
-    b_obstacles:
-      type: OBJECT
-      num: 7
-      color: red
-      diameter: 10
+subtype_labels:
+  - agent
+  - resource
+  - small_obstacle
+  - big_obstacle
