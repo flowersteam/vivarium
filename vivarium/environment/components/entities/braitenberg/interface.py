@@ -138,7 +138,7 @@ class AgentRenderer(EntityRenderer):
             lpi=proxs[:, 1],
             mar=max_angle_r,
             mal=max_angle_l,
-            mpr=max_prox,
+            mpr=max_prox + radii,
             wd=wheel_diameter,
         )
 
