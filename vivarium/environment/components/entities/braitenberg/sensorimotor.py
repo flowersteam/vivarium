@@ -160,24 +160,29 @@ def compute_motor_selective(prox_per_subtype, sensed, params, motors):
     return compute_motor(prox, params, motors)
 
 
-def left_or_right_prox(mask, dist, relative_theta, dist_max, cos_min, agent_neighbors):
+def left_or_right_prox(mask, dist, relative_theta, diameter, braitenberg_mask, dist_max, cos_min, agent_neighbors):
 
     sensed = mask & (jnp.cos(relative_theta) > jnp.tile(cos_min, (relative_theta.shape[1], 1)).T)
     dist = jnp.where(sensed, dist, jnp.inf)
     min_dist_neigbor = jnp.argmin(dist, axis=1)
     distance_to_target = dist[jnp.arange(dist.shape[0]), min_dist_neigbor]
+    prox_idx = agent_neighbors[jnp.arange(agent_neighbors.shape[0]), jnp.argmin(dist, axis=1)]
+    
+    # Sensor is positioned at the border of the agent and sensed proximity to the border of an entity
+    # Hence we remove the radius of bith source and target
+    distance_to_target -= (diameter[braitenberg_mask] + diameter[prox_idx]) / 2
+    distance_to_target = distance_to_target.clip(0.)
+    
     prox = jnp.where(
         distance_to_target < dist_max,
         1. - distance_to_target / dist_max,
         0.
     )
 
-    prox_idx = agent_neighbors[jnp.arange(agent_neighbors.shape[0]), jnp.argmin(dist, axis=1)]
-
     return prox, prox_idx
 
 
-def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, proxs_dist_max, proxs_cos_min):
+def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, diameter, proxs_dist_max, proxs_cos_min):
 
     agent_neighbors = neighbors_idx[braitenberg_mask]
     mask = neighbors_entity_mask(agent_neighbors, source_mask, target_mask, neighbor_mask[braitenberg_mask])
@@ -201,6 +206,8 @@ def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, nei
         mask & (jnp.sin(all_relative_theta) >= 0),
         all_dist,
         all_relative_theta,
+        diameter,
+        braitenberg_mask,
         proxs_dist_max,
         proxs_cos_min,
         agent_neighbors
@@ -210,6 +217,8 @@ def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, nei
         mask & (jnp.sin(all_relative_theta) < 0),
         all_dist,
         all_relative_theta,
+        diameter,
+        braitenberg_mask,
         proxs_dist_max,
         proxs_cos_min,
         agent_neighbors
@@ -245,6 +254,7 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
             displacement=displacement,
             positions=state.entity_state.position,
             orientations=state.entity_state.orientation,
+            diameter=state.entity_state.diameter,
             proxs_dist_max=braitenberg_state.proxs_dist_max,
             proxs_cos_min=braitenberg_state.proxs_cos_min
         )
@@ -261,8 +271,6 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
         braitenberg_state = braitenberg_state.set(
             prox=proxs,
             prox_per_subtype=prox_per_subtype,
-            # proximity_map_dist=proximity_dist_map,
-            # proximity_map_theta=proximity_dist_theta,
             motor=motors,
         )
 
