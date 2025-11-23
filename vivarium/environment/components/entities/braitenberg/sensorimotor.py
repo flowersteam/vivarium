@@ -160,7 +160,7 @@ def compute_motor_selective(prox_per_subtype, sensed, params, motors):
     return compute_motor(prox, params, motors)
 
 
-def left_or_right_prox(mask, dist, relative_theta, diameter, braitenberg_mask, dist_max, cos_min, agent_neighbors):
+def proximeters(mask, dist, relative_theta, diameter, braitenberg_mask, dist_max, cos_min, agent_neighbors):
 
     sensed = mask & (jnp.cos(relative_theta) > jnp.tile(cos_min, (relative_theta.shape[1], 1)).T)
     dist = jnp.where(sensed, dist, jnp.inf)
@@ -181,6 +181,7 @@ def left_or_right_prox(mask, dist, relative_theta, diameter, braitenberg_mask, d
 
     return prox, prox_idx
 
+proximeters = vmap(proximeters, in_axes=(0, None, None, None, None, None, None, None))
 
 def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, diameter, proxs_dist_max, proxs_cos_min):
 
@@ -202,8 +203,11 @@ def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, nei
         all_dist, 
         jnp.inf)
 
-    left_prox, left_idx = left_or_right_prox(
-        mask & (jnp.sin(all_relative_theta) >= 0),
+    prox, idx = proximeters(
+        jnp.stack((
+            mask & (jnp.sin(all_relative_theta) >= 0),
+            mask & (jnp.sin(all_relative_theta) < 0),
+        )),
         all_dist,
         all_relative_theta,
         diameter,
@@ -213,22 +217,8 @@ def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, nei
         agent_neighbors
     )
 
-    right_prox, right_idx = left_or_right_prox(
-        mask & (jnp.sin(all_relative_theta) < 0),
-        all_dist,
-        all_relative_theta,
-        diameter,
-        braitenberg_mask,
-        proxs_dist_max,
-        proxs_cos_min,
-        agent_neighbors
-    )
-
-    return (
-        jnp.vstack((left_prox, right_prox)).T,
-        jnp.vstack((left_idx, right_idx)).T
-    )
-
+    return prox.T, idx.T
+    
 
 def extend_prox_per_subtype(prox, prox_idx, entity_subtype, n_subtypes):
     subtype_mask = entity_subtype[prox_idx][:, :, jnp.newaxis] == jnp.arange(n_subtypes)[jnp.newaxis, jnp.newaxis, :]
