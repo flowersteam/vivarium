@@ -69,7 +69,7 @@ class WindowManager(Parameterized):
             align="center",
         )
         self.plot_fps = pn.widgets.FloatInput(
-            name="Plot FPS", value=25, width=80
+            name="Plot FPS", value=15, width=80
         )
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
         self.controller_toggle = pn.widgets.ToggleGroup(
@@ -147,7 +147,7 @@ class WindowManager(Parameterized):
         p_tools = "crosshair,pan,wheel_zoom,box_zoom,reset,tap,box_select,lasso_select"
         p = figure(tools=p_tools, active_drag="box_select")
         # p.axis.major_label_text_font_size = "24px"
-        p.axis.visible = False
+        p.axis.visible = True
         p.grid.visible = False
         hover = HoverTool(tooltips=None)
         p.add_tools(hover)
