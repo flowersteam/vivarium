@@ -13,8 +13,6 @@ lg = logging.getLogger(__name__)
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig = None) -> None:
     
-    print(OmegaConf.to_yaml(cfg))
-    
     logging.basicConfig(level=cfg.log_level)
 
     lg.info(f"Scene loading: {cfg.scene.scene_name}")
