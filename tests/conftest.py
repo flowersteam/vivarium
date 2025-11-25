@@ -47,8 +47,8 @@ def cleanup_parameterized_class(request):
 
 @pytest.fixture
 def scene_config():
-    def fn(scene_name):
-        return load_config('scene', scene_name)
+    def fn(scene_name, overrides=[]):
+        return load_config('scene', scene_name, overrides=overrides)
     return fn
 
 
@@ -71,15 +71,25 @@ def state_from_config(scene_config):
 
 @pytest.fixture
 def simulator_from_config(scene_config):
-    def fn(scene_name):
-        return Simulator.from_config(scene_config(scene_name).simulator)
+    def fn(scene_name, overrides=[]):
+        return Simulator.from_config(scene_config(scene_name, overrides=overrides).simulator)
     return fn
 
 
 @pytest.fixture
 def vivarium_controller():
-    def fn(client, controller_cls=VivariumController):
-        return controller_cls.from_client(
+    def fn(client):
+        return VivariumController.from_client(
+            client=client
+        )
+    return fn
+
+
+@pytest.fixture
+def vivarium_controller_from_config(simulator_from_config):
+    def fn(scene_name, overrides=[]):
+        client = simulator_from_config(scene_name, overrides=overrides)
+        return VivariumController.from_client(
             client=client
         )
     return fn
