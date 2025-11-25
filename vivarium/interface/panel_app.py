@@ -56,6 +56,9 @@ class WindowManager(Parameterized):
             panel_cls=pn.Column
         )
         
+        for name, interface in self.interfaces.items():
+            interface.udpate_other_interfaces(self.interfaces)
+        
         # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
         self.param_simulator = ParamSimulator(self.controller.controllers['simulator'])
         self.param_simulator.update_from_server = True

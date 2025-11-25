@@ -2,7 +2,6 @@ import param
 import panel as pn
 from enum import Enum
 from threading import Lock
-from dataclasses import asdict
 from panel.layout import Column
 from bokeh.plotting import figure
 from bokeh.models import BooleanFilter, CDSView
@@ -240,7 +239,7 @@ class EntityInterface(Interface):
     
     def __init__(self, controller, panel_cls=Column):
         
-        parameters = self.param_cls(controller, controller.subtype_labels)
+        self.parameters = self.param_cls(controller, controller.subtype_labels)
         
         self.selected = Selected()
         
@@ -250,21 +249,19 @@ class EntityInterface(Interface):
         
         renderer = self.renderer_cls(
                 entities = controller._entity_list,
-                selected_param_entity=parameters,
+                selected_param_entity=self.parameters,
                 selected=self.selected,
                 etype=controller.entity_type,
                 state=state,
                 shape=controller[0].shape, # TODO: for now only the shape of the first entity is considered
             )
         
-        super().__init__(controller, parameters, panel_cls=panel_cls, renderer=renderer)
+        super().__init__(controller, self.parameters, panel_cls=panel_cls, renderer=renderer, build_widget=False)
         
         self.global_params = ParamGlobal(hide_non_existing=self.renderer.hide_non_existing)
         
-        self.widget.insert(1, pn.panel(self.global_params))
-        self.widget.insert(2, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))
+        self.build_widget()
         
-
         self.selected.param.watch(
             self.pull_selected_entities,
             ["selection"],
@@ -278,6 +275,12 @@ class EntityInterface(Interface):
             onlychanged=True,
             precedence=1,
         )
+    
+    def build_widget(self):
+        super().build_widget()
+        self.widget.insert(1, pn.panel(self.global_params))
+        self.widget.insert(2, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))        
+    
     def set_hide_non_existing(self, event):
         self.renderer.hide_non_existing = event.new
         
