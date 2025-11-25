@@ -55,7 +55,7 @@ class VivariumController:
     def __getattr__(self, name):
         if name in self.controllers:
             return self.controllers[name]
-        raise AttributeError(f"'SimulatorController' object has no attribute '{name}'")
+        raise AttributeError(f"'VivariumController' object has no attribute '{name}'")
 
     def start(self, threaded=True, num_steps=math.inf, debug_mode=False):
         """
@@ -73,15 +73,15 @@ class VivariumController:
         self._is_started = True
         if threaded:
             run_thread = threading.Thread(
-                target=self._run, args=(num_steps, catch_errors)
+                target=self._start, args=(num_steps, catch_errors)
             )
             run_thread.daemon = True
             run_thread.start()
         else:
-            self._run(num_steps=num_steps, catch_errors=catch_errors)
+            self._start(num_steps=num_steps, catch_errors=catch_errors)
         lg.info("Simulator started on client")
             
-    def _run(self, num_steps=math.inf, catch_errors=True):
+    def _start(self, num_steps=math.inf, catch_errors=True):
         """run the simulation for a given number of steps
 
         :param num_steps: num_steps, defaults to math.inf
@@ -92,14 +92,8 @@ class VivariumController:
         while run_time < num_steps and self._is_started:
 
             with sleep_timer(freq=self.controllers['simulator'].freq):
-                # Step through controllers (e.g. routines and behaviors)
-                for _, controller in self.controllers.items():
-                    controller.step(time=self.time, catch_errors=catch_errors)
                 
-                if self.simulator.run_from == self.client.name and self.simulator.simulation_running:
-                    self.step()
-                else:
-                    self.apply_changes()
+                self.step(catch_errors=catch_errors)
 
                 self.time += 1
                 run_time += 1
@@ -119,9 +113,21 @@ class VivariumController:
         """Check if the simulation loop is started on this client."""
         return self._is_started
 
-    def step(self):
+    def simulator_step(self):
         changes = self.fetch_changes()
         self.client.step(changes)
+        
+    def controller_step(self, catch_errors=True):
+        # Step through controllers (e.g. routines and behaviors)
+        for _, controller in self.controllers.items():
+            controller.step(time=self.time, catch_errors=catch_errors)        
+
+    def step(self, catch_errors=True):
+        self.controller_step(catch_errors=catch_errors)
+        if self.simulator.run_from == self.client.name and self.simulator.simulation_running:
+            self.simulator_step()
+        else:
+            self.apply_changes()        
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
