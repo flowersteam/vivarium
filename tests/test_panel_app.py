@@ -2,9 +2,9 @@ import pytest
 from vivarium.interface.panel_app import WindowManager
 
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
-def test_window_manager(client_fixture, simulator_controller, request):
+def test_window_manager(client_fixture, vivarium_controller, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller = simulator_controller(client)
+    controller = vivarium_controller(client)
     wm = WindowManager(controller=controller, testing_mode=True)
     
     wm.interfaces['agents'].parameters.subtype = 'predator'

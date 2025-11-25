@@ -72,9 +72,9 @@ def test_controller_param(controller_and_interfaces_from_config, simulator_from_
     assert controller.client.state.collision_state.alpha.item() == 43.
 
 
-def test_simulator_state_param(simulator_controller, simulator_from_config):
+def test_simulator_state_param(vivarium_controller, simulator_from_config):
 
-    controller = simulator_controller(simulator_from_config('braitenberg'))
+    controller = vivarium_controller(simulator_from_config('braitenberg'))
 
     simulator_param = ParamSimulator(controller.simulator)
     simulator_param.update_from_server = True
@@ -97,7 +97,7 @@ def test_simulator_state_param(simulator_controller, simulator_from_config):
     assert controller.simulator.freq == -10
 
 
-def test_controller_parameters(simulator_controller, simulator_from_config):
-    controller = simulator_controller(simulator_from_config('braitenberg'))
+def test_controller_parameters(vivarium_controller, simulator_from_config):
+    controller = vivarium_controller(simulator_from_config('braitenberg'))
     controller.controllers['agents'][0].visible_wheels = False
     controller.apply_changes()

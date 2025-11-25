@@ -77,7 +77,7 @@ def simulator_from_config(scene_config):
 
 
 @pytest.fixture
-def simulator_controller():
+def vivarium_controller():
     def fn(client, controller_cls=VivariumController):
         return controller_cls.from_client(
             client=client
@@ -86,9 +86,9 @@ def simulator_controller():
 
 
 @pytest.fixture
-def controller_and_interfaces_from_config(scene_config, simulator_controller):
+def controller_and_interfaces_from_config(scene_config, vivarium_controller):
     def fn(client):
-        controller = simulator_controller(client)
+        controller = vivarium_controller(client)
         config = scene_config(controller.client.scene_name)
         interfaces = create_interfaces(
             config.environment.components.component_list,
