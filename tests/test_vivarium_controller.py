@@ -14,7 +14,7 @@ def test_load_viviarium_controller(client_fixture, request):
     controller = VivariumController.from_client(client=client)
     controllers = controller.controllers
     
-    controller.step()
+    controller.simulator_step()
     
     assert hasattr(controller.client.controller_parameters.agents, 'behaviors')
 
@@ -47,14 +47,14 @@ def test_load_viviarium_controller(client_fixture, request):
 
     for _ in range(NUM_STEPS):
         pos = controller.client.state.entity_state.position[idx]
-        controller.step()
+        controller.simulator_step()
         assert (not jnp.equal(pos, ag.position).all())
 
     for ag in controllers['agents']:
         ag.behaviors[0] = Behaviors.MANUAL
         ag.motor = [1., 0.]
 
-    controller.step()
+    controller.simulator_step()
 
     controller.apply_changes()
 
