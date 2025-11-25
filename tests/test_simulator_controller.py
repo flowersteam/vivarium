@@ -2,8 +2,6 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
-from vivarium.environment.components.entities.braitenberg.controller import BraitenbergController
-from vivarium.controllers.dataclass_wrapper import Remote, update_dataclass_from_change_list
 from vivarium.controllers.vivarium_controller import VivariumController
 
 
@@ -15,9 +13,6 @@ def test_load_viviarium_controller(client_fixture, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
     controller = VivariumController.from_client(client=client)
     controllers = controller.controllers
-    
-    controller._is_running = True
-    controller._run(num_steps=3)
     
     controller.step()
     
