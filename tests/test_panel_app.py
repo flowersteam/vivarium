@@ -8,7 +8,7 @@ def test_window_manager(client_fixture, vivarium_controller, request):
     wm = WindowManager(controller=controller, testing_mode=True)
     
     wm.interfaces['agents'].parameters.subtype = 'predator'
-    wm.controller.step()
+    wm.controller.simulator_step()
     assert wm.controller.controllers['agents'][0].subtype == 'predator'
     assert wm.controller.client.state.entity_state.entity_subtype[0].item() == 1
     
