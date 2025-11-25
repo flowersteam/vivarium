@@ -123,7 +123,8 @@ class Environment:
                 'neighbor_radius': self.neighbor_radius,
                 'dr_threshold': self.dr_threshold,
                 'num_scan_steps': self.num_scan_steps,
-                'to_jit': self.to_jit
+                'to_jit': self.to_jit,
+                'debug_mode': self.debug_mode,
             },
             'components': {
                 'component_list': {
