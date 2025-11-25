@@ -79,7 +79,8 @@ class Environment:
                  neighbor_manager,
                  base_state_cls=BaseState,
                  factories=[], 
-                 num_scan_steps=1, to_jit=True, seed=42):
+                 num_scan_steps=1, to_jit=True, seed=42,
+                 debug_mode=False):
 
         self.key = random.PRNGKey(seed)
         self.base_state_cls = base_state_cls
@@ -88,7 +89,8 @@ class Environment:
         self.neighbor_manager = neighbor_manager
         self.num_scan_steps = num_scan_steps
         self.to_jit = to_jit
-        if to_jit:
+        self.debug_mode = debug_mode
+        if to_jit and not debug_mode:
             self._step_env = jit(self._step_env, static_argnums=(2,))
 
     @classmethod
@@ -108,7 +110,8 @@ class Environment:
             base_state_cls=base_state_cls,
             factories=component_factories,
             num_scan_steps=config.kwargs.num_scan_steps,
-            to_jit=config.kwargs.to_jit
+            to_jit=config.kwargs.to_jit,
+            debug_mode=config.kwargs.debug_mode
             )
 
     def to_config(self, state):
@@ -198,7 +201,7 @@ class Environment:
 
         neighbors = self.neighbor_manager.neighbors
 
-        if scan:
+        if scan and not self.debug_mode:
             new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps, self.key)
         else:  # For debugging purpose
             new_state = state
