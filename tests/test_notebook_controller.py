@@ -1,42 +1,37 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.controllers.notebook_controller import NotebookController
 
 NUM_STEPS = 4
 
-@pytest.mark.parametrize('scene_name', ['braitenberg', 'lenia_braitenberg'])
-def test_notebook_controller(scene_name, simulator_controller_from_config):
+@pytest.mark.parametrize('scene_name', ['session_1', 'session_2', 'session_3', 'session_4'])
+def test_session(scene_name, vivarium_controller_from_config):
 
-    controller = simulator_controller_from_config(scene_name, NotebookController)
-    controllers = controller.controllers
-    
-    # agent_field = 'agents'
-    controller.step()
-
-    assert controller.client.freq == -1
+    controller = vivarium_controller_from_config(scene_name, overrides=["environment.kwargs.debug_mode=true"])
 
     def beh(agent):
-        left, right = agent.sensors()
+        left, right = agent.proximeters()
         return 1 - right, 1 - left
 
     idx = 0
-    pos = controller.state.entity_state.position_center[idx]
+    pos = controller.client.state.entity_state.position[idx]
 
-    ag = controllers['agents'][idx]
+    ag = controller.agents[idx]
 
     ag.attach_behavior(beh)
     
-    controller.execute_routines_and_behaviors()
-
-    assert (jnp.equal(pos, ag.position_center).all())
+    assert (jnp.equal(pos, ag.position).all())
+    
+    controller.simulator.simulation_running = True
+    
+    # Step twice to initialize force an momentum
+    controller.step()
+    controller.step()
 
     for _ in range(NUM_STEPS):
-        pos = controller.state.entity_state.position_center[idx]
-        controller.run(threaded=False, num_steps=1)
-        
-        # assert below no longer work, to reintroduce once manual behavior will be back
-        # assert (not jnp.equal(pos, ag.position_center).all())
-
+        pos = controller.client.state.entity_state.position[idx]
+        controller.step()
+        assert (not jnp.equal(pos, ag.position).all())
+    
     ag.color = 'pink'
     controller.step()
