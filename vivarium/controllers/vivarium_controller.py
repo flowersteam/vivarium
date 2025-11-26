@@ -14,15 +14,6 @@ logging.basicConfig(level=logging.INFO)
 lg = logging.getLogger(__name__)
 
 
-def start_session(scene_name):
-    start_server_and_interface(cmd_args=[f'scene={scene_name}'])
-    controller = VivariumController.from_client()
-    controller.simulator.run_from = controller.client.name
-    controller.start()
-    controller.simulator.simulation_running = True
-    return controller
-
-
 class VivariumController:
 
     def __init__(self, client=None, subtypes=[], **controllers):
@@ -50,7 +41,24 @@ class VivariumController:
             client=client,
             subtypes=components_config.subtype_labels,
             **controllers
-        )
+        )   
+        
+    @classmethod
+    def start_session(cls, scene_name, 
+                      start_interface=True,
+                      safe_mode=False,
+                      step_from_controller=True, 
+                      run_simulation=True):
+        start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
+                                   start_interface=start_interface,
+                                   safe_mode=safe_mode)
+        controller = cls.from_client()
+        if step_from_controller:
+            controller.simulator.run_from = controller.client.name
+        controller.start()
+        if run_simulation:
+            controller.simulator.simulation_running = True
+        return controller                 
 
     def __getattr__(self, name):
         if name in self.controllers:
