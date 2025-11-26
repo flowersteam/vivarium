@@ -5,7 +5,7 @@ from concurrent import futures
 
 
 from vivarium.environment.components.eco_evo import (
-    EnergyComponent, ReproductionComponent, ConsumptionComponent, SpawnComponent
+    ReproductionComponent, ConsumptionComponent, SpawnComponent, EnergyComponent
 )
 from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
 from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
