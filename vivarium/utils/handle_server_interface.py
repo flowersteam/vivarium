@@ -133,12 +133,12 @@ def start_process(process_command):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, notebook_mode: bool = True, wait_time: int = 7, safe_mode=True
+    cmd_args, start_interface: bool = True, wait_time: int = 7, safe_mode=True
 ):
     """Start the server and interface for the given scene
 
     :param scene_name: scene name
-    :param notebook_mode: notebook_mode to adapt the interface, defaults to True
+    :param start_interface: whether to start the interface, defaults to True
     """
     if os.name == "nt":
         lg.warning(
@@ -173,22 +173,23 @@ def start_server_and_interface(
         target=start_process, args=(server_command,)
     )
     server_process.start()
-    time.sleep(wait_time)
+    
+    if start_interface:
+        time.sleep(wait_time)
 
-    interface_command = [
-        "panel",
-        "serve",
-        interface_script,
-        "--args",
-        f"--notebook_mode={str(notebook_mode)}",
-    ]
+        interface_command = [
+            "panel",
+            "serve",
+            interface_script,
+            "--args",
+        ]
 
-    # start the interface
-    print("\nSTARTING INTERFACE")
-    interface_process = multiprocessing.Process(
-        target=start_process, args=(interface_command,)
-    )
-    interface_process.start()
+        # start the interface
+        print("\nSTARTING INTERFACE")
+        interface_process = multiprocessing.Process(
+            target=start_process, args=(interface_command,)
+        )
+        interface_process.start()
 
 
 if __name__ == "__main__":
