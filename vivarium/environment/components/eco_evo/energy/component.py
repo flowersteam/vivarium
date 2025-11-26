@@ -5,17 +5,24 @@ from vivarium.environment.components.component import Component
 from vivarium.environment.utils import type_mask
 
 
+def consuming_trigger(state):
+    return state.entity_state.consuming
+
+
 class EnergyComponent(Component):
     def __init__(self, name, precedence,
                  entity_type, subtype,
-                 init_energy, max_energy, decay, burst):
+                 energy_init, energy_max, energy_decay, 
+                 energy_burst, energy_trigger_fn=consuming_trigger):
         super().__init__(name, precedence)
-        self.init_energy = init_energy
-        self.max_energy = max_energy
-        self.decay = decay
-        self.burst = burst
+        
+        self.energy_init = jnp.array(energy_init)
+        self.energy_max = jnp.array(energy_max)
+        self.energy_burst = jnp.array(energy_burst)
+        self.energy_decay = jnp.array(energy_decay)
         self.entity_type = entity_type
         self.subtype = subtype
+        self.energy_trigger_fn = energy_trigger_fn
 
     def get_step_function(self, state, neighbor_manager, key):
 
@@ -32,18 +39,18 @@ class EnergyComponent(Component):
 
             energy = jnp.where(
                 jnp.logical_and(mask,
-                                state.entity_state.consuming
+                                self.energy_trigger_fn(state)
                                 ),
-                cur_energy + self.burst,
+                cur_energy + entities.energy_burst,
                 cur_energy
             )
             energy = jnp.where(
                 mask,
-                energy - self.decay,
+                energy - entities.energy_decay,
                 energy
             )
 
-            energy = jnp.clip(energy, 0, self.max_energy)
+            energy = jnp.clip(energy, 0, entities.energy_max)
 
             return state.set(**{
                 self.entity_type: entities.set(
@@ -54,23 +61,29 @@ class EnergyComponent(Component):
         return state_fn
 
     def update_state_cls(self, state_cls):
-        assert 'entity_state' in state_cls.__annotations__, 'no entity_state in state class'
-        # assert 'consuming' in state_cls.__annotations__['entity_state'].__annotations__, 'consuming not in entity_state'
-        if self.entity_type in state_cls.__annotations__:
-            @md_dataclass
-            class AgentState(state_cls.__annotations__[self.entity_type]):
-                energy: jnp.ndarray = None
-        else:
-            @md_dataclass
-            class AgentState:
-                energy: jnp.ndarray = None
+        superclass = state_cls.__annotations__[self.entity_type] if self.entity_type in state_cls.__annotations__ else object
+        @md_dataclass
+        class AgentState(superclass):
+            energy: jnp.ndarray = None
+            energy_init: jnp.ndarray = None
+            energy_max: jnp.ndarray = None
+            energy_burst: jnp.ndarray = None
+            energy_decay: jnp.ndarray = None
         state_cls.__annotations__[self.entity_type] = AgentState
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
+        if len(self.energy_init.shape) == 0:
+            energy = jnp.full(getattr(state, self.entity_type).count(), self.energy_init)
+        else:
+            energy = self.energy_init
         return state.set(
             **{self.entity_type: getattr(state, self.entity_type).set(
-                energy=jnp.full(getattr(state, self.entity_type).count(), self.init_energy)
+                energy=energy,
+                energy_init=self.energy_init,
+                energy_max=self.energy_max,
+                energy_burst=self.energy_burst,
+                energy_decay=self.energy_decay,                
             )}
         )
         
