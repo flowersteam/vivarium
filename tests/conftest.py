@@ -195,10 +195,10 @@ def energy(consumption):
         precedence=2,
         entity_type='agents',
         subtype=-1,
-        init_energy=0.5,
-        max_energy=1.,
-        decay=0.00001,
-        burst=0.7
+        energy_init=0.5,
+        energy_max=1.,
+        energy_decay=0.00001,
+        energy_burst=0.7
     )
     return [*consumption, energy_component]
 
