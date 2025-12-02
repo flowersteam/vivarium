@@ -5,7 +5,7 @@ defaults:
   - clients/spawn@environment.components.component_list.spawn.client
   - clients/consumption@environment.components.component_list.consumption.client
 
-scene_name: session_3
+scene_name: session_4
 
 environment:
   components:
