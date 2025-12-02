@@ -6,7 +6,9 @@ scene_name: quickstart
 environment:
   kwargs:
     box_size: 100
-    neighbor_radius: 100
+    neighbor_radius: 150
+    num_scan_steps: 1
+    to_jit: true
   components:
     component_list:
       agents:
