@@ -9,7 +9,7 @@ scene_name: boyds
 
 environment:
   kwargs:
-    box_size: 160.0
+    box_size: 250.0
     neighbor_radius: 8.0
     dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
     num_scan_steps: 1
@@ -18,7 +18,7 @@ environment:
       step:
         dt: 0.2
       agents:
-        n_max: 160
+        n_max: 300
         n_behaviors: 2
         client:
           controller_kwargs:
@@ -28,7 +28,7 @@ environment:
               _all_values_: false
         by_indices:
           - prey:
-              indices: "${range: 0, 157}"
+              indices: "${range: 0, 297}"
               subtype: prey
               diameter: 1.0
               wheel_diameter: 6.0
@@ -40,7 +40,7 @@ environment:
                   - LOVE: [prey]
                   - FEAR: [predator]
           - predator:
-              indices: "${range: 157, 160}"
+              indices: "${range: 297, 300}"
               subtype: predator
               diameter: 5.0
               wheel_diameter: 8.0
