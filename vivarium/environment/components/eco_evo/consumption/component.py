@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 from jax_md import partition
 from jax_md.dataclasses import dataclass as md_dataclass
@@ -14,7 +15,34 @@ class ConsumptionState:
     target_subtype: jnp.ndarray
     range: jnp.ndarray
     start: jnp.ndarray
+
+
+def count_masked_values(x, mask, num_values):
+    """
+    For each integer value in x, count how many times it corresponds 
+    to True values in mask.
     
+    Args:
+        x: array of integers, shape (N,), with values in [0, num_values)
+        mask: array of booleans, shape (N,)
+        num_values: the range of possible values [0, num_values).
+                   Must be a concrete integer (not a traced value).
+    
+    Returns:
+        counts: array of shape (num_values,) where counts[i] is the number
+                of times value i appears in x where mask is True
+    """
+    # Use segment_sum to count occurrences
+    # Convert mask to integers (True -> 1, False -> 0)
+    counts = jax.ops.segment_sum(
+        mask.astype(jnp.int32),
+        x,
+        num_segments=num_values
+    )
+    
+    return counts
+
+count_masked_values = jax.jit(count_masked_values, static_argnums=(2,))
 
 class ConsumptionComponent(Component):
     def __init__(self, name, precedence, source_subtype, target_subtype, range, start):
@@ -28,7 +56,7 @@ class ConsumptionComponent(Component):
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
             entity_state=state.entity_state.set(
-                consuming=jnp.full(state.entity_state.exists.shape, False),
+                consuming=jnp.full(state.entity_state.exists.shape, 0.),
                 consumed=jnp.full(state.entity_state.exists.shape, False)
             ),
             **{self.state_attr: ConsumptionState(
@@ -53,6 +81,7 @@ class ConsumptionComponent(Component):
     def get_step_function(self, state, neighbor_manager, key):
         self.displacement = neighbor_manager.displacement
         source_mask = jnp.full(state.entity_state.exists.shape, True, dtype=bool)
+        n_entities = state.entity_state.exists.shape[0]
         def step_fn(state, neighbors, key):
             
             consumption_state = getattr(state, self.state_attr)
@@ -76,12 +105,21 @@ class ConsumptionComponent(Component):
                 neighbor_mask=partition.neighbor_list_mask(neighbors, mask_self=True)
             )
             mask &= jnp.logical_and(d_r < consumption_state.range, consumption_state.start)
-            consuming = mask.any(axis=1)
+
             consumed = jnp.full(state.entity_state.exists.shape, False)
 
             neigh_flat = neighbors.idx.ravel()
             mask_flat = mask.ravel()
             consumed = consumed.at[neigh_flat].max(mask_flat)
+            
+            # For each neighbor of the neigbor.idx matric, count how many entities are consuming it
+            consumed_by_how_many = count_masked_values(neigh_flat, mask_flat, n_entities)
+            consumed_by_how_many_matrix = consumed_by_how_many[neighbors.idx]
+
+            # `consuming` is the number of other entities consumed by each entity.
+            # It is a float, so that when multiple entities consume the same target,
+            # they only get the corresponding fraction of it.
+            consuming = jnp.where(mask, 1. / consumed_by_how_many_matrix, 0).sum(axis=1)
 
             new_exists = jnp.where(
                 consumed,
