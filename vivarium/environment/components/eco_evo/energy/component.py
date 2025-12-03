@@ -5,15 +5,11 @@ from vivarium.environment.components.component import Component
 from vivarium.environment.utils import type_mask
 
 
-def consuming_trigger(state):
-    return state.entity_state.consuming
-
-
 class EnergyComponent(Component):
     def __init__(self, name, precedence,
                  entity_type, subtype,
                  energy_init, energy_max, energy_decay, 
-                 energy_burst, energy_trigger_fn=consuming_trigger):
+                 energy_burst):
         super().__init__(name, precedence)
         
         self.energy_init = jnp.array(energy_init)
@@ -22,7 +18,6 @@ class EnergyComponent(Component):
         self.energy_decay = jnp.array(energy_decay)
         self.entity_type = entity_type
         self.subtype = subtype
-        self.energy_trigger_fn = energy_trigger_fn
 
     def get_step_function(self, state, neighbor_manager, key):
 
@@ -36,14 +31,9 @@ class EnergyComponent(Component):
             cur_energy = cur_energy.at[idxs].set(entities.energy)
 
             mask = type_mask(state.entity_state, entity_type=entity_type, subtype=self.subtype)
-
-            energy = jnp.where(
-                jnp.logical_and(mask,
-                                self.energy_trigger_fn(state)
-                                ),
-                cur_energy + entities.energy_burst,
-                cur_energy
-            )
+            
+            energy = cur_energy + state.entity_state.consuming * entities.energy_burst
+            
             energy = jnp.where(
                 mask,
                 energy - entities.energy_decay,
