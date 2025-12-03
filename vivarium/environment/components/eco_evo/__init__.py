@@ -5,4 +5,4 @@ from .consumption.interface import ConsumptionInterface
 from .spawn.component import SpawnComponent
 from .spawn.controller import SpawnController
 from .spawn.interface import SpawnInterface
-from .component import ReproductionComponent
+from .reproduction.component import ReproductionComponent
