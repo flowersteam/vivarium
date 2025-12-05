@@ -3,7 +3,6 @@ defaults:
   - environment/components/base_physics@environment.components.component_list
   - environment/components/entities/braitenberg@environment.components.component_list.agents
   - clients/braitenberg@environment.components.component_list.agents.client
-  - clients/collision@environment.components.component_list.collision.client
 
 scene_name: boyds
 

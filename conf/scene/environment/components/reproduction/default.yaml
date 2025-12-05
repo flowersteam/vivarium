@@ -1,0 +1,8 @@
+_target_: vivarium.environment.components.eco_evo.ReproductionComponent
+precedence: 80
+subtype: -1
+birth_energy_threshold: 2.0
+death_energy_threshold: 0.0
+birth_recovery_time: 100 
+birth_radius: 20  # actually a square 
+birth_energy: 1.0
