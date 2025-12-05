@@ -32,7 +32,9 @@ class EnergyComponent(Component):
 
             mask = type_mask(state.entity_state, entity_type=entity_type, subtype=self.subtype)
             
-            energy = cur_energy + state.entity_state.consuming * entities.energy_burst
+            
+            energy = cur_energy + (state.entity_state.consuming - state.entity_state.consumed) * entities.energy_burst
+            
             
             energy = jnp.where(
                 mask,
@@ -44,8 +46,13 @@ class EnergyComponent(Component):
 
             return state.set(**{
                 self.entity_type: entities.set(
-                    energy=energy[idxs]
-                )}
+                    energy=energy[idxs]                    
+                ),
+                'entity_state': state.entity_state.set(
+                    consuming=jnp.full(state.entity_state.exists.shape, 0.),
+                    consumed=jnp.full(state.entity_state.exists.shape, 0.)
+                    )
+                }
             )
 
         return state_fn

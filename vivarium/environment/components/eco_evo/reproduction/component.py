@@ -45,7 +45,7 @@ class ReproductionComponent(Component):
     def init_state_fn(self, state, neighbor_manager, key):
         agent_state = getattr(state, self.entity_type)
         reproduction_cls  = state.__class__.__annotations__[self.entity_type].__annotations__['reproduction']
-        recover_time = jnp.full(state.entity_state.exists.shape, 0, dtype=int)
+        recover_time = jnp.full(agent_state.count(), 0, dtype=int)
         return state.set(
             **{self.entity_type: agent_state.set(
                 reproduction=reproduction_cls(
@@ -68,16 +68,15 @@ class ReproductionComponent(Component):
 
             entities = getattr(state, self.entity_type)
 
-            cur_energy = jnp.zeros(state.entity_state.exists.shape)
-            cur_energy = cur_energy.at[idxs].set(entities.energy)
+            cur_energy = entities.energy
 
             death_mask = jnp.logical_and(
-                type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype),
+                type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs],
                 cur_energy <= entities.reproduction.death_energy_threshold
             )
             
             new_exists = jnp.where(
-                death_mask,
+                jnp.full(state.entity_state.exists.shape, False).at[idxs].set(death_mask),
                 0,
                 state.entity_state.exists
             )
@@ -88,13 +87,12 @@ class ReproductionComponent(Component):
                 )
             )
 
-            cur_recover_time = jnp.zeros(state.entity_state.exists.shape)
-            cur_recover_time = cur_recover_time.at[idxs].set(entities.reproduction.recover_time)
+            cur_recover_time = entities.reproduction.recover_time
 
             reproduce_mask = jnp.logical_and(
                 jnp.logical_and(
-                    type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype), 
-                    cur_energy > entities.reproduction.birth_energy_threshold),
+                    type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs], 
+                    cur_energy >= entities.reproduction.birth_energy_threshold),
                 cur_recover_time > entities.reproduction.birth_recovery_time
             )
 
@@ -114,6 +112,8 @@ class ReproductionComponent(Component):
 
             reproduction_cond = jnp.logical_and(does_reproduce, can_be_born)
 
+            n_exists = jnp.sum(state.entity_state.exists)
+
             state = lax.cond(
                 reproduction_cond,
                 lambda: spawn_entity_at_idx(
@@ -125,6 +125,10 @@ class ReproductionComponent(Component):
                 ),
                 lambda: state
             )
+            
+            reproduction_sucess = (jnp.sum(state.entity_state.exists) == n_exists + 1)
+            
+            reproduction_cond &= reproduction_sucess
 
 
             energy = lax.cond(
@@ -132,6 +136,12 @@ class ReproductionComponent(Component):
                 lambda: entities.energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(entities.reproduction.birth_energy),
                 lambda: entities.energy
             )
+            
+            energy = lax.cond(
+                reproduction_cond,
+                lambda: energy.at[state.entity_state.entity_type_idx[parent_idx]].subtract(entities.reproduction.birth_energy),
+                lambda: energy
+            )            
 
 
             recover_time = entities.reproduction.recover_time + 1

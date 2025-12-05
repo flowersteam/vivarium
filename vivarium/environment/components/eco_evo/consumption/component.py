@@ -57,7 +57,7 @@ class ConsumptionComponent(Component):
         return state.set(
             entity_state=state.entity_state.set(
                 consuming=jnp.full(state.entity_state.exists.shape, 0.),
-                consumed=jnp.full(state.entity_state.exists.shape, False)
+                consumed=jnp.full(state.entity_state.exists.shape, 0.)
             ),
             **{self.state_attr: ConsumptionState(
                 source_subtype=jnp.array(self.source_subtype),
@@ -106,30 +106,26 @@ class ConsumptionComponent(Component):
             )
             mask &= jnp.logical_and(d_r < consumption_state.range, consumption_state.start)
 
-            consumed = jnp.full(state.entity_state.exists.shape, False)
+            # Normalize mask by row sums, handling zero-sum rows
+            row_sums = mask.sum(axis=1, keepdims=True)
+            mask_normalized = jnp.where(row_sums > 0, mask / row_sums, 0)            
 
-            neigh_flat = neighbors.idx.ravel()
-            mask_flat = mask.ravel()
-            consumed = consumed.at[neigh_flat].max(mask_flat)
+            # # `consuming` is the number of other entities consumed by each entity.
+            # # It is a float, so that when multiple entities consume the same target,
+            # # they only get the corresponding fraction of it.
+            consuming = state.entity_state.consuming + mask_normalized.sum(axis=1)
             
-            # For each neighbor of the neigbor.idx matric, count how many entities are consuming it
-            consumed_by_how_many = count_masked_values(neigh_flat, mask_flat, n_entities)
-            consumed_by_how_many_matrix = consumed_by_how_many[neighbors.idx]
-
-            # `consuming` is the number of other entities consumed by each entity.
-            # It is a float, so that when multiple entities consume the same target,
-            # they only get the corresponding fraction of it.
-            consuming = jnp.where(mask, 1. / consumed_by_how_many_matrix, 0).sum(axis=1)
-
-            new_exists = jnp.where(
-                consumed,
-                0,
-                state.entity_state.exists
-            )
+            neigh_flat = neighbors.idx.ravel()
+            mask_normalized_flat = mask_normalized.ravel()            
+            
+            # Similar logic as in consuming
+            # TODO: if consuming entities are taking more than the energy available in a target, they should share only what is available
+            # But this is rather related to the energy component than the consumption one. Maybe they should be merged.
+            consumed = state.entity_state.consumed + jax.ops.segment_sum(mask_normalized_flat, neigh_flat, n_entities)
 
             return state.set(
                 entity_state=state.entity_state.set(
-                    exists=new_exists,
+                    # exists=new_exists,
                     consuming=consuming,
                     consumed=consumed
                 )
