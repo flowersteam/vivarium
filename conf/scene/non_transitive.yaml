@@ -12,7 +12,7 @@ defaults:
   - environment/components/energy/default@environment.components.component_list.energy
   - environment/components/reproduction/default@environment.components.component_list.reproduction
 
-scene_name: eco_evo
+scene_name: non_transitive
 
 environment:
   kwargs:
