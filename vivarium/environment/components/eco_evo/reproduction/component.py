@@ -68,17 +68,26 @@ class ReproductionComponent(Component):
 
             entities = getattr(state, self.entity_type)
 
-            cur_energy = entities.energy
+            energy = entities.energy
 
             death_mask = jnp.logical_and(
                 type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs],
-                cur_energy <= entities.reproduction.death_energy_threshold
+                energy <= entities.reproduction.death_energy_threshold
             )
             
             new_exists = jnp.where(
                 jnp.full(state.entity_state.exists.shape, False).at[idxs].set(death_mask),
                 0,
                 state.entity_state.exists
+            )
+            
+            # Better to reset init energy now
+            # Useful e.g. when respawning in SpawnComponent
+            # (otherwise entity will die again right away if init energy <= death threshold)
+            energy = jnp.where(
+                death_mask,
+                entities.energy_init,
+                energy
             )
 
             state = state.set(
@@ -92,7 +101,7 @@ class ReproductionComponent(Component):
             reproduce_mask = jnp.logical_and(
                 jnp.logical_and(
                     type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs], 
-                    cur_energy >= entities.reproduction.birth_energy_threshold),
+                    energy >= entities.reproduction.birth_energy_threshold),
                 cur_recover_time > entities.reproduction.birth_recovery_time
             )
 
@@ -133,8 +142,8 @@ class ReproductionComponent(Component):
 
             energy = lax.cond(
                 reproduction_cond,
-                lambda: entities.energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(entities.reproduction.birth_energy),
-                lambda: entities.energy
+                lambda: energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(entities.reproduction.birth_energy),
+                lambda: energy
             )
             
             energy = lax.cond(
