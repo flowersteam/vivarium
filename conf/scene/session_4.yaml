@@ -4,6 +4,8 @@ defaults:
   - environment/components/consumption/default@environment.components.component_list.consumption
   - clients/spawn@environment.components.component_list.spawn.client
   - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction    
 
 scene_name: session_4
 
@@ -43,6 +45,18 @@ environment:
         target_subtype: 1
         range: 12.5
         start: false
+      energy:
+        entity_type: objects
+        subtype: 1
+        energy_init: 1.
+        energy_max: 1.0
+        energy_decay: 0.0
+        energy_burst: 1.
+      reproduction:
+        entity_type: objects
+        subtype: 1
+        birth_energy_threshold: 2.0 # > energy_max to prevent reproduction
+        death_energy_threshold: 0.0          
 
 subtype_labels:
   - agent
