@@ -35,7 +35,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
     def __init__(self, simulator):
         self.simulator = simulator
-        self.simulator.init_state()
         self._lock = Lock()
     
     def _step(self):
