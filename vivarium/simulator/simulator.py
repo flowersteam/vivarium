@@ -136,11 +136,6 @@ class Simulator:
         self._freq = value
         self.sleep_timer.frequency = value
 
-    def init_state(self):
-        if self.state.entity_state.momentum is None:
-            self.state = self.env.init_fn(self.state)
-        return self.state
-
     def _step(self, state):
         """Do num_updates jitted steps in the simulation. This is done by converting state into environment state, and convert it back to simulation state during return
 

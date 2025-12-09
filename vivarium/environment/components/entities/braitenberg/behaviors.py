@@ -21,5 +21,5 @@ behavior_params = {
     Behaviors.SHY: jnp.array([[1.0, 0.0, -1.0, 0.0, 0.0], [1.0, -1.0, 0.0, 0.0, 0.0]]),
     Behaviors.NOOP: jnp.array([[0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0]]),
     Behaviors.MANUAL: jnp.array([[0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0, 1.0]]),
-    Behaviors.CUSTOM: jnp.array([[0.1, 0.0, 0.0, 0.0, 0.0], [0.1, 0.0, 0.0, 0.0, 0.0]]),
+    Behaviors.CUSTOM: jnp.array([[0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0]]),
 }
