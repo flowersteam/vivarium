@@ -189,7 +189,7 @@ class Environment:
             state, neighbors, key = carry
             for fn in self.step_functions:
                 key, sub_key = random.split(key)
-                state = fn(state, neighbors, sub_key) 
+                state = fn(state, neighbors, sub_key)
             neighbors = neighbors.update(state.entity_state.position)
             state = state.set(time=state.time + 1)
             carry = (state, neighbors, key)
@@ -208,7 +208,7 @@ class Environment:
             new_state = state
             for fn in self.step_functions:
                 self.key, sub_key = random.split(self.key)
-                new_state = fn(new_state, neighbors, sub_key) 
+                new_state = fn(new_state, neighbors, sub_key)
             neighbors = self.neighbor_manager.update(new_state.entity_state.position)
             if not self.neighbor_manager.reallocate_if_overflow(new_state.entity_state.unified_position):
                 new_state = new_state.set(time=state.time + 1)
@@ -219,6 +219,9 @@ class Environment:
                 f"NEIGHBORS BUFFER OVERFLOW: rebuilding neighbors"
             )
             neighbors = self.neighbor_manager.neighbor_fn.allocate(state.entity_state.position)
+            self.neighbor_manager.neighbors = neighbors
+            for factory in self.factories:
+                state = factory.neighbor_update(state, self.neighbor_manager, self.key)         
         else:
             state = new_state
 
