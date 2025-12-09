@@ -69,9 +69,11 @@ class ReproductionComponent(Component):
             entities = getattr(state, self.entity_type)
 
             energy = entities.energy
+            
+            mask = type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs]
 
             death_mask = jnp.logical_and(
-                type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs],
+                mask,
                 energy <= entities.reproduction.death_energy_threshold
             )
             

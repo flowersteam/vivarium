@@ -53,11 +53,22 @@ class ConsumptionComponent(Component):
         self.start = start
         self.state_attr = f'{self.name}_state'
 
+    def update_state_cls(self, state_cls):
+        base_cls = state_cls.__annotations__['entity_state'] if 'entity_state' in state_cls.__annotations__ else BaseEntityState
+        
+        @md_dataclass
+        class EntityState(base_cls):
+            consumption_matrix: jnp.ndarray = None
+        
+        state_cls.__annotations__['entity_state'] = EntityState
+        state_cls.__annotations__[self.state_attr] = ConsumptionState
+        setattr(state_cls, self.state_attr, None)        
+        return state_cls
+
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
             entity_state=state.entity_state.set(
-                consuming=jnp.full(state.entity_state.exists.shape, 0.),
-                consumed=jnp.full(state.entity_state.exists.shape, 0.)
+                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, False)
             ),
             **{self.state_attr: ConsumptionState(
                 source_subtype=jnp.array(self.source_subtype),
@@ -66,17 +77,6 @@ class ConsumptionComponent(Component):
                 start=jnp.array(self.start)
             )}            
         )
-
-    def update_state_cls(self, state_cls):
-        base_cls = state_cls.__annotations__['entity_state'] if 'entity_state' in state_cls.__annotations__ else BaseEntityState
-        @md_dataclass
-        class EntityState(base_cls):
-            consuming: jnp.ndarray = None
-            consumed: jnp.ndarray = None
-        state_cls.__annotations__['entity_state'] = EntityState
-        state_cls.__annotations__[self.state_attr] = ConsumptionState
-        setattr(state_cls, self.state_attr, None)        
-        return state_cls
 
     def get_step_function(self, state, neighbor_manager, key):
         self.displacement = neighbor_manager.displacement
@@ -106,29 +106,17 @@ class ConsumptionComponent(Component):
             )
             mask &= jnp.logical_and(d_r < consumption_state.range, consumption_state.start)
 
-            # Normalize mask by row sums, handling zero-sum rows
-            row_sums = mask.sum(axis=1, keepdims=True)
-            mask_normalized = jnp.where(row_sums > 0, mask / row_sums, 0)            
-
-            # # `consuming` is the number of other entities consumed by each entity.
-            # # It is a float, so that when multiple entities consume the same target,
-            # # they only get the corresponding fraction of it.
-            consuming = state.entity_state.consuming + mask_normalized.sum(axis=1)
-            
-            neigh_flat = neighbors.idx.ravel()
-            mask_normalized_flat = mask_normalized.ravel()            
-            
-            # Similar logic as in consuming
-            # TODO: if consuming entities are taking more than the energy available in a target, they should share only what is available
-            # But this is rather related to the energy component than the consumption one. Maybe they should be merged.
-            consumed = state.entity_state.consumed + jax.ops.segment_sum(mask_normalized_flat, neigh_flat, n_entities)
-
             return state.set(
                 entity_state=state.entity_state.set(
-                    # exists=new_exists,
-                    consuming=consuming,
-                    consumed=consumed
+                    consumption_matrix= state.entity_state.consumption_matrix | mask,
                 )
             )
 
         return step_fn
+    
+    def neighbor_update(self, state, neighbor_manager, key):
+        return state.set(
+            entity_state=state.entity_state.set(
+                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, False)
+            )
+        )
