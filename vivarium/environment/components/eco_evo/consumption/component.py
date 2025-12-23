@@ -77,10 +77,14 @@ class ConsumptionComponent(Component):
                 neighbor_mask=partition.neighbor_list_mask(neighbors, mask_self=True)
             )
             mask &= jnp.logical_and(d_r < consumption_state.range, consumption_state.start)
+            
+            # Normalize mask by row sums, handling zero-sum rows
+            row_sums = mask.sum(axis=1, keepdims=True)
+            mask_normalized = jnp.where(row_sums > 0, mask / row_sums, 0)               
 
             return state.set(
                 entity_state=state.entity_state.set(
-                    consumption_matrix= state.entity_state.consumption_matrix | mask,
+                    consumption_matrix= state.entity_state.consumption_matrix + mask_normalized,
                 )
             )
 
