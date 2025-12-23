@@ -2,6 +2,7 @@ import math
 import hydra
 import logging
 import threading
+from time import sleep
 
 from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -28,9 +29,9 @@ class VivariumController:
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
 
     @classmethod
-    def from_client(cls, client=None):
+    def from_client(cls, client=None, scene_config=None):
         client = client or SimulatorGRPCClient()
-        scene_config = load_scene_config(client.scene_name)
+        scene_config = scene_config or load_scene_config(client.scene_name)
         components_config = scene_config.environment.components       
         controllers = {}
         for name, c_config in components_config.component_list.items():
@@ -48,10 +49,12 @@ class VivariumController:
                       start_interface=True,
                       safe_mode=False,
                       step_from_controller=True, 
-                      run_simulation=True):
+                      run_simulation=True,
+                      wait_for_server_ready=10.0):
         start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
                                    start_interface=start_interface,
                                    safe_mode=safe_mode)
+        sleep(wait_for_server_ready)  # wait for server to be ready
         controller = cls.from_client()
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
