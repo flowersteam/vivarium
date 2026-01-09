@@ -82,6 +82,8 @@ class BaseParticleState:
         return self.entity_idx.shape[0]
     
 
+# TODO: There might be a better way to map field names to entity type integer
+# See https://docs.jax.dev/en/latest/pytrees.html#explicit-key-paths
 def field_accessors(cls):
     """
     Decorator to add `field_name` and `field` methods to a class.
