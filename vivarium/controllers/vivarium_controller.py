@@ -19,7 +19,7 @@ class VivariumController:
 
     def __init__(self, client=None, subtypes=[], **controllers):
         self.client = client or SimulatorGRPCClient()
-        self.subtype_labels = {i: label for i, label in enumerate(subtypes)}
+        self.subtypes = subtypes
         
         self.controllers = controllers
         
