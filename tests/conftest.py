@@ -96,6 +96,19 @@ def vivarium_controller_from_config(simulator_from_config):
 
 
 @pytest.fixture
+def vivarium_controller_start_session(grpc_client):
+    def fn(scene_name, overrides=[]):
+        client = grpc_client(scene_name)
+        controller = VivariumController.start_session(
+            scene_name=scene_name,
+            client=client,
+            start_interface=False,
+        )
+        return controller
+    return fn
+
+
+@pytest.fixture
 def controller_and_interfaces_from_config(scene_config, vivarium_controller):
     def fn(client):
         controller = vivarium_controller(client)
