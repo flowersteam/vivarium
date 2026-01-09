@@ -4,10 +4,11 @@ import jax.numpy as jnp
 
 NUM_STEPS = 4
 
-@pytest.mark.parametrize('scene_name', ['session_1', 'session_2', 'session_3', 'session_4'])
-def test_session(scene_name, vivarium_controller_from_config):
 
-    controller = vivarium_controller_from_config(scene_name, overrides=["environment.kwargs.debug_mode=true"])
+@pytest.mark.parametrize('scene_name', ['session_1', 'session_2', 'session_3', 'session_4'])
+def test_session(scene_name, vivarium_controller_start_session):
+
+    controller = vivarium_controller_start_session(scene_name, overrides=["environment.kwargs.debug_mode=true"])
 
     def beh(agent):
         left, right = agent.proximeters()
@@ -24,7 +25,7 @@ def test_session(scene_name, vivarium_controller_from_config):
     
     controller.simulator.simulation_running = True
     
-    # Step twice to initialize force an momentum
+    # Step twice to initialize force and momentum
     controller.step()
     controller.step()
 
