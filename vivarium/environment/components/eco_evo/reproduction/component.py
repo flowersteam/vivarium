@@ -68,13 +68,17 @@ class ReproductionComponent(Component):
 
             entities = getattr(state, self.entity_type)
 
-            energy = entities.energy
+            energy_state = state.energy_state
             
-            mask = type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs]
+            energy = energy_state.energy
+            entity_type_energy = energy[idxs]
+            
+            mask = type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)
+            entity_type_mask = mask[idxs]
 
             death_mask = jnp.logical_and(
-                mask,
-                energy <= entities.reproduction.death_energy_threshold
+                entity_type_mask,
+                entity_type_energy <= entities.reproduction.death_energy_threshold
             )
             
             new_exists = jnp.where(
@@ -83,15 +87,6 @@ class ReproductionComponent(Component):
                 state.entity_state.exists
             )
             
-            # Better to reset init energy now
-            # Useful e.g. when respawning in SpawnComponent
-            # (otherwise entity will die again right away if init energy <= death threshold)
-            energy = jnp.where(
-                death_mask,
-                entities.energy_init,
-                energy
-            )
-
             state = state.set(
                 entity_state=state.entity_state.set(
                     exists=new_exists
@@ -142,16 +137,16 @@ class ReproductionComponent(Component):
             reproduction_cond &= reproduction_sucess
 
 
-            energy = lax.cond(
+            entity_type_energy = lax.cond(
                 reproduction_cond,
-                lambda: energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(entities.reproduction.birth_energy),
-                lambda: energy
+                lambda: entity_type_energy.at[state.entity_state.entity_type_idx[offspring_idx]].set(entities.reproduction.birth_energy),
+                lambda: entity_type_energy
             )
             
-            energy = lax.cond(
+            entity_type_energy = lax.cond(
                 reproduction_cond,
-                lambda: energy.at[state.entity_state.entity_type_idx[parent_idx]].subtract(entities.reproduction.birth_energy),
-                lambda: energy
+                lambda: entity_type_energy.at[state.entity_state.entity_type_idx[parent_idx]].subtract(entities.reproduction.birth_energy),
+                lambda: entity_type_energy
             )            
 
 
@@ -169,11 +164,20 @@ class ReproductionComponent(Component):
                 lambda: recover_time
             )
             
+            energy = jnp.where(
+                idxs,
+                energy.at[idxs].set(entity_type_energy),
+                energy
+            )
+            
             return state.set(
+                energy_state=energy_state.set(
+                    energy=energy
+                    ),
                 **{self.entity_type: entities.set(
                     reproduction=entities.reproduction.set(recover_time=recover_time),
-                    energy=energy,
-                )}
+                    )
+                   }
             )
         
         return step_fn
