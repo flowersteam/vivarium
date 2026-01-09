@@ -88,9 +88,9 @@ class Environment:
         self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(factories)}
         self.neighbor_manager = neighbor_manager
         self.num_scan_steps = num_scan_steps
-        self.to_jit = to_jit
+        self.to_jit = to_jit and not debug_mode
         self.debug_mode = debug_mode
-        if to_jit and not debug_mode:
+        if self.to_jit:
             self._step_env = jit(self._step_env, static_argnums=(2,))
 
     @classmethod

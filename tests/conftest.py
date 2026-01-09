@@ -268,13 +268,14 @@ def step():
 
 @pytest.fixture
 def environment():
-    def fn(factories):
+    def fn(factories, debug_mode=False):
         nm = NeighborManager(box_size=100., neighbor_radius=150., dr_threshold=10.)
         env = Environment(
             neighbor_manager=nm,
             base_state_cls=BaseState,
             factories=remove_duplicates(factories),
-            to_jit=True
+            to_jit=not debug_mode,
+            debug_mode=debug_mode
         )
         return env
     return fn
@@ -282,8 +283,8 @@ def environment():
 
 @pytest.fixture
 def environment_and_state(environment):
-    def fn(factories):
-        env = environment(factories)
+    def fn(factories, debug_mode=False):
+        env = environment(factories, debug_mode=debug_mode)
         state = env.init_state()
         return env, state
     return fn
