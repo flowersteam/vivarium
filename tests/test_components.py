@@ -1,7 +1,11 @@
+import jax
 import jax.numpy as jnp
 
-from vivarium.environment.utils import type_mask
+from jax_md import partition
+
+from vivarium.environment.utils import type_mask, neighbors_entity_mask
 from vivarium.utils.scene_configs import component_factories_from_config
+
 
 def test_instantiate(scene_config):
     scene_config = scene_config('braitenberg')
@@ -112,15 +116,34 @@ def test_consumption(environment_and_state, consumption):
         )
     )
     
-    assert not state.entity_state.consuming[consumer_idx]
-    assert not state.entity_state.consumed[consumee_idx]
-    assert state.entity_state.exists[consumee_idx]
+    mask = neighbors_entity_mask(
+        neighbors_idx=env.neighbor_manager.neighbors.idx,
+        source_mask=jnp.full(state.entity_state.exists.shape, False, dtype=bool).at[consumer_idx].set(True),
+        target_mask=jnp.full(state.entity_state.exists.shape, False, dtype=bool).at[consumee_idx].set(True),
+        neighbor_mask=partition.neighbor_list_mask(env.neighbor_manager.neighbors)
+    )
+    
+    assert mask.sum() == 1
+    
+    consumption_idx = [i.item() for i in jnp.nonzero(mask)]
+    assert state.consumption_state.consumption_matrix[*consumption_idx] == 0.
+    
 
     state = env.step(state, scan=False)
 
-    assert state.entity_state.consuming[consumer_idx]
-    assert state.entity_state.consumed[consumee_idx]
-    assert not state.entity_state.exists[consumee_idx]
+    consumption_idx = [i.item() for i in jnp.nonzero(mask)]
+    assert state.consumption_state.consumption_matrix[*consumption_idx] > 0.
+
+    consuming = state.consumption_state.consumption_matrix.sum(axis=1)
+    
+    neigh_flat = env.neighbor_manager.neighbors.idx.ravel()
+    consumption_matrix_flat = state.consumption_state.consumption_matrix.ravel()
+    
+    consumed = jax.ops.segment_sum(consumption_matrix_flat, neigh_flat) #, n_entities)      
+    
+    assert consumed.sum() == consuming.sum()
+    
+    
 
 
 def test_energy(environment_and_state, energy):
@@ -128,12 +151,13 @@ def test_energy(environment_and_state, energy):
     idx = 0
     etype_idx = state.entity_state.entity_type_idx[idx]
     state = state.set(
-        entity_state=state.entity_state.set(
-            consuming=state.entity_state.consuming.at[idx].set(True),
+        consumption_state=state.consumption_state.set(
+            consumption_matrix=jnp.full(state.consumption_state.consumption_matrix.shape, 0.).at[idx, 2].set(1.),
         )
     )
-    state = env.step(state, scan=False)
-    new_energy = state.agents.energy[etype_idx]
+    energy_step_fn = env.get_factory_by_name('energy').get_step_function(state, env.neighbor_manager, None)
+    state = energy_step_fn(state, env.neighbor_manager.neighbors, None)
+    new_energy = state.energy_state.energy[etype_idx]
     assert new_energy == 1
 
 
@@ -143,15 +167,15 @@ def test_death(environment_and_state, reproduction):
     etype_idx = state.entity_state.entity_type_idx[idx]
     state = env.step(state)
     state = state.set(
-        agents=state.agents.set(
-            energy=state.agents.energy.at[etype_idx].set(1.),
+        energy_state=state.energy_state.set(
+            energy=state.energy_state.energy.at[etype_idx].set(1.),
         )
     )
     state = env.step(state)
     assert state.entity_state.exists[idx] == 1
     state = state.set(
-        agents=state.agents.set(
-            energy=state.agents.energy.at[etype_idx].set(0.),
+        energy_state=state.energy_state.set(
+            energy=state.energy_state.energy.at[etype_idx].set(0.),
         )
     )
     state = env.step(state)
@@ -169,10 +193,15 @@ def test_reproduction(environment_and_state, reproduction):
     n_exists = state.entity_state.exists.sum()
     state = env.step(state, scan=False)
     assert state.entity_state.exists.sum() == n_exists
+
     state = state.set(
+        energy_state=state.energy_state.set(
+            energy=state.energy_state.energy.at[etype_idx].set(1.),
+        ),
         agents=state.agents.set(
-            energy=state.agents.energy.at[etype_idx].set(1.),
-            recover_time=state.agents.recover_time.at[etype_idx].set(1e5),
+            reproduction=state.agents.reproduction.set(
+                recover_time=state.agents.reproduction.recover_time.at[etype_idx].set(1e5),
+            )
         )
     )
     state = state = env.step(state)
