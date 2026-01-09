@@ -20,7 +20,7 @@ from vivarium.utils.scene_configs import extend_controller_kwargs
 from vivarium.utils.timer import SleepTimer, sleep_timer
 
 lg = logging.getLogger(__name__)
-# lg.setLevel(logging.DEBUG)
+lg.setLevel(logging.DEBUG)
 
 
 def update_from_dataclass(obj, dataclass_instance, exclude_fields=[]):
@@ -77,8 +77,11 @@ class Simulator:
             kwargs['simulator'] = OmegaConf.to_container(simulator_config.client.controller_kwargs, resolve=True)
         for name, c_config in simulator_config.env.components.component_list.items():
             if 'client' in c_config and 'controller_kwargs' in c_config.client:
-                n_max = c_config.n_max
-                controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
+                if 'n_max' in c_config:
+                    n_max = c_config.n_max
+                    controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
+                else:
+                    controller_kwargs = c_config.client.controller_kwargs
                 kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
 
         cp = create_dataclass_from_dict('ControllerParameters', kwargs)
