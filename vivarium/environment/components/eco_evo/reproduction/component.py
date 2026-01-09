@@ -68,9 +68,9 @@ class ReproductionComponent(Component):
 
             entities = getattr(state, self.entity_type)
 
-            energy_state = state.energy_state
+            entity_state = state.entity_state
             
-            energy = energy_state.energy
+            energy = entity_state.energy
             entity_type_energy = energy[idxs]
             
             mask = type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)
@@ -98,7 +98,7 @@ class ReproductionComponent(Component):
             # (otherwise entity will die again right away if init energy <= death threshold)
             entity_type_energy = jnp.where(
                 death_mask,
-                energy_state.energy_init,
+                entity_state.energy_init,
                 entity_type_energy
             )
 
@@ -161,7 +161,18 @@ class ReproductionComponent(Component):
                 lambda: entity_type_energy
             )            
 
+            # behavior_params = entities.behavior_params
 
+            # behavior_params = lax.cond(
+            #     reproduction_cond,
+            #     lambda: behavior_params.at[
+            #         state.entity_state.entity_type_idx[offspring_idx]
+            #         ].set(
+            #             behavior_params[state.entity_state.entity_type_idx[parent_idx]] + random.normal(sub_key, shape=entities.behavior_params.shape[1:]) * 0.01
+            #             ),
+            #     lambda: behavior_params
+            # )
+            
             recover_time = entities.reproduction.recover_time + 1
 
             recover_time = lax.cond(
@@ -183,11 +194,12 @@ class ReproductionComponent(Component):
             )
             
             return state.set(
-                energy_state=energy_state.set(
+                entity_state=state.entity_state.set(
                     energy=energy
                     ),
                 **{self.entity_type: entities.set(
                     reproduction=entities.reproduction.set(recover_time=recover_time),
+                    # behavior_params=behavior_params
                     )
                    }
             )

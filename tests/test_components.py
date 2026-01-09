@@ -149,7 +149,6 @@ def test_consumption(environment_and_state, consumption):
 def test_energy(environment_and_state, energy):
     env, state = environment_and_state(energy)
     idx = 0
-    etype_idx = state.entity_state.entity_type_idx[idx]
     state = state.set(
         consumption_state=state.consumption_state.set(
             consumption_matrix=jnp.full(state.consumption_state.consumption_matrix.shape, 0.).at[idx, 2].set(1.),
@@ -157,7 +156,7 @@ def test_energy(environment_and_state, energy):
     )
     energy_step_fn = env.get_factory_by_name('energy').get_step_function(state, env.neighbor_manager, None)
     state = energy_step_fn(state, env.neighbor_manager.neighbors, None)
-    new_energy = state.energy_state.energy[etype_idx]
+    new_energy = state.entity_state.energy[idx]
     assert new_energy == 1
 
 
@@ -167,22 +166,22 @@ def test_death(environment_and_state, reproduction):
     etype_idx = state.entity_state.entity_type_idx[idx]
     state = env.step(state)
     state = state.set(
-        energy_state=state.energy_state.set(
-            energy=state.energy_state.energy.at[etype_idx].set(1.),
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[etype_idx].set(1.),
         )
     )
     state = env.step(state)
     assert state.entity_state.exists[idx] == 1
     state = state.set(
-        energy_state=state.energy_state.set(
-            energy=state.energy_state.energy.at[etype_idx].set(0.),
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[etype_idx].set(0.),
         )
     )
     state = env.step(state)
     assert state.entity_state.exists[idx] == 0
 
 def test_reproduction(environment_and_state, reproduction):
-    env, state = environment_and_state(reproduction)
+    env, state = environment_and_state(reproduction, debug_mode=True)
     idx = 0
     etype_idx = state.entity_state.entity_type_idx[idx]
     state = state.set(
@@ -195,8 +194,8 @@ def test_reproduction(environment_and_state, reproduction):
     assert state.entity_state.exists.sum() == n_exists
 
     state = state.set(
-        energy_state=state.energy_state.set(
-            energy=state.energy_state.energy.at[etype_idx].set(1.),
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[idx].set(1.),
         ),
         agents=state.agents.set(
             reproduction=state.agents.reproduction.set(
