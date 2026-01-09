@@ -196,10 +196,12 @@ def consumption(proximity_map):
     consumption = ConsumptionComponent(
         name='consumption', 
         precedence=1, 
-        source_subtype=0, 
-        target_subtype=1, 
-        range=20.0,
-        start=True
+        test_consumption = dict(
+            source_subtype=0, 
+            target_subtype=1, 
+            range=20.0,
+            start=True
+        )
     )
     return [*proximity_map, consumption]
 
@@ -210,7 +212,6 @@ def energy(consumption):
         name='energy',
         precedence=2,
         entity_type='agents',
-        subtype=-1,
         energy_init=0.5,
         energy_max=1.,
         energy_decay=0.00001,
@@ -222,7 +223,7 @@ def energy(consumption):
 @pytest.fixture
 def reproduction(energy):
     # Disable the ConsumptionComponent for the reproduction test by setting its range to 0.
-    energy[-2].range = 0.
+    energy[-2].consumption_params_dict['test_consumption']['range'] = 0.
     reproduction = ReproductionComponent(
         name='reproduction', 
         precedence=3,
