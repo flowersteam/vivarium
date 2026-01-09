@@ -1,6 +1,6 @@
 import numpy as np
 
-from vivarium.controllers import Controller
+from vivarium.controllers import Controller, AttributeMapping
 
 class SingleConsumptionController:
     def __init__(self, remote, idx, global_controller_name, subtype_labels):
@@ -36,6 +36,14 @@ class ConsumptionController(Controller):
         self._single_consumption_controllers = {
             c_name: SingleConsumptionController(remote, idx, name, self._subtype_labels) for idx, c_name in enumerate(self._consumption_names)
         }
+        
+        mapping = mapping or {
+            'consumption_matrix': AttributeMapping(
+                f'state.{name}_state.consumption_matrix',
+                remote_to_ctrl_fn=lambda x: np.array(x),
+                ctrl_to_remote_fn=lambda x: np.array(x)
+            )
+        }        
         
         super().__init__(name, remote, mapping=mapping)
 
