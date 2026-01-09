@@ -53,10 +53,10 @@ class Controller:
             pass
 
     def remote_to_ctrl(self, attr):
-            mapping = self._mapping[attr]
-            remote_value = attrgetter(mapping.remote_attr)(self._remote)
-            remote_value = remote_value.obj() if isinstance(remote_value, Remote) else remote_value
-            return mapping.remote_to_ctrl_fn(remote_value)
+        mapping = self._mapping[attr]
+        remote_value = attrgetter(mapping.remote_attr)(self._remote)
+        remote_value = remote_value.obj() if isinstance(remote_value, Remote) else remote_value
+        return mapping.remote_to_ctrl_fn(remote_value)
 
     def ctrl_to_remote(self, attr, value=None):
         if attr in self._mapping:
