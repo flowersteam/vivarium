@@ -92,17 +92,29 @@ class ReproductionComponent(Component):
                     exists=new_exists
                 )
             )
+            
+            # Better to reset init energy now
+            # Useful e.g. when respawning in SpawnComponent
+            # (otherwise entity will die again right away if init energy <= death threshold)
+            entity_type_energy = jnp.where(
+                death_mask,
+                energy_state.energy_init,
+                entity_type_energy
+            )
 
             cur_recover_time = entities.reproduction.recover_time
 
-            reproduce_mask = jnp.logical_and(
+            entity_type_reproduce_mask = jnp.logical_and(
                 jnp.logical_and(
-                    type_mask(state.entity_state, entity_type=entity_type, subtype=entities.reproduction.subtype)[idxs], 
-                    energy >= entities.reproduction.birth_energy_threshold),
+                    entity_type_mask,
+                    entity_type_energy >= entities.reproduction.birth_energy_threshold),
                 cur_recover_time > entities.reproduction.birth_recovery_time
             )
+            
+            reproduce_mask = jnp.full(state.entity_state.exists.shape, False).at[idxs].set(entity_type_reproduce_mask)
 
             # Workaround to make it simpler, we reproduce only a single agent per time step
+            # TODO: Maybe could use a vmap?
             key, sub_key = random.split(key)
             does_reproduce, parent_idx = sample_true_index(sub_key, reproduce_mask)
 
