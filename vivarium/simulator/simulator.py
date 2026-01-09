@@ -20,7 +20,7 @@ from vivarium.utils.scene_configs import extend_controller_kwargs
 from vivarium.utils.timer import SleepTimer, sleep_timer
 
 lg = logging.getLogger(__name__)
-lg.setLevel(logging.DEBUG)
+# lg.setLevel(logging.DEBUG)
 
 
 def update_from_dataclass(obj, dataclass_instance, exclude_fields=[]):
