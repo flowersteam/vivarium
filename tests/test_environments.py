@@ -7,7 +7,12 @@ from vivarium.environment import Environment
 NUM_STEPS = 5
 
 
-@pytest.mark.parametrize("scene_name", ["braitenberg", "particle_lenia", "lenia_braitenberg"])
+@pytest.mark.parametrize("scene_name", [
+    "braitenberg", 
+    "particle_lenia", 
+    "lenia_braitenberg", 
+    "non_transitive", 
+    "fishing"])
 def test_env(scene_name, scene_config):
     """Test the stepping mechanism of the env with occlusion (default)"""
     config = scene_config(scene_name)
