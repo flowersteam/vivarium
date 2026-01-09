@@ -13,6 +13,7 @@ from bokeh.models import (
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.controllers.panel_controller import ParamSimulator
+from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 
 
@@ -20,6 +21,7 @@ lg = logging.getLogger(__name__)
 
 
 def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Column):
+    cleanup_parameterized_class()
     interfaces = {}
     for name, component in component_list_config.items():
         if 'client' in component:
