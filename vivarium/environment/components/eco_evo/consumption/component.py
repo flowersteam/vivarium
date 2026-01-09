@@ -1,3 +1,4 @@
+from jax import vmap
 import jax.numpy as jnp
 from jax_md import partition
 from jax_md.dataclasses import dataclass as md_dataclass
@@ -5,7 +6,6 @@ from jax_md.dataclasses import dataclass as md_dataclass
 from vivarium.environment.utils import get_relative_displacement
 from vivarium.environment.components.component import Component
 from vivarium.environment.utils import neighbors_entity_mask
-from vivarium.environment.state import BaseEntityState
 
 
 @md_dataclass
@@ -14,39 +14,48 @@ class ConsumptionState:
     target_subtype: jnp.ndarray
     range: jnp.ndarray
     start: jnp.ndarray
+    consumption_matrix: jnp.ndarray = None
+
+
+def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype, source_subtype, target_subtype, start, range):     
+
+    mask = neighbors_entity_mask(
+        neighbors_idx=neighbors_idx,
+        source_mask=jnp.logical_and(exists == 1, entity_subtype == source_subtype),
+        target_mask=jnp.logical_and(exists == 1, entity_subtype == target_subtype),
+        neighbor_mask=neighbor_mask
+    )
+    mask &= jnp.logical_and(d_r < range, start)
     
+    # Normalize mask by row sums, handling zero-sum rows
+    row_sums = mask.sum(axis=1, keepdims=True)
+    mask_normalized = jnp.where(row_sums > 0, mask / row_sums, 0)               
+
+    return mask_normalized
+
+
+single_consumption = vmap(single_consumption, in_axes=(None, None, None, None, None, 0, 0, 0, 0))
+
 
 class ConsumptionComponent(Component):
-    def __init__(self, name, precedence, source_subtype, target_subtype, range, start):
+    def __init__(self, name, precedence, **consumption_params):
         super().__init__(name, precedence)
-        self.source_subtype = source_subtype
-        self.target_subtype = target_subtype
-        self.range = range
-        self.start = start
+        self.consumption_params_dict = consumption_params
         self.state_attr = f'{self.name}_state'
 
     def update_state_cls(self, state_cls):
-        base_cls = state_cls.__annotations__['entity_state'] if 'entity_state' in state_cls.__annotations__ else BaseEntityState
-        
-        @md_dataclass
-        class EntityState(base_cls):
-            consumption_matrix: jnp.ndarray = None
-        
-        state_cls.__annotations__['entity_state'] = EntityState
         state_cls.__annotations__[self.state_attr] = ConsumptionState
-        setattr(state_cls, self.state_attr, None)        
+        setattr(state_cls, self.state_attr, None)
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
         return state.set(
-            entity_state=state.entity_state.set(
-                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, False)
-            ),
             **{self.state_attr: ConsumptionState(
-                source_subtype=jnp.array(self.source_subtype),
-                target_subtype=jnp.array(self.target_subtype),
-                range=jnp.array(self.range),
-                start=jnp.array(self.start)
+                source_subtype=jnp.array([params['source_subtype'] for params in self.consumption_params_dict.values()]),
+                target_subtype=jnp.array([params['target_subtype'] for params in self.consumption_params_dict.values()]),
+                range=jnp.array([params['range'] for params in self.consumption_params_dict.values()]),
+                start=jnp.array([params['start'] for params in self.consumption_params_dict.values()]),
+                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, 0.)
             )}            
         )
 
@@ -68,31 +77,31 @@ class ConsumptionComponent(Component):
                     neighbors.idx,
                     displacement_fn=neighbor_manager.displacement
                 )
-            )            
-
-            mask = neighbors_entity_mask(
-                neighbors_idx=neighbors.idx,
-                source_mask=jnp.logical_and(state.entity_state.exists == 1, state.entity_state.entity_subtype == consumption_state.source_subtype),
-                target_mask=jnp.logical_and(state.entity_state.exists == 1, state.entity_state.entity_subtype == consumption_state.target_subtype),
-                neighbor_mask=partition.neighbor_list_mask(neighbors, mask_self=True)
             )
-            mask &= jnp.logical_and(d_r < consumption_state.range, consumption_state.start)
             
-            # Normalize mask by row sums, handling zero-sum rows
-            row_sums = mask.sum(axis=1, keepdims=True)
-            mask_normalized = jnp.where(row_sums > 0, mask / row_sums, 0)               
+            consumption_matrix = single_consumption(
+                d_r,
+                neighbors.idx,
+                partition.neighbor_list_mask(neighbors, mask_self=True),
+                state.entity_state.exists,
+                state.entity_state.entity_subtype,
+                consumption_state.source_subtype,
+                consumption_state.target_subtype,
+                consumption_state.start,
+                consumption_state.range
+            ).sum(axis=0)                    
 
             return state.set(
-                entity_state=state.entity_state.set(
-                    consumption_matrix= state.entity_state.consumption_matrix + mask_normalized,
-                )
+                **{self.state_attr: state.consumption_state.set(
+                    consumption_matrix=consumption_matrix
+                )}
             )
 
         return step_fn
     
     def neighbor_update(self, state, neighbor_manager, key):
         return state.set(
-            entity_state=state.entity_state.set(
-                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, False)
-            )
+            **{self.state_attr: state.consumption_state.set(
+                consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, 0.)
+            )}
         )
