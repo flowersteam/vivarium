@@ -18,7 +18,7 @@ def main(cmd_args):
     print(f"Interface PIDs: {interface_pids}")
     print(f"Server PIDs: {server_pids}")
     stop_server_and_interface(safe_mode=True)
-    start_server_and_interface(cmd_args, notebook_mode=False, wait_time=6)
+    start_server_and_interface(cmd_args, wait_time=6)
 
 
 if __name__ == "__main__":
