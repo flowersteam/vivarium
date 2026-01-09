@@ -1,5 +1,6 @@
 import grpc
 import pytest
+from time import sleep
 import jax.numpy as jnp
 from concurrent import futures
 
@@ -136,6 +137,8 @@ def grpc_server(simulator_from_config):
         port = server.add_insecure_port('[::]:0')  # Random available port
         server.start()
         servers.append(server)
+        
+        sleep(10)  # Give server time to start
         
         return f'localhost:{port}'
        
