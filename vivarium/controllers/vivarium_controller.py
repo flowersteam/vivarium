@@ -45,17 +45,19 @@ class VivariumController:
         )   
         
     @classmethod
-    def start_session(cls, scene_name, 
+    def start_session(cls, scene_name,
+                      client=None,
                       start_interface=True,
                       safe_mode=False,
                       step_from_controller=True, 
                       run_simulation=True,
                       wait_for_server_ready=10.0):
-        start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
-                                   start_interface=start_interface,
-                                   safe_mode=safe_mode)
-        sleep(wait_for_server_ready)  # wait for server to be ready
-        controller = cls.from_client()
+        if client is None:
+            start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
+                                    start_interface=start_interface,
+                                    safe_mode=safe_mode)
+            sleep(wait_for_server_ready)  # wait for server to be ready
+        controller = cls.from_client(client=client)
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
         controller.start()
@@ -151,6 +153,7 @@ class VivariumController:
         """Stop the session: simulation, server and interface"""
         if self._is_started:
             self.stop()
+            sleep(1)  # wait for the simulation loop to stop
         self.client.close()
         stop_server_and_interface(safe_mode=safe_mode)
         
