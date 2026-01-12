@@ -38,18 +38,25 @@ single_consumption = vmap(single_consumption, in_axes=(None, None, None, None, N
 
 
 class ConsumptionComponent(Component):
-    def __init__(self, name, precedence, **consumption_params):
+    def __init__(self, name, precedence, consuming_in_entity_state=False, **consumption_params):
         super().__init__(name, precedence)
         self.consumption_params_dict = consumption_params
         self.state_attr = f'{self.name}_state'
+        self.consuming_in_entity_state = consuming_in_entity_state
 
     def update_state_cls(self, state_cls):
+        if self.consuming_in_entity_state:
+            @md_dataclass
+            class EntityState(state_cls.__annotations__['entity_state']):
+                consuming: jnp.ndarray = None
+            state_cls.__annotations__['entity_state'] = EntityState
+            setattr(state_cls, 'entity_state', None)
         state_cls.__annotations__[self.state_attr] = ConsumptionState
         setattr(state_cls, self.state_attr, None)
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
-        return state.set(
+        state = state.set(
             **{self.state_attr: ConsumptionState(
                 source_subtype=jnp.array([params['source_subtype'] for params in self.consumption_params_dict.values()]),
                 target_subtype=jnp.array([params['target_subtype'] for params in self.consumption_params_dict.values()]),
@@ -59,10 +66,17 @@ class ConsumptionComponent(Component):
             )}            
         )
 
+        if self.consuming_in_entity_state:
+            state = state.set(
+                entity_state=state.entity_state.set(
+                    consuming=jnp.full(state.entity_state.exists.shape[0], False, dtype=bool),
+                )
+            )
+        return state
+
     def get_step_function(self, state, neighbor_manager, key):
         self.displacement = neighbor_manager.displacement
         source_mask = jnp.full(state.entity_state.exists.shape, True, dtype=bool)
-        n_entities = state.entity_state.exists.shape[0]
         def step_fn(state, neighbors, key):
             
             consumption_state = getattr(state, self.state_attr)
@@ -91,17 +105,27 @@ class ConsumptionComponent(Component):
                 consumption_state.range
             ).sum(axis=0)                    
 
-            return state.set(
-                **{self.state_attr: state.consumption_state.set(
+            state = state.set(
+                **{self.state_attr: getattr(state, self.state_attr).set(
                     consumption_matrix=consumption_matrix
                 )}
             )
+            
+            if self.consuming_in_entity_state:
+                consuming = jnp.any(consumption_matrix > 0, axis=1)
+                state = state.set(
+                    entity_state=state.entity_state.set(
+                        consuming=consuming,
+                    )
+                )
+            
+            return state
 
         return step_fn
     
     def neighbor_update(self, state, neighbor_manager, key):
         return state.set(
-            **{self.state_attr: state.consumption_state.set(
+            **{self.state_attr: getattr(state, self.state_attr).set(
                 consumption_matrix=jnp.full(neighbor_manager.neighbors.idx.shape, 0.)
             )}
         )
