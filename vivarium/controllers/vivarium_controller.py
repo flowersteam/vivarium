@@ -136,11 +136,14 @@ class VivariumController:
             controller.step(time=self.time, catch_errors=catch_errors)        
 
     def step(self, catch_errors=True):
-        self.controller_step(catch_errors=catch_errors)
-        if self.simulator.run_from == self.client.name and self.simulator.simulation_running:
-            self.simulator_step()
-        else:
-            self.apply_changes()        
+        changed_applied = False
+        if self.simulator.simulation_running:
+            self.controller_step(catch_errors=catch_errors)
+            if self.simulator.run_from == self.client.name: # and self.simulator.simulation_running:
+                self.simulator_step()
+                changed_applied = True
+        if not changed_applied:
+            self.apply_changes()            
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
