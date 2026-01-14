@@ -22,7 +22,7 @@ class Logger(object):
         else:
             self.logs[log_field].append(data)
 
-    def get_log(self, log_field):
+    def get(self, log_field):
         """Get the log of the logger for a specific log_field
 
         :param log_field: log_field
@@ -34,10 +34,17 @@ class Logger(object):
         else:
             return self.logs[log_field]
 
-    def clear(self):
+    def clear(self, log_field=None):
         """Clear all logs of the logger"""
-        del self.logs
-        self.logs = {}
+        
+        if log_field is None:
+            del self.logs
+            self.logs = {}
+        else:
+            if log_field in self.logs:
+                del self.logs[log_field]
+            else:
+                print("No topic called " + log_field)
 
 
 class RoutineHandler(object):

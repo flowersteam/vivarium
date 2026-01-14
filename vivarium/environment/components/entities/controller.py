@@ -1,7 +1,7 @@
 import numpy as np
 
+from vivarium.controllers.utils import RoutineHandler, Logger
 from ....controllers.controller import AttributeMapping
-from vivarium.controllers.utils import RoutineHandler
 
 class InternalData:
     pass
@@ -86,6 +86,7 @@ class EntityWrapper:
                                    'mass_center', 'mass_orientation'
                                ]
                         )
+        object.__setattr__(self, 'logger', Logger())
 
     def __getattr__(self, attr):
         if attr in self._entity_fields:
