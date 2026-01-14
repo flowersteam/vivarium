@@ -63,6 +63,7 @@ class VivariumController:
         controller.start()
         if run_simulation:
             controller.simulator.simulation_running = True
+        lg.info(f"VivariumController session '{scene_name}' is started")
         return controller                 
 
     def __getattr__(self, name):
