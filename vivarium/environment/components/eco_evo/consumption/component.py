@@ -38,11 +38,12 @@ single_consumption = vmap(single_consumption, in_axes=(None, None, None, None, N
 
 
 class ConsumptionComponent(Component):
-    def __init__(self, name, precedence, consuming_in_entity_state=False, **consumption_params):
+    def __init__(self, name, precedence, subtype_labels=None, consuming_in_entity_state=False, **consumption_params):
         super().__init__(name, precedence)
         self.consumption_params_dict = consumption_params
         self.state_attr = f'{self.name}_state'
         self.consuming_in_entity_state = consuming_in_entity_state
+        self.subtype_labels = subtype_labels
 
     def update_state_cls(self, state_cls):
         if self.consuming_in_entity_state:
@@ -56,6 +57,11 @@ class ConsumptionComponent(Component):
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
+        for params in self.consumption_params_dict.values():
+            for k in ['source_subtype', 'target_subtype']:
+                if isinstance(params[k], str):
+                    assert self.subtype_labels is not None, "subtype_labels must be provided to use string subtype names"
+                    params[k] = self.subtype_labels.index(params[k])
         state = state.set(
             **{self.state_attr: ConsumptionState(
                 source_subtype=jnp.array([params['source_subtype'] for params in self.consumption_params_dict.values()]),
