@@ -1,7 +1,11 @@
 import logging
+import IPython
 import threading
-
 import numpy as np
+from time import sleep
+
+
+from vivarium.utils.handle_server_interface import stop_server_and_interface
 
 lg = logging.getLogger(__name__)
 
@@ -301,3 +305,28 @@ class BehaviorHandler(object):
                 if full_infos:
                     for name, (fn, interval, weight) in self._behaviors.items():
                         print(f"Behavior {name}: interval={interval}, weight={weight}")
+
+
+def kill_session(global_vars, controller_variable_name='controller'):
+    """
+    Try to properly close the session by calling VivariumController.stop_session() on a controller instance
+    if it exists in the provided global_vars dictionary.
+    If it does not exist, it calls stop_server_and_interface() to ensure the server and interface are stopped.
+    
+    :param global_vars: Dictionary of global variables, typically globals() from a notebook or script.
+    :param controller_variable_name: Name of the controller variable in global_vars, defaults to 'controller'.
+    """
+    try:
+        c = global_vars[controller_variable_name]
+        c.stop_session()
+        del c
+    except KeyError:
+        stop_server_and_interface(safe_mode=False)
+
+    sleep(2)
+
+    kernel = IPython.Application.instance().kernel
+
+    kernel.do_shutdown(True)
+    
+    print('If a message says that "The Kernel crashed ...", it means the session was successfully killed.')
