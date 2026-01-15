@@ -1,7 +1,5 @@
 _target_: vivarium.environment.components.eco_evo.EnergyComponent
 precedence: 60
-# entity_type to define in specific configs
-subtype: -1
 energy_init: 1.0
 energy_max: 4.0
 energy_decay: 0.001
