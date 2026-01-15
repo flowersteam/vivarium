@@ -52,12 +52,14 @@ class VivariumController:
                       step_from_controller=True, 
                       run_simulation=True,
                       wait_for_server_ready=10.0):
+        interface_url = None
         if client is None:
-            start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
+            interface_url = start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
                                     start_interface=start_interface,
                                     safe_mode=safe_mode)
             sleep(wait_for_server_ready)  # wait for server to be ready
         controller = cls.from_client(client=client)
+        controller.interface_url = interface_url
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
         controller.start()

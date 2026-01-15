@@ -5,6 +5,7 @@ import multiprocessing
 import subprocess
 import signal
 import logging
+import re
 
 
 lg = logging.getLogger(__name__)
@@ -124,12 +125,34 @@ def stop_server_and_interface(safe_mode=True):
     return processes_running
 
 
-def start_process(process_command):
+def start_process(process_command, url_queue=None):
     """Start a process with the given command
 
     :param process_command: command to start the process
+    :param url_queue: optional Queue to send the URL back to parent process
     """
-    subprocess.run(process_command)
+    if url_queue is None:
+        subprocess.run(process_command)
+    else:
+        # Capture output to extract URL
+        process = subprocess.Popen(
+            process_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        
+        # Parse output for URL
+        url_pattern = re.compile(r'(http://[^\s]+)')
+        for line in process.stdout:
+            print(line, end='')  # Still print to console
+            match = url_pattern.search(line)
+            if match:
+                url = match.group(1)
+                url_queue.put(url)
+        
+        process.wait()
 
 
 # Define parameters of the simulator
@@ -138,8 +161,11 @@ def start_server_and_interface(
 ):
     """Start the server and interface for the given scene
 
-    :param scene_name: scene name
+    :param cmd_args: command line arguments to pass to the server script
     :param start_interface: whether to start the interface, defaults to True
+    :param wait_time: time to wait for server startup before starting interface
+    :param safe_mode: whether to prompt before stopping existing processes
+    :return: URL of the interface if started, None otherwise
     """
     if os.name == "nt":
         lg.warning(
@@ -148,8 +174,8 @@ def start_server_and_interface(
         lg.warning(
             "Instead, start the server and interface by running the following command from the root directory in a Windows Powershell (make sure to activate the virtual environment before). Then click on the link to open the web interface:"
         )
-        lg.warning(f"\nstart_all.bat {scene_name}")
-        return
+        lg.warning(f"\nstart_all.bat {cmd_args[0] if cmd_args else ''}")
+        return None
 
     # first ensure no interface or server is running
     processes_running = stop_server_and_interface(safe_mode=safe_mode)
@@ -159,7 +185,7 @@ def start_server_and_interface(
             "\nServer and Interface processes are still running, please stop them before starting new ones"
         )
         lg.warning("ERROR: New processes will not be started")
-        return
+        return None
 
     # find the path to the server and interface scripts
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
@@ -174,6 +200,7 @@ def start_server_and_interface(
     )
     server_process.start()
     
+    interface_url = None
     if start_interface:
         time.sleep(wait_time)
 
@@ -184,12 +211,26 @@ def start_server_and_interface(
             "--args",
         ]
 
+        # Create a queue to receive the URL from the subprocess
+        url_queue = multiprocessing.Queue()
+
         # start the interface
         print("\nSTARTING INTERFACE")
         interface_process = multiprocessing.Process(
-            target=start_process, args=(interface_command,)
+            target=start_process, args=(interface_command, url_queue)
         )
         interface_process.start()
+        
+        # Wait for URL with timeout
+        try:
+            interface_url = url_queue.get(timeout=10)
+            print(f"\n✓ Interface available at: {interface_url}")
+        except:
+            # If we can't get the URL from the queue, construct it
+            interface_url = "http://localhost:5006/run_interface"
+            print(f"\n✓ Interface should be available at: {interface_url}")
+    
+    return interface_url
 
 
 def setup_colab_environment(scene,
