@@ -220,16 +220,17 @@ def setup_colab_environment(scene,
         ngrok_token = userdata.get('NGROK_TOKEN')
         print("✓ Using ngrok token from Colab Secrets")
     except Exception:
-        print("\n❌ NGROK_TOKEN not found in Colab Secrets!")
-        print("\nTo set up your ngrok token:")
-        print("1. Go to https://dashboard.ngrok.com/get-started/your-authtoken")
-        print("2. Sign up/log in and copy your authtoken")
-        print("3. In this Colab notebook, click the key icon (🔑) in the left sidebar")
-        print("4. Click 'Add a new secret'")
-        print("5. Set Name: NGROK_TOKEN")
-        print("6. Paste your authtoken as the Value")
-        print("7. Toggle on 'Notebook access' for this notebook")
-        print("8. Re-run this cell\n")
+        print("\nIn order to run Vivarium in Colab, you need to use ngrok to enable access to the web interface.")
+        print("Here are the steps to set up your ngrok token:")
+        print("1. Create an account on ngrok: https://dashboard.ngrok.com/signup")
+        print("2. Once you are logged in, go to the 'Auth' section: https://dashboard.ngrok.com/get-started/your-authtoken")
+        print("3. Copy your authtoken")
+        print("4. In this Colab notebook, click the key icon (🔑) in the left sidebar")
+        print("5. Click 'Add a new secret'")
+        print("6. Set Name: NGROK_TOKEN")
+        print("7. Paste your authtoken as the Value")
+        print("8. Toggle on 'Notebook access' for this notebook")
+        print("9. Re-run this cell\n")
         raise RuntimeError("NGROK_TOKEN secret not configured")    
     
     # Start server in background
@@ -245,7 +246,6 @@ def setup_colab_environment(scene,
     import panel as pn
     from pyngrok import ngrok
     import nest_asyncio    
-
     
     # Configure environment
     nest_asyncio.apply()
