@@ -214,6 +214,8 @@ def setup_colab_environment(scene,
     if 'google.colab' not in sys.modules:
         raise RuntimeError("This function is only for Google Colab environment")
     
+    subprocess.run(["pip", "install", "pyngrok", "-q"], check=True)
+    from pyngrok import ngrok
     try:
         ngrok_token = userdata.get('NGROK_TOKEN')
         print("✓ Using ngrok token from Colab Secrets")
@@ -242,9 +244,8 @@ def setup_colab_environment(scene,
         stderr=subprocess.STDOUT
     )    
 
-    subprocess.run(["pip", "install", "pyngrok", "jupyter_bokeh", "-q"], check=True)
+    subprocess.run(["pip", "install", "jupyter_bokeh", "-q"], check=True)
     import panel as pn
-    from pyngrok import ngrok
     import nest_asyncio    
 
     
