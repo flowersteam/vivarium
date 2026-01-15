@@ -196,7 +196,7 @@ def start_server_and_interface(
 
     server_command = ["python3", server_script, *cmd_args]
 
-    print("\nSTARTING SERVER")
+    print("\n🚀 Starting Vivarium server...")
     server_process = multiprocessing.Process(
         target=start_process, args=(server_command,), kwargs={"show_output": show_output}
     )
@@ -217,7 +217,7 @@ def start_server_and_interface(
         url_queue = multiprocessing.Queue()
 
         # start the interface
-        print("\nSTARTING INTERFACE")
+        print("\n🌐 Starting web interface...")
         interface_process = multiprocessing.Process(
             target=start_process, args=(interface_command, url_queue), kwargs={"show_output": show_output}
         )
