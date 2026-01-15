@@ -6,6 +6,7 @@ import subprocess
 import signal
 import logging
 
+
 lg = logging.getLogger(__name__)
 
 SERVER_PROCESS_NAME = "scripts/run_server.py"
@@ -189,6 +190,98 @@ def start_server_and_interface(
             target=start_process, args=(interface_command,)
         )
         interface_process.start()
+
+
+def setup_colab_environment(scene,
+                            branch="main", 
+                            port=5006,
+                            startup_delay=10):
+    """
+    Set up Vivarium in Google Colab with ngrok tunnel.
+    
+    Args:
+        branch: Git branch to clone
+        scene: Scene name for the simulator
+        port: Port for Panel server
+        startup_delay: Seconds to wait for server startup
+    
+    Returns:
+        tuple: (controller, WindowManager, ngrok_url)
+    """
+    import sys
+    import subprocess
+    
+    if 'google.colab' not in sys.modules:
+        raise RuntimeError("This function is only for Google Colab environment")
+    
+    try:
+        ngrok_token = userdata.get('NGROK_TOKEN')
+        print("✓ Using ngrok token from Colab Secrets")
+    except Exception:
+        print("\n❌ NGROK_TOKEN not found in Colab Secrets!")
+        print("\nTo set up your ngrok token:")
+        print("1. Go to https://dashboard.ngrok.com/get-started/your-authtoken")
+        print("2. Sign up/log in and copy your authtoken")
+        print("3. In this Colab notebook, click the key icon (🔑) in the left sidebar")
+        print("4. Click 'Add a new secret'")
+        print("5. Set Name: NGROK_TOKEN")
+        print("6. Paste your authtoken as the Value")
+        print("7. Toggle on 'Notebook access' for this notebook")
+        print("8. Re-run this cell\n")
+        raise RuntimeError("NGROK_TOKEN secret not configured")    
+    
+    from google.colab import userdata
+    
+    
+    # Start server in background
+    print("🚀 Starting Vivarium server...")
+    server_cmd = f"python /content/vivarium/scripts/run_server.py scene={scene}"
+    subprocess.Popen(
+        server_cmd.split(),
+        stdout=open('/content/vivarium_server.log', 'w'),
+        stderr=subprocess.STDOUT
+    )    
+
+    subprocess.run(["pip", "install", "pyngrok", "jupyter_bokeh", "-q"], check=True)
+    import panel as pn
+    from pyngrok import ngrok
+    import nest_asyncio    
+
+    
+    # Configure environment
+    nest_asyncio.apply()
+    pn.extension(inline=True)
+    ngrok.set_auth_token(ngrok_token)
+    
+    from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+    from vivarium.controllers import VivariumController
+    from vivarium.interface.panel_app import WindowManager
+
+    # Wait for server and initialize
+    print(f"⏳ Waiting {startup_delay}s for server startup...")
+    
+    time.sleep(startup_delay)    
+    print("🔧 Initializing controller...")
+    client = SimulatorGRPCClient()
+    controller = VivariumController.start_session(scene_name=client.scene_name, client=client)
+    wm = WindowManager()
+    
+    # Start Panel server with ngrok
+    print("🌐 Starting Panel server and ngrok tunnel...")
+    server = pn.serve(
+        wm.app,
+        port=port,
+        threaded=True,
+        show=False,
+        websocket_origin="*"
+    )
+    
+    public_url = ngrok.connect(port, bind_tls=True)
+    ngrok_url = public_url.public_url
+    
+    print(f"\n✅ Setup complete!")
+    
+    return controller, wm, ngrok_url
 
 
 if __name__ == "__main__":
