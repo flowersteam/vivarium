@@ -87,3 +87,4 @@ class EntityComponent(Component):
             entity_subtype=self.subtype,
             entity_type_idx=jnp.arange(self.n_max),
         )
+        
