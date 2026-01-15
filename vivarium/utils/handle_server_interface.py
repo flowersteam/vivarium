@@ -161,7 +161,6 @@ def start_server_and_interface(
         return
 
     # find the path to the server and interface scripts
-    print(f"{os.path.dirname(__file__)}")
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
     server_script = os.path.join(project_root, SERVER_PROCESS_NAME)
     interface_script = os.path.join(project_root, INTERFACE_PROCESS_NAME)
