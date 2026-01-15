@@ -125,14 +125,15 @@ def stop_server_and_interface(safe_mode=True):
     return processes_running
 
 
-def start_process(process_command, url_queue=None):
+def start_process(process_command, url_queue=None, show_output=True):
     """Start a process with the given command
 
     :param process_command: command to start the process
     :param url_queue: optional Queue to send the URL back to parent process
+    :param show_output: whether to echo subprocess stdout/stderr
     """
     if url_queue is None:
-        subprocess.run(process_command)
+        subprocess.run(process_command, stdout=None if show_output else subprocess.DEVNULL, stderr=None if show_output else subprocess.DEVNULL)
     else:
         # Capture output to extract URL
         process = subprocess.Popen(
@@ -146,7 +147,8 @@ def start_process(process_command, url_queue=None):
         # Parse output for URL
         url_pattern = re.compile(r'(http://[^\s]+)')
         for line in process.stdout:
-            print(line, end='')  # Still print to console
+            if show_output:
+                print(line, end='')  # Still print to console
             match = url_pattern.search(line)
             if match:
                 url = match.group(1)
@@ -157,7 +159,7 @@ def start_process(process_command, url_queue=None):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, start_interface: bool = True, wait_time: int = 7, safe_mode=True
+    cmd_args, start_interface: bool = True, wait_time: int = 7, safe_mode=True, show_output=True
 ):
     """Start the server and interface for the given scene
 
@@ -196,7 +198,7 @@ def start_server_and_interface(
 
     print("\nSTARTING SERVER")
     server_process = multiprocessing.Process(
-        target=start_process, args=(server_command,)
+        target=start_process, args=(server_command,), kwargs={"show_output": show_output}
     )
     server_process.start()
     
@@ -217,7 +219,7 @@ def start_server_and_interface(
         # start the interface
         print("\nSTARTING INTERFACE")
         interface_process = multiprocessing.Process(
-            target=start_process, args=(interface_command, url_queue)
+            target=start_process, args=(interface_command, url_queue), kwargs={"show_output": show_output}
         )
         interface_process.start()
         

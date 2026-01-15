@@ -56,7 +56,8 @@ class VivariumController:
         if client is None:
             interface_url = start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
                                     start_interface=start_interface,
-                                    safe_mode=safe_mode)
+                                    safe_mode=safe_mode,
+                                    show_output=False)
             sleep(wait_for_server_ready)  # wait for server to be ready
         controller = cls.from_client(client=client)
         controller.interface_url = interface_url
