@@ -1,6 +1,7 @@
 import grpc
 import uuid
 from hydra.utils import get_class
+from dataclasses import dataclass
 
 from vivarium.simulator.grpc_server.converters import proto_to_dataclass, changes_to_proto
 import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
@@ -33,11 +34,18 @@ class SimulatorGRPCClient:
         )
         self.state = self.get_state()
         self.controller_parameters = self.get_controller_parameters()
+        
+        @dataclass
+        class StateAndControllerParameters:
+            state: self.state_cls
+            controller_parameters: type(self.controller_parameters)
+        self.state_and_cp_cls = StateAndControllerParameters
+        
         self.remote = Remote(self)
 
     def apply_changes(self, changes):
         proto_changes = changes_to_proto(changes)
-        state_and_cp = proto_to_dataclass(self.stub.SetChanges(proto_changes))
+        state_and_cp = proto_to_dataclass(self.stub.SetChanges(proto_changes), self.state_and_cp_cls)
         self.state = state_and_cp.state
         self.controller_parameters = state_and_cp.controller_parameters
 
@@ -80,7 +88,7 @@ class SimulatorGRPCClient:
 
         :return: simulation state
         """
-        res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)))
+        res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_and_cp_cls)
         self.state = res.state
         self.controller_parameters = res.controller_parameters
         return res
