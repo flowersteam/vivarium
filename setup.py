@@ -62,6 +62,9 @@ setup(
         "cuda13": [
             f"jax[cuda13]", #=={JAX_VERSION}",
         ],
+        "ngrok": [
+            "pyngrok",
+        ],
         # You can add more variants as needed
     },
     

@@ -4,7 +4,7 @@ import logging
 import threading
 from time import sleep
 
-from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface
+from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface, create_ngrok_tunnel
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.simulator.controller import SimulatorController
 from vivarium.utils.scene_configs import load_scene_config
@@ -51,22 +51,56 @@ class VivariumController:
                       safe_mode=False,
                       step_from_controller=True, 
                       run_simulation=True,
-                      wait_for_server_ready=10.0):
+                      wait_for_server_ready=10.0,
+                      ngrok=False,
+                      ngrok_token=None):
+        """Start a Vivarium session with server, simulation, and optionally interface.
+        
+        Args:
+            scene_name: Name of the scene configuration to load
+            client: Existing SimulatorGRPCClient or Simulator, or None to start a new server
+            start_interface: Whether to start the Panel web interface
+            safe_mode: Whether to prompt before stopping existing processes
+            step_from_controller: Whether this controller drives simulation steps
+            run_simulation: Whether to start the simulation running immediately
+            wait_for_server_ready: Seconds to wait for server startup
+            ngrok: Whether to create an ngrok tunnel for public access
+            ngrok_token: ngrok auth token (reads from NGROK_TOKEN env var if None)
+            
+        Returns:
+            VivariumController instance with interface_url attribute set
+        """
         interface_url = None
         if client is None:
             interface_url = start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
                                     start_interface=start_interface,
                                     safe_mode=safe_mode,
-                                    show_output=False)
+                                    allow_external_origins=ngrok)
             sleep(wait_for_server_ready)  # wait for server to be ready
         controller = cls.from_client(client=client)
         controller.interface_url = interface_url
+        controller._ngrok_active = False
+        
+        # Create ngrok tunnel if requested
+        if ngrok:
+            try:
+                ngrok_url = create_ngrok_tunnel(port=5006, token=ngrok_token)
+                controller.interface_url = ngrok_url
+                controller._ngrok_active = True
+            except Exception as e:
+                lg.warning(f"Failed to create ngrok tunnel: {e}")
+        
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
         controller.start()
         if run_simulation:
             controller.simulator.simulation_running = True
         lg.info(f"VivariumController session '{scene_name}' is started")
+        
+        # Print the URL the user should use
+        if controller.interface_url:
+            print(f"\n🌐 Open the interface at: {controller.interface_url}\n")
+        
         return controller                 
 
     def __getattr__(self, name):
@@ -157,10 +191,16 @@ class VivariumController:
         self.client.apply_changes(changes)
             
     def stop_session(self, safe_mode=False):
-        """Stop the session: simulation, server and interface"""
+        """Stop the session: simulation, server, interface, and ngrok tunnel"""
         if self._is_started:
             self.stop()
             sleep(1)  # wait for the simulation loop to stop
         self.client.close()
         stop_server_and_interface(safe_mode=safe_mode)
+        
+        # Close ngrok tunnel if one was created
+        if getattr(self, '_ngrok_active', False):
+            from vivarium.utils.handle_server_interface import close_ngrok_tunnel
+            close_ngrok_tunnel()
+            self._ngrok_active = False
         
