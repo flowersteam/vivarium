@@ -6,6 +6,8 @@ import subprocess
 import signal
 import logging
 import re
+import grpc
+from grpc_health.v1 import health_pb2, health_pb2_grpc
 
 
 lg = logging.getLogger(__name__)
@@ -159,16 +161,17 @@ def start_process(process_command, url_queue=None, show_output=True):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, start_interface: bool = True, wait_time: int = 7, safe_mode=True, show_output=True, allow_external_origins=False
+    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False
 ):
     """Start the server and interface for the given scene
 
     :param cmd_args: command line arguments to pass to the server script
     :param start_interface: whether to start the interface, defaults to True
-    :param wait_time: time to wait for server startup before starting interface
+    :param server_timeout: maximum seconds to wait for gRPC server to be ready
     :param safe_mode: whether to prompt before stopping existing processes
     :param allow_external_origins: whether to allow websocket connections from external origins (e.g., ngrok)
     :return: URL of the interface if started, None otherwise
+    :raises RuntimeError: if gRPC server doesn't start within timeout
     """
     if os.name == "nt":
         lg.warning(
@@ -203,9 +206,12 @@ def start_server_and_interface(
     )
     server_process.start()
     
+    # Wait for gRPC server to be ready
+    if not wait_for_grpc_server(timeout=server_timeout):
+        raise RuntimeError(f"gRPC server did not start within {server_timeout} seconds")
+    
     interface_url = None
     if start_interface:
-        time.sleep(wait_time)
 
         interface_command = [
             "panel",
@@ -239,6 +245,38 @@ def start_server_and_interface(
             print(f"\n✓ Interface should be available at: {interface_url}")
     
     return interface_url
+
+
+def wait_for_grpc_server(host="localhost", port=50051, timeout=30.0, poll_interval=0.5):
+    """
+    Wait for the gRPC server to be ready using the standard health checking protocol.
+    
+    Args:
+        host: Server hostname
+        port: Server port
+        timeout: Maximum seconds to wait
+        poll_interval: Seconds between connection attempts
+        
+    Returns:
+        True if server is ready, False if timeout reached
+    """
+    channel = grpc.insecure_channel(f"{host}:{port}")
+    health_stub = health_pb2_grpc.HealthStub(channel)
+    
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            request = health_pb2.HealthCheckRequest(service="")
+            response = health_stub.Check(request, timeout=1.0)
+            if response.status == health_pb2.HealthCheckResponse.SERVING:
+                channel.close()
+                return True
+        except grpc.RpcError:
+            pass
+        time.sleep(poll_interval)
+    
+    channel.close()
+    return False
 
 
 def get_ngrok_token():

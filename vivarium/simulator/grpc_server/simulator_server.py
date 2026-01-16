@@ -9,6 +9,7 @@ from numproto.numproto import proto_to_ndarray
 import simulator_pb2_grpc
 import simulator_pb2
 import grpc
+from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 
 from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, proto_to_changes
@@ -117,6 +118,15 @@ def serve(simulator):
     simulator_pb2_grpc.add_SimulatorServerServicer_to_server(
         SimulatorServerServicer(simulator), server
     )
+    
+    # Add health checking service
+    health_servicer = health.HealthServicer()
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    
     server.add_insecure_port("[::]:50051")
     server.start()
+    
+    # Mark service as ready
+    health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+    
     server.wait_for_termination()

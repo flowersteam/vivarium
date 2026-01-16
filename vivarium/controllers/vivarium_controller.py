@@ -51,7 +51,7 @@ class VivariumController:
                       safe_mode=False,
                       step_from_controller=True, 
                       run_simulation=True,
-                      wait_for_server_ready=10.0,
+                      server_timeout=30.0,
                       ngrok=False,
                       ngrok_token=None):
         """Start a Vivarium session with server, simulation, and optionally interface.
@@ -63,7 +63,7 @@ class VivariumController:
             safe_mode: Whether to prompt before stopping existing processes
             step_from_controller: Whether this controller drives simulation steps
             run_simulation: Whether to start the simulation running immediately
-            wait_for_server_ready: Seconds to wait for server startup
+            server_timeout: Maximum seconds to wait for gRPC server to be ready
             ngrok: Whether to create an ngrok tunnel for public access
             ngrok_token: ngrok auth token (reads from NGROK_TOKEN env var if None)
             
@@ -75,8 +75,8 @@ class VivariumController:
             interface_url = start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
                                     start_interface=start_interface,
                                     safe_mode=safe_mode,
+                                    server_timeout=server_timeout,
                                     allow_external_origins=ngrok)
-            sleep(wait_for_server_ready)  # wait for server to be ready
         controller = cls.from_client(client=client)
         controller.interface_url = interface_url
         controller._ngrok_active = False
