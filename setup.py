@@ -43,6 +43,7 @@ setup(
         "protobuf==5.29.5",
         "grpcio==1.76.0",
         "grpcio-tools==1.71.2",
+        "grpcio-health-checking",
         "panel==1.8.3",
         "param==2.2.1",
         "hydra-core==1.3.2",
