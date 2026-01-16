@@ -305,15 +305,15 @@ def setup_colab_environment(scene,
     print("🔧 Initializing controller...")
     client = SimulatorGRPCClient()
     controller = VivariumController.start_session(scene_name=client.scene_name, client=client)
-    wm = WindowManager()
+    wm = WindowManager(controller=controller, apply_changes=False)
     
     # Start Panel server with ngrok
     print("🌐 Starting Panel server and ngrok tunnel...")
-    server = pn.serve(
+    panel_server = pn.serve(
         wm.app,
         port=port,
         threaded=True,
-        show=False,
+        show=True,
         websocket_origin="*"
     )
     
@@ -322,7 +322,7 @@ def setup_colab_environment(scene,
     
     print(f"\n✅ Setup complete!")
     
-    return controller, wm, ngrok_url
+    return controller, panel_server, ngrok_url
 
 
 if __name__ == "__main__":

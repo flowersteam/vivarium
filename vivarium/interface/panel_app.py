@@ -36,7 +36,7 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, notebook_mode=False, testing_mode=False, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
         super().__init__(**kwargs)
         pn.config.theme = 'dark'
 
@@ -49,6 +49,8 @@ class WindowManager(Parameterized):
             client = self.controller.client
             self.scene_config = load_scene_config(client.scene_name)
 
+        self.apply_changes = apply_changes
+        
         self.controller_names = list(self.controller.controllers.keys())
         
         self.interfaces = create_interfaces(
@@ -118,7 +120,8 @@ class WindowManager(Parameterized):
         for interface in self.interfaces.values():
             if interface.renderer is not None:
                 interface.renderer.update()
-        self.controller.apply_changes()
+        if self.apply_changes:
+            self.controller.apply_changes()
         state = self.controller.client.state
         # if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
         #     self.controller.pull_selected_entities()
