@@ -236,7 +236,6 @@ def start_server_and_interface(
 
 
 def setup_colab_environment(scene,
-                            branch="main", 
                             port=5006,
                             startup_delay=10):
     """
