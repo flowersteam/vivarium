@@ -12,7 +12,8 @@ from vivarium.environment.components.entities.braitenberg.component import Brait
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
-from vivarium.simulator.grpc_server.simulator_server import SimulatorServerServicer
+from vivarium.utils.handle_server_interface import wait_for_grpc_server
+from vivarium.simulator.grpc_server.simulator_server import SimulatorServerServicer, create_grpc_server
 from vivarium.environment.components.physics.step.component import StepComponent
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.environment import Environment, NeighborManager, MaskFunction
@@ -85,15 +86,21 @@ def vivarium_controller_from_config(simulator_from_config):
 
 @pytest.fixture
 def vivarium_controller_start_session(grpc_client):
+    controllers = []
     def fn(scene_name, overrides=[]):
-        client = grpc_client(scene_name)
+        client = grpc_client(scene_name, overrides)
         controller = VivariumController.start_session(
             scene_name=scene_name,
             client=client,
             start_interface=False,
         )
+        controllers.append(controller)
         return controller
-    return fn
+    
+    yield fn
+    
+    for controller in controllers:
+        controller.stop()
 
 
 @pytest.fixture
@@ -115,17 +122,14 @@ def grpc_server(simulator_from_config):
     
     servers = []
     
-    def fn(scene_name):
-        simulator = simulator_from_config(scene_name)
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        simulator_pb2_grpc.add_SimulatorServerServicer_to_server(
-            SimulatorServerServicer(simulator), server
-        )
-        port = server.add_insecure_port('[::]:0')  # Random available port
-        server.start()
+    def fn(scene_name, overrides=[]):
+        simulator = simulator_from_config(scene_name, overrides=overrides)
+        server, port = create_grpc_server(simulator, port=0)  # Random available port
         servers.append(server)
         
-        sleep(10)  # Give server time to start
+        # Wait for server to be ready using health check
+        if not wait_for_grpc_server(port=port, timeout=10):
+            raise RuntimeError(f"Test gRPC server did not start within 10 seconds")
         
         return f'localhost:{port}'
        
@@ -138,8 +142,9 @@ def grpc_server(simulator_from_config):
 @pytest.fixture
 def grpc_client(grpc_server):
     clients = []
-    def fn(scene_name):
-        client = SimulatorGRPCClient(server=grpc_server(scene_name))
+    def fn(scene_name, overrides=[]):
+        client = SimulatorGRPCClient(server=grpc_server(scene_name, overrides))
+        clients.append(client)
         return client
     
     yield fn
