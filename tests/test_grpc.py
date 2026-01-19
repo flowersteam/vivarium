@@ -107,3 +107,51 @@ def test_controller_parameters(simulator):
     cp_2 = proto_to_dataclass(p_cp)
 
     assert cp.agents.color[1] == cp_2.agents.color[1]
+
+
+def test_bidirectional_streaming(grpc_client):
+    """Test bidirectional streaming RPC."""
+    client = grpc_client(scene_name)
+    
+    num_steps = 5
+    received_states = []
+    
+    def changes_generator():
+        for i in range(num_steps):
+            yield []  # No changes, just step
+    
+    for state_and_cp in client.bidirectional_step_generator(changes_generator()):
+        received_states.append(state_and_cp)
+    
+    # Should receive one state per step
+    assert len(received_states) == num_steps
+    
+    # Each state should be valid
+    for state_and_cp in received_states:
+        assert state_and_cp.state is not None
+        assert state_and_cp.controller_parameters is not None
+    
+    client.close()
+
+
+def test_set_changes(grpc_client):
+    """Test RPC for streaming mode."""
+    client = grpc_client(scene_name)
+    
+    # Verify is_streaming is False initially
+    assert not client.is_streaming
+    
+    # Apply changes with update_from_server=False
+    # (doesn't update local state, just sends to server)
+    initial_state = client.state
+    client.set_changes([], update_from_server=False)
+    
+    # Local state should still be the same reference
+    # (set_changes doesn't update it)
+    assert client.state is initial_state
+    
+    # But with update_from_server=True should update it
+    client.set_changes([], update_from_server=True)
+    assert client.state is not initial_state
+    
+    client.close()

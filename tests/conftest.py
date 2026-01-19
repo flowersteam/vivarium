@@ -93,6 +93,7 @@ def vivarium_controller_start_session(grpc_client):
             scene_name=scene_name,
             client=client,
             start_interface=False,
+            start=False
         )
         controllers.append(controller)
         return controller

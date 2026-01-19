@@ -1,5 +1,6 @@
 import hydra
 import logging
+import threading
 import panel as pn
 from param import Parameterized
 
@@ -36,7 +37,7 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, use_streaming=True, **kwargs):
         super().__init__(**kwargs)
         pn.config.theme = 'dark'
 
@@ -50,6 +51,10 @@ class WindowManager(Parameterized):
             self.scene_config = load_scene_config(client.scene_name)
 
         self.apply_changes = apply_changes
+        self.use_streaming = use_streaming
+        self._streaming_active = False
+        self._pending_state_update = threading.Event()
+        self._state_lock = threading.Lock()
         
         self.controller_names = list(self.controller.controllers.keys())
         
@@ -78,6 +83,11 @@ class WindowManager(Parameterized):
         self.plot_fps = pn.widgets.FloatInput(
             name="Plot FPS", value=15, width=80
         )
+        self.streaming_toggle = pn.widgets.Toggle(
+            name="Use Streaming" if not use_streaming else "Using Streaming",
+            value=use_streaming,
+            align="center",
+        )
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
         self.controller_toggle = pn.widgets.ToggleGroup(
             name="ControllerToggle",
@@ -93,6 +103,9 @@ class WindowManager(Parameterized):
         self.app = self.create_app()
         if not testing_mode:
             self.set_callbacks()
+            # Start streaming if enabled
+            if self.use_streaming:
+                self._start_streaming()
         self.update_plot_cb()
 
     def start_toggle_cb(self, event):
@@ -112,8 +125,65 @@ class WindowManager(Parameterized):
             self.pcb_plot.period = int((1.0 / event.new) * 1000)
             if not self.pcb_plot.running:
                 self.pcb_plot.start()
+            # Also update streaming FPS if active
+            if self._streaming_active:
+                self._restart_streaming_with_fps(event.new)
         else:
             self.pcb_plot.stop()
+
+    def _on_state_stream_update(self, state_and_cp):
+        """Callback for state updates from streaming.
+        
+        This runs in a background thread, so we just set a flag
+        and let the periodic callback handle the actual UI update.
+        """
+        with self._state_lock:
+            # State is already updated in client by the streaming callback
+            self._pending_state_update.set()
+
+    def _start_streaming(self):
+        """Start receiving state updates via streaming."""
+        if self._streaming_active:
+            return
+        
+        # Only start streaming if we have a gRPC client
+        client = self.controller.client
+        if hasattr(client, 'start_state_stream'):
+            max_fps = int(self.plot_fps.value) if self.plot_fps.value > 0 else 30
+            client.start_state_stream(
+                callback=self._on_state_stream_update,
+                max_fps=max_fps,
+                include_controller_params=True
+            )
+            self._streaming_active = True
+            lg.info(f"Started state streaming at max {max_fps} FPS")
+        else:
+            lg.warning("Client does not support streaming, falling back to polling")
+
+    def _stop_streaming(self):
+        """Stop receiving state updates via streaming."""
+        if not self._streaming_active:
+            return
+        
+        client = self.controller.client
+        if hasattr(client, 'stop_state_stream'):
+            client.stop_state_stream()
+            self._streaming_active = False
+            lg.info("Stopped state streaming")
+
+    def _restart_streaming_with_fps(self, new_fps):
+        """Restart streaming with a new FPS limit."""
+        self._stop_streaming()
+        self._start_streaming()
+
+    def streaming_toggle_cb(self, event):
+        """Callback for the streaming toggle."""
+        if event.new:
+            self._start_streaming()
+            self.streaming_toggle.name = "Using Streaming"
+        else:
+            self._stop_streaming()
+            self.streaming_toggle.name = "Use Streaming"
 
     def update_plot_cb(self):
         """Periodic callback for the plot update"""
@@ -196,6 +266,7 @@ class WindowManager(Parameterized):
                 pn.Row(
                     self.start_toggle,
                     self.plot_fps,
+                    self.streaming_toggle,
                     self.drag_n_drop,
                 ),
                 pn.panel(self.plot, sizing_mode="scale_width"),
@@ -218,6 +289,7 @@ class WindowManager(Parameterized):
         self.controller_toggle.param.watch(self.controller_toggle_cb, "value")
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
         self.plot_fps.param.watch(self.update_plot_fps, "value")
+        self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
 
 

@@ -1,3 +1,4 @@
+import time
 import logging
 from threading import Lock
 from concurrent import futures
@@ -42,25 +43,31 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
         assert not self.simulator.is_running()
         self.simulator.step()
         
-    def _apply_changes(self, changes):
+    def _set_changes(self, changes):
         if len(changes) == 0:
             return
         with self._lock:
             with self.simulator.pause():
-                self.simulator.apply_changes(changes)           
+                self.simulator.set_changes(changes)           
     
     def Step(self, request, context):
         self._step()
         return dataclass_to_proto(self.simulator.state)
     
-    def SetChanges(self, request, context):
+    def SetChangesReturnsState(self, request, context):
         changes = proto_to_changes(request)
-        self._apply_changes(changes)
+        self._set_changes(changes)
         return self.GetStateAndControllerParameters(None, None)
+
+    def SetChanges(self, request, context):
+        """Apply changes without returning state (for use with streaming)."""
+        changes = proto_to_changes(request)
+        self._set_changes(changes)
+        return Empty()
 
     def SetChangesAndStep(self, request, context):
         changes = proto_to_changes(request)
-        self._apply_changes(changes)
+        self._set_changes(changes)
         self._step()
         return self.GetStateAndControllerParameters(None, None)
 
@@ -111,6 +118,64 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
                 request.nested_field, ent_idx, col_idx, proto_to_ndarray(request.value)
             )
         return Empty()
+
+    # ============ Streaming RPCs ============
+
+    def StreamState(self, request, context):
+        """Server-side streaming: Push state updates to client.
+        
+        Used when server is running continuously and client wants to observe.
+        Yields state updates at the configured FPS rate.
+        """
+        max_fps = request.max_fps if request.max_fps > 0 else 60
+        min_interval = 1.0 / max_fps
+        include_cp = request.include_controller_params
+        
+        lg.info(f"StreamState started (max_fps={max_fps}, include_cp={include_cp})")
+        
+        while context.is_active():
+            start_time = time.time()
+            
+            # Get current state
+            if include_cp:
+                state_and_cp = self.simulator.get_state_and_controller_parameters()
+                yield dataclass_to_proto(state_and_cp)
+            else:
+                yield dataclass_to_proto(self.simulator.state)
+            
+            # Rate limiting - sleep for remaining time in interval
+            elapsed = time.time() - start_time
+            if elapsed < min_interval:
+                time.sleep(min_interval - elapsed)
+        
+        lg.info("StreamState ended")
+
+    def BidirectionalStep(self, request_iterator, context):
+        """Bidirectional streaming: Client sends changes, server responds with state.
+        
+        Each message from client triggers:
+        1. Apply changes (if any)
+        2. Execute one step
+        3. Return new state
+        
+        This is essentially a streaming version of SetChangesAndStep.
+        """
+        lg.info("BidirectionalStep stream started")
+        
+        for request in request_iterator:
+            if not context.is_active():
+                break
+                
+            # Apply changes and step
+            changes = proto_to_changes(request)
+            self._set_changes(changes)
+            self._step()
+            
+            # Yield the new state
+            state_and_cp = self.simulator.get_state_and_controller_parameters()
+            yield dataclass_to_proto(state_and_cp)
+        
+        lg.info("BidirectionalStep stream ended")
 
 
 def create_grpc_server(simulator, port=50051):

@@ -132,6 +132,6 @@ def test_simulator_apply_change(simulator_from_config):
     remote.controller_parameters.simulator.env.box_size = 42.
     remote.controller_parameters.simulator.freq = -10.
     changes = remote.fetch_changes()
-    simulator.apply_changes(changes)
+    simulator.set_changes(changes)
     assert simulator.env.box_size == 42.
     assert simulator.freq == -10.

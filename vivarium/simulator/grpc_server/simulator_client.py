@@ -1,5 +1,6 @@
 import grpc
 import uuid
+import threading
 from hydra.utils import get_class
 from dataclasses import dataclass
 
@@ -42,12 +43,33 @@ class SimulatorGRPCClient:
         self.state_and_cp_cls = StateAndControllerParameters
         
         self.remote = Remote(self)
+        
+        # Streaming state
+        self._stream_thread = None
+        self._stream_stop_event = None
 
-    def apply_changes(self, changes):
+    @property
+    def is_streaming(self):
+        """Check if state streaming is currently active."""
+        return self._stream_thread is not None and self._stream_thread.is_alive()
+
+    def set_changes(self, changes, update_from_server=True):
+        """Apply changes to the simulator server
+        Args:
+            changes: list of changes to apply
+            update_from_server: whether to request the state and controller parameters from the server and update them here.
+            Disable it when state updates are already being received via streaming,
+        to avoid redundant state serialization (typically in WindowManager).
+        """
         proto_changes = changes_to_proto(changes)
-        state_and_cp = proto_to_dataclass(self.stub.SetChanges(proto_changes), self.state_and_cp_cls)
-        self.state = state_and_cp.state
-        self.controller_parameters = state_and_cp.controller_parameters
+        if update_from_server:
+            state_and_cp = proto_to_dataclass(self.stub.SetChangesReturnsState(proto_changes), self.state_and_cp_cls)
+            self.state = state_and_cp.state
+            self.controller_parameters = state_and_cp.controller_parameters
+
+        else:
+            proto_changes = changes_to_proto(changes)
+            self.stub.SetChanges(proto_changes)
 
     def start(self):
         """Start the simulator."""
@@ -107,4 +129,157 @@ class SimulatorGRPCClient:
         
     def close(self):
         """Close the gRPC channel."""
+        self.stop_state_stream()
         self.channel.close()
+
+    # ============ Streaming Methods ============
+
+    def start_state_stream(self, callback, max_fps=30, include_controller_params=True):
+        """Start receiving state updates via server-side streaming.
+        
+        Args:
+            callback: Function called with each state update (receives state or state_and_cp)
+            max_fps: Maximum updates per second
+            include_controller_params: Whether to include controller parameters
+            
+        Returns:
+            Thread object running the stream
+        """
+        if self._stream_thread is not None:
+            self.stop_state_stream()
+        
+        self._stream_stop_event = threading.Event()
+        
+        def stream_worker():
+            config = simulator_pb2.StreamConfig(
+                max_fps=max_fps,
+                include_controller_params=include_controller_params
+            )
+            try:
+                for proto_state in self.stub.StreamState(config):
+                    if self._stream_stop_event.is_set():
+                        break
+                    if include_controller_params:
+                        state_and_cp = proto_to_dataclass(proto_state, self.state_and_cp_cls)
+                        self.state = state_and_cp.state
+                        self.controller_parameters = state_and_cp.controller_parameters
+                        callback(state_and_cp)
+                    else:
+                        state = proto_to_dataclass(proto_state, self.state_cls)
+                        self.state = state
+                        callback(state)
+            except grpc.RpcError as e:
+                if e.code() != grpc.StatusCode.CANCELLED:
+                    raise
+        
+        self._stream_thread = threading.Thread(target=stream_worker, daemon=True)
+        self._stream_thread.start()
+        return self._stream_thread
+
+    def stop_state_stream(self):
+        """Stop the state streaming."""
+        if self._stream_stop_event is not None:
+            self._stream_stop_event.set()
+        if self._stream_thread is not None:
+            self._stream_thread.join(timeout=1.0)
+            self._stream_thread = None
+            self._stream_stop_event = None
+
+    def bidirectional_step_generator(self, changes_iterator):
+        """Generator for bidirectional stepping.
+        
+        Args:
+            changes_iterator: Iterator yielding changes to send
+            
+        Yields:
+            State updates from server after each step
+            
+        Note: This is NOT synchronized - the changes_iterator runs independently
+        of responses. For synchronized stepping, use bidirectional_step_sync().
+        """
+        def request_generator():
+            for changes in changes_iterator:
+                yield changes_to_proto(changes)
+        
+        for proto_state in self.stub.BidirectionalStep(request_generator()):
+            state_and_cp = proto_to_dataclass(proto_state, self.state_and_cp_cls)
+            self.state = state_and_cp.state
+            self.controller_parameters = state_and_cp.controller_parameters
+            yield state_and_cp
+
+    def bidirectional_step_sync(self, num_steps, compute_changes_fn):
+        """Synchronized bidirectional stepping with proper state synchronization.
+        
+        This maintains a persistent stream but ensures each step waits for the
+        previous state before computing the next motor commands.
+        
+        Args:
+            num_steps: Number of steps to execute (can be math.inf for infinite)
+            compute_changes_fn: Function that computes and returns changes.
+                                Can have signature:
+                                - compute_changes_fn() -> changes_list  (uses self.state internally)
+                                - compute_changes_fn(state) -> changes_list
+                                Returns None or raises StopIteration to stop the loop.
+                                
+        Yields:
+            State updates from server after each step
+            
+        Example:
+            def compute_motors():
+                # Access client.state directly
+                # Compute motor commands based on current state
+                return []  # or list of changes, or None to stop
+            
+            for state_and_cp in client.bidirectional_step_sync(100, compute_motors):
+                pass  # State already updated in client
+        """
+        import inspect
+        
+        # Check if compute_changes_fn takes a state argument
+        sig = inspect.signature(compute_changes_fn)
+        takes_state = len(sig.parameters) > 0
+        
+        # Use threading events to synchronize request/response
+        state_ready = threading.Event()
+        stop_flag = threading.Event()
+        steps_done = [0]
+        
+        def synchronized_request_generator():
+            while steps_done[0] < num_steps and not stop_flag.is_set():
+                # Compute changes (state is already updated in self.state)
+                try:
+                    if takes_state:
+                        changes = compute_changes_fn(self.state)
+                    else:
+                        changes = compute_changes_fn()
+                except StopIteration:
+                    break
+                    
+                # None signals stop
+                if changes is None:
+                    break
+                    
+                yield changes_to_proto(changes)
+                steps_done[0] += 1
+                
+                # Wait for state to be updated before computing next changes
+                # (except for the last iteration)
+                if steps_done[0] < num_steps:
+                    state_ready.wait(timeout=30.0)
+                    if stop_flag.is_set():
+                        break
+                    state_ready.clear()
+        
+        try:
+            for proto_state in self.stub.BidirectionalStep(synchronized_request_generator()):
+                state_and_cp = proto_to_dataclass(proto_state, self.state_and_cp_cls)
+                self.state = state_and_cp.state
+                self.controller_parameters = state_and_cp.controller_parameters
+                
+                # Signal that state is ready for next computation
+                state_ready.set()
+                
+                yield state_and_cp
+        finally:
+            stop_flag.set()
+            state_ready.set()  # Unblock generator if waiting

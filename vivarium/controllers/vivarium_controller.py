@@ -51,6 +51,7 @@ class VivariumController:
                       safe_mode=False,
                       step_from_controller=True, 
                       run_simulation=True,
+                      start=True,
                       server_timeout=30.0,
                       ngrok=False,
                       ngrok_token=None):
@@ -92,7 +93,8 @@ class VivariumController:
         
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
-        controller.start()
+        if start:
+            controller.start()
         if run_simulation:
             controller.simulator.simulation_running = True
         lg.info(f"VivariumController session '{scene_name}' is started")
@@ -108,10 +110,11 @@ class VivariumController:
             return self.controllers[name]
         raise AttributeError(f"'VivariumController' object has no attribute '{name}'")
 
-    def start(self, threaded=True, num_steps=math.inf, debug_mode=False):
+    def start(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
         """
         Execute the simulation loop from this client.
         :param threaded: Whether to run the simulation in a thread or not, defaults to True
+        :param use_streaming: Use bidirectional streaming (True) or unary RPC (False), defaults to True
         :raises RuntimeError: if the simulator is already started
         """
         if self.is_started():
@@ -124,31 +127,47 @@ class VivariumController:
         self._is_started = True
         if threaded:
             run_thread = threading.Thread(
-                target=self._start, args=(num_steps, catch_errors)
+                target=self._start, args=(num_steps, catch_errors, use_streaming)
             )
             run_thread.daemon = True
             run_thread.start()
         else:
-            self._start(num_steps=num_steps, catch_errors=catch_errors)
+            self._start(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
         lg.info("Simulator started on client")
             
-    def _start(self, num_steps=math.inf, catch_errors=True):
-        """run the simulation for a given number of steps
+    def _start(self, num_steps=math.inf, catch_errors=True, use_streaming=True):
+        """Run the simulation for a given number of steps.
 
         :param num_steps: num_steps, defaults to math.inf
         :param catch_errors: wether to catch errors or not, defaults to False
+        :param use_streaming: Use bidirectional streaming (True) or unary RPC (False)
         """
-        # Add a local time for the run function independant from the controller time
-        run_time = 0
-        while run_time < num_steps and self._is_started:
-
-            with sleep_timer(freq=self.controllers['simulator'].freq):
+        
+        if use_streaming:
+            # Use synchronized bidirectional streaming
+            def compute_changes():
+                """Compute motor commands and return changes for the next step."""
+                if not self._is_started:
+                    return None  # Signal to stop
                 
-                self.step(catch_errors=catch_errors)
-
-                self.time += 1
-                run_time += 1
-
+                with sleep_timer(freq=self.controllers['simulator'].freq):
+                    self.controller_step(catch_errors=catch_errors)
+                    self.time += 1
+                    
+                return self.fetch_changes()
+            
+            for state_and_cp in self.client.bidirectional_step_sync(num_steps, compute_changes):
+                if not self._is_started:
+                    break  # Stop if we've been told to stop
+        else:
+            # Use unary RPC (original approach)
+            run_time = 0
+            while run_time < num_steps and self._is_started:
+                with sleep_timer(freq=self.controllers['simulator'].freq):
+                    self.step(catch_errors=catch_errors)
+                    self.time += 1
+                    run_time += 1
+                
         # finally stop the simulation
         if self.is_started():
             self.stop()
@@ -181,14 +200,16 @@ class VivariumController:
                 self.simulator_step()
                 changed_applied = True
         if not changed_applied:
-            self.apply_changes()            
+            self.apply_changes()             
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
 
     def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
-        self.client.apply_changes(changes)
+        # Use set_changes when streaming is active to avoid redundant state fetch
+        update_from_server = not (hasattr(self.client, 'is_streaming') and self.client.is_streaming)
+        self.client.set_changes(changes, update_from_server=update_from_server)
             
     def stop_session(self, safe_mode=False):
         """Stop the session: simulation, server, interface, and ngrok tunnel"""

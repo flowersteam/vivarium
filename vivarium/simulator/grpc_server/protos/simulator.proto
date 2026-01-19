@@ -21,8 +21,11 @@ service SimulatorServer {
 
   rpc GetStateAndControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
-  // send changes made on the client side to the simulator server
-  rpc SetChanges(StateChangeList) returns (Dataclass) {}
+  // send changes made on the client side to the simulator server (returns updated state)
+  rpc SetChangesReturnsState(StateChangeList) returns (Dataclass) {}
+  
+  // send changes without returning state (for use with streaming)
+  rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
 
   // send the labels of subtypes and scene name
   rpc GetSceneName(Scene) returns (Scene) {}
@@ -34,6 +37,24 @@ service SimulatorServer {
   rpc IsRunning(google.protobuf.Empty) returns (IsRunningState) {}
   rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+  // ============ Streaming RPCs ============
+  
+  // Server-side streaming: Subscribe to state updates when server is running
+  // Server pushes state whenever it changes (after each step)
+  rpc StreamState(StreamConfig) returns (stream Dataclass) {}
+  
+  // Bidirectional streaming: Send commands, receive state updates
+  // Client sends changes, server responds with updated state after each step
+  rpc BidirectionalStep(stream StateChangeList) returns (stream Dataclass) {}
+}
+
+// Configuration for streaming RPCs
+message StreamConfig {
+  // Maximum updates per second (0 = unlimited)
+  int32 max_fps = 1;
+  // Whether to include controller parameters in updates
+  bool include_controller_params = 2;
 }
 
 message Dataclass {

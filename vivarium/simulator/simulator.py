@@ -157,7 +157,7 @@ class Simulator:
     def step(self, changes=None):
         
         if changes is not None and len(changes) > 0:
-            self.apply_changes(changes)
+            self.set_changes(changes)
         self.state = self._step(self.state)
         
         # record the env state because it is the one we can plot and use without client-server interaction
@@ -224,7 +224,9 @@ class Simulator:
     def is_running(self):
         return self._is_running or self._was_running
 
-    def apply_changes(self, changes):
+    def set_changes(self, changes, update_from_server=True):
+        # update_from_server is only here to match the SimulatorGRPCClient interface
+        
         lg.debug("Applying changes to simulator")
         lg.debug(f"Changes: {changes}")
         self = update_dataclass_from_change_list(self, changes)

@@ -61,10 +61,15 @@ class SimulatorServerStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=simulator__pb2.Dataclass.FromString,
                 _registered_method=True)
+        self.SetChangesReturnsState = channel.unary_unary(
+                '/simulator.SimulatorServer/SetChangesReturnsState',
+                request_serializer=simulator__pb2.StateChangeList.SerializeToString,
+                response_deserializer=simulator__pb2.Dataclass.FromString,
+                _registered_method=True)
         self.SetChanges = channel.unary_unary(
                 '/simulator.SimulatorServer/SetChanges',
                 request_serializer=simulator__pb2.StateChangeList.SerializeToString,
-                response_deserializer=simulator__pb2.Dataclass.FromString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
         self.GetSceneName = channel.unary_unary(
                 '/simulator.SimulatorServer/GetSceneName',
@@ -95,6 +100,16 @@ class SimulatorServerStub(object):
                 '/simulator.SimulatorServer/Stop',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.StreamState = channel.unary_stream(
+                '/simulator.SimulatorServer/StreamState',
+                request_serializer=simulator__pb2.StreamConfig.SerializeToString,
+                response_deserializer=simulator__pb2.Dataclass.FromString,
+                _registered_method=True)
+        self.BidirectionalStep = channel.stream_stream(
+                '/simulator.SimulatorServer/BidirectionalStep',
+                request_serializer=simulator__pb2.StateChangeList.SerializeToString,
+                response_deserializer=simulator__pb2.Dataclass.FromString,
                 _registered_method=True)
 
 
@@ -134,8 +149,15 @@ class SimulatorServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetChangesReturnsState(self, request, context):
+        """send changes made on the client side to the simulator server (returns updated state)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def SetChanges(self, request, context):
-        """send changes made on the client side to the simulator server
+        """send changes without returning state (for use with streaming)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -179,6 +201,24 @@ class SimulatorServerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamState(self, request, context):
+        """============ Streaming RPCs ============
+
+        Server-side streaming: Subscribe to state updates when server is running
+        Server pushes state whenever it changes (after each step)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BidirectionalStep(self, request_iterator, context):
+        """Bidirectional streaming: Send commands, receive state updates
+        Client sends changes, server responds with updated state after each step
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SimulatorServerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -207,10 +247,15 @@ def add_SimulatorServerServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=simulator__pb2.Dataclass.SerializeToString,
             ),
+            'SetChangesReturnsState': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetChangesReturnsState,
+                    request_deserializer=simulator__pb2.StateChangeList.FromString,
+                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
+            ),
             'SetChanges': grpc.unary_unary_rpc_method_handler(
                     servicer.SetChanges,
                     request_deserializer=simulator__pb2.StateChangeList.FromString,
-                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
             'GetSceneName': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSceneName,
@@ -241,6 +286,16 @@ def add_SimulatorServerServicer_to_server(servicer, server):
                     servicer.Stop,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'StreamState': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamState,
+                    request_deserializer=simulator__pb2.StreamConfig.FromString,
+                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
+            ),
+            'BidirectionalStep': grpc.stream_stream_rpc_method_handler(
+                    servicer.BidirectionalStep,
+                    request_deserializer=simulator__pb2.StateChangeList.FromString,
+                    response_serializer=simulator__pb2.Dataclass.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -390,6 +445,33 @@ class SimulatorServer(object):
             _registered_method=True)
 
     @staticmethod
+    def SetChangesReturnsState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/simulator.SimulatorServer/SetChangesReturnsState',
+            simulator__pb2.StateChangeList.SerializeToString,
+            simulator__pb2.Dataclass.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def SetChanges(request,
             target,
             options=(),
@@ -405,7 +487,7 @@ class SimulatorServer(object):
             target,
             '/simulator.SimulatorServer/SetChanges',
             simulator__pb2.StateChangeList.SerializeToString,
-            simulator__pb2.Dataclass.FromString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,
@@ -568,6 +650,60 @@ class SimulatorServer(object):
             '/simulator.SimulatorServer/Stop',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/simulator.SimulatorServer/StreamState',
+            simulator__pb2.StreamConfig.SerializeToString,
+            simulator__pb2.Dataclass.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BidirectionalStep(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/simulator.SimulatorServer/BidirectionalStep',
+            simulator__pb2.StateChangeList.SerializeToString,
+            simulator__pb2.Dataclass.FromString,
             options,
             channel_credentials,
             insecure,

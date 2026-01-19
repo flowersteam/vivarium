@@ -6,6 +6,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class StreamConfig(_message.Message):
+    __slots__ = ("max_fps", "include_controller_params")
+    MAX_FPS_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_CONTROLLER_PARAMS_FIELD_NUMBER: _ClassVar[int]
+    max_fps: int
+    include_controller_params: bool
+    def __init__(self, max_fps: _Optional[int] = ..., include_controller_params: bool = ...) -> None: ...
+
 class Dataclass(_message.Message):
     __slots__ = ("value", "nested_fields")
     class NestedFieldsEntry(_message.Message):
