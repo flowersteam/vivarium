@@ -134,7 +134,6 @@ class WindowManager(Parameterized):
 
         # Build notebook URL if path is specified and Jupyter is enabled
         default_url = ""
-        show_notebook = False
         if jupyter_enabled and notebook_path:
             import os
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
@@ -145,28 +144,12 @@ class WindowManager(Parameterized):
             # Convert to URL path (relative to project root for Jupyter)
             notebook_rel_path = os.path.relpath(notebook_path, project_root)
             default_url = f"http://localhost:{jupyter_port}/notebooks/{notebook_rel_path}"
-            show_notebook = True
-
-        self.notebook_toggle = pn.widgets.Toggle(
-            name="Hide Notebook" if show_notebook else "Show Notebook",
-            value=show_notebook,
-            align="center",
-        )
 
         self.notebook_url = pn.widgets.TextInput(
             name="Notebook URL",
             placeholder="http://localhost:8888/notebooks/path/to/notebook.ipynb",
             value=default_url,
             width=400,
-        )
-
-        self.notebook_height = pn.widgets.IntInput(
-            name="Height (px)",
-            value=600,
-            start=300,
-            end=2000,
-            step=50,
-            width=100,
         )
         
         #TODO: Obsolete, to remove here and all other modules using it
@@ -181,9 +164,9 @@ class WindowManager(Parameterized):
             # Start streaming if enabled
             if self.use_streaming:
                 self._start_streaming()
-            # Show notebook if configured
-            if show_notebook and default_url:
-                self._show_notebook()
+            # Load notebook if configured
+            if self.jupyter_enabled and default_url:
+                self._update_notebook()
         self.update_plot_cb()
 
     def start_toggle_cb(self, event):
@@ -310,57 +293,31 @@ class WindowManager(Parameterized):
         pn.state.location.reload=False
         pn.state.location.reload=True
 
-    def notebook_toggle_cb(self, event):
-        """Callback for the notebook toggle button
-
-        :param event: The event for the new value of the button
-        """
-        if event.new:
-            self._show_notebook()
-            self.notebook_toggle.name = "Hide Notebook"
-        else:
-            self._hide_notebook()
-            self.notebook_toggle.name = "Show Notebook"
-
     def notebook_url_cb(self, event):
         """Callback for when the notebook URL changes
 
         :param event: The event for the new URL value
         """
-        if self.notebook_toggle.value and event.new:
-            self._show_notebook()
+        if event.new:
+            self._update_notebook()
 
-    def notebook_height_cb(self, event):
-        """Callback for when the notebook height changes
-
-        :param event: The event for the new height value
-        """
-        if self.notebook_toggle.value:
-            self.notebook_iframe.height = event.new
-
-    def _show_notebook(self):
-        """Show the notebook iframe with the current URL"""
+    def _update_notebook(self):
+        """Update the notebook iframe with the current URL"""
         url = self.notebook_url.value
         if url:
             # Allow scripts, forms, and same-origin for full Jupyter functionality
             iframe_html = f'''<iframe
                 src="{url}"
                 width="100%"
-                height="{self.notebook_height.value}px"
+                height="100%"
                 frameborder="0"
                 style="border: 1px solid #ddd;"
                 sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups allow-downloads"
                 allow="clipboard-read; clipboard-write"
             ></iframe>'''
             self.notebook_iframe.object = iframe_html
-            self.notebook_iframe.height = self.notebook_height.value
         else:
-            lg.warning("No notebook URL provided")
-
-    def _hide_notebook(self):
-        """Hide the notebook iframe"""
-        self.notebook_iframe.object = ""
-        self.notebook_iframe.height = 0
+            self.notebook_iframe.object = ""
 
     def create_plot(self):
         """Creates a bokeh plot for the simulator
@@ -412,43 +369,44 @@ class WindowManager(Parameterized):
         # Create the notebook iframe (initially empty)
         self.notebook_iframe = pn.pane.HTML(
             "",
-            sizing_mode="stretch_width",
-            height=0,
+            sizing_mode="stretch_both",
         )
 
-        # Build app components
-        app_components = [
-            pn.Row(
-                pn.Column(
-                    pn.Row(
-                        self.start_toggle,
-                        self.plot_fps,
-                        # self.streaming_toggle,
-                        self.drag_n_drop,
-                        self.dark_theme_switch
-                    ),
-                    pn.panel(self.plot, sizing_mode="scale_width"),
-                ),
-                pn.Column(
-                    pn.Row("### Show Configurations", self.controller_toggle),
-                    pn.Row(*self.config_columns),
-                ),
-            )
+        # Build tabs for the right side
+        tabs_list = [
+            ("Configurations", pn.Column(
+                pn.Row("### Show Configurations", self.controller_toggle),
+                pn.Row(*self.config_columns),
+                sizing_mode="stretch_both",
+            ))
         ]
 
-        # Only add notebook section if Jupyter is enabled
+        # Add notebook tab if Jupyter is enabled
         if self.jupyter_enabled:
-            app_components.extend([
-                pn.Row(
-                    pn.pane.Markdown("### Jupyter Notebook", align="center"),
-                    self.notebook_toggle,
+            tabs_list.append(
+                ("Notebook", pn.Column(
                     self.notebook_url,
-                    self.notebook_height,
-                ),
-                self.notebook_iframe,
-            ])
+                    self.notebook_iframe,
+                    sizing_mode="stretch_both",
+                ))
+            )
 
-        app = pn.Column(*app_components)
+        right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
+
+        # Build the main app
+        app = pn.Row(
+            pn.Column(
+                pn.Row(
+                    self.start_toggle,
+                    self.plot_fps,
+                    # self.streaming_toggle,
+                    self.drag_n_drop,
+                    self.dark_theme_switch
+                ),
+                pn.panel(self.plot, sizing_mode="scale_width"),
+            ),
+            right_side_tabs,
+        )
         return app
 
     def set_callbacks(self):
@@ -465,9 +423,7 @@ class WindowManager(Parameterized):
         # self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
         self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
-        self.notebook_toggle.param.watch(self.notebook_toggle_cb, "value")
         self.notebook_url.param.watch(self.notebook_url_cb, "value")
-        self.notebook_height.param.watch(self.notebook_height_cb, "value")
 
 
 if __name__ == "__main__":
