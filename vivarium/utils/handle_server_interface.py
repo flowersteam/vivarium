@@ -161,7 +161,7 @@ def start_process(process_command, url_queue=None, show_output=True):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False
+    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False, jupyter_enabled=False
 ):
     """Start the server and interface for the given scene
 
@@ -170,6 +170,7 @@ def start_server_and_interface(
     :param server_timeout: maximum seconds to wait for gRPC server to be ready
     :param safe_mode: whether to prompt before stopping existing processes
     :param allow_external_origins: whether to allow websocket connections from external origins (e.g., ngrok)
+    :param jupyter_enabled: whether Jupyter server is running (passed to interface)
     :return: URL of the interface if started, None otherwise
     :raises RuntimeError: if gRPC server doesn't start within timeout
     """
@@ -218,12 +219,13 @@ def start_server_and_interface(
             "serve",
             interface_script,
         ]
-        
+
         # Allow external origins (e.g., ngrok) if requested
         if allow_external_origins:
             interface_command.append("--allow-websocket-origin=*")
-        
+
         interface_command.append("--args")
+        interface_command.append(f"--jupyter_enabled={'True' if jupyter_enabled else 'False'}")
 
         # Create a queue to receive the URL from the subprocess
         url_queue = multiprocessing.Queue()

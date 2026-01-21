@@ -1,2 +1,5 @@
 use_streaming: true
 dark_mode: false
+notebook:
+  path: null  # Path to notebook file (e.g., "notebooks/sessions/session_1.ipynb")
+  jupyter_port: 8889
