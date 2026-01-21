@@ -101,7 +101,7 @@ def stop_server_and_interface(safe_mode=True):
     interface_pids, server_pids = get_server_interface_pids()
 
     if interface_pids or server_pids:
-        print("\nStopping server and interface processes\n")
+        lg.info("\nStopping server and interface processes\n")
         processes_running = True
         if not safe_mode:
             terminate_process(interface_pids)
@@ -122,7 +122,7 @@ def stop_server_and_interface(safe_mode=True):
                 processes_running = False
 
         if not processes_running:
-            lg.warning("\nServer and Interface processes have been stopped\n")
+            lg.info("\nServer and Interface processes have been stopped\n")
 
     return processes_running
 
