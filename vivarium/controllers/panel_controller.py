@@ -101,6 +101,7 @@ class ParamSimulator(ParameterizedData):
         
         params = asdict(simulator_controller._remote.controller_parameters.simulator.obj())
         params.pop('client_names', None)
+        params.pop('close', None)
         params['env'] = ParamEnvironment(simulator_controller.env)
         
         super().__init__(simulator_controller, 

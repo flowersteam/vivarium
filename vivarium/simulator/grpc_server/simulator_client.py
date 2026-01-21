@@ -1,5 +1,7 @@
 import grpc
 import uuid
+import time
+import logging
 import threading
 from hydra.utils import get_class
 from dataclasses import dataclass
@@ -15,6 +17,8 @@ from vivarium.utils.scene_configs import component_factories_from_config
 
 
 Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
+
+lg = logging.getLogger(__name__)
 
 
 # @access_nested_fields(nested_fields_to_access)
@@ -61,6 +65,9 @@ class SimulatorGRPCClient:
             Disable it when state updates are already being received via streaming,
         to avoid redundant state serialization (typically in WindowManager).
         """
+        if self.channel is None:
+            lg.warning("Channel is closed, cannot set changes.")
+            return
         proto_changes = changes_to_proto(changes)
         if update_from_server:
             state_and_cp = proto_to_dataclass(self.stub.SetChangesReturnsState(proto_changes), self.state_and_cp_cls)
@@ -129,8 +136,10 @@ class SimulatorGRPCClient:
         
     def close(self):
         """Close the gRPC channel."""
-        self.stop_state_stream()
+        self.unregister_client(self.name)
+        self.stop_state_stream(blocking=True)
         self.channel.close()
+        self.channel = None
 
     # ============ Streaming Methods ============
 
@@ -176,7 +185,7 @@ class SimulatorGRPCClient:
         self._stream_thread.start()
         return self._stream_thread
 
-    def stop_state_stream(self):
+    def stop_state_stream(self, blocking=True):
         """Stop the state streaming."""
         if self._stream_stop_event is not None:
             self._stream_stop_event.set()
@@ -184,6 +193,10 @@ class SimulatorGRPCClient:
             self._stream_thread.join(timeout=1.0)
             self._stream_thread = None
             self._stream_stop_event = None
+        
+        lg.info("Stopping state stream ...")
+        while blocking and self.is_streaming:
+            time.sleep(0.1)
 
     def bidirectional_step_generator(self, changes_iterator):
         """Generator for bidirectional stepping.
@@ -283,3 +296,4 @@ class SimulatorGRPCClient:
         finally:
             stop_flag.set()
             state_ready.set()  # Unblock generator if waiting
+            lg.info('bidirectional_step_sync stopped')

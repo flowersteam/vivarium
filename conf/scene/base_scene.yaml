@@ -1,6 +1,7 @@
 defaults:
   - environment: default
   - simulator: base_simulator
+  - interface: base_interface
 
 subtype_labels:
   - dummy

@@ -309,7 +309,7 @@ class BehaviorHandler(object):
 
 def kill_session(global_vars, controller_variable_name='controller'):
     """
-    Try to properly close the session by calling VivariumController.stop_session() on a controller instance
+    Try to properly close the session by calling VivariumController.close_session() on a controller instance
     if it exists in the provided global_vars dictionary.
     If it does not exist, it calls stop_server_and_interface() to ensure the server and interface are stopped.
     
@@ -318,7 +318,7 @@ def kill_session(global_vars, controller_variable_name='controller'):
     """
     try:
         c = global_vars[controller_variable_name]
-        c.stop_session()
+        c.close_session()
         del c
     except KeyError:
         stop_server_and_interface(safe_mode=False)

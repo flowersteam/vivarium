@@ -37,9 +37,10 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, use_streaming=True, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
+        
+        
         super().__init__(**kwargs)
-        pn.config.theme = 'dark'
 
         if controller is None:
             client = SimulatorGRPCClient()
@@ -50,8 +51,19 @@ class WindowManager(Parameterized):
             client = self.controller.client
             self.scene_config = load_scene_config(client.scene_name)
 
+        self.dark_theme = self.scene_config.interface.dark_mode
+        if pn.state.location is not None:
+            query_params = pn.state.location.query_params
+            if 'theme' in query_params:
+                self.dark_theme = (query_params['theme'] == 'dark')
+            if self.dark_theme:
+                pn.config.theme = 'dark'
+            else:
+                pn.config.theme = 'default'
+        
+
         self.apply_changes = apply_changes
-        self.use_streaming = use_streaming
+        self.use_streaming = self.scene_config.interface.use_streaming
         self._streaming_active = False
         self._pending_state_update = threading.Event()
         self._state_lock = threading.Lock()
@@ -80,15 +92,26 @@ class WindowManager(Parameterized):
             ),
             align="center",
         )
+        
         self.plot_fps = pn.widgets.FloatInput(
             name="Plot FPS", value=15, width=80
         )
+        
+        # Currently not displayed
         self.streaming_toggle = pn.widgets.Toggle(
-            name="Use Streaming" if not use_streaming else "Using Streaming",
-            value=use_streaming,
+            name="Use Streaming" if not self.use_streaming else "Using Streaming",
+            value=self.use_streaming,
             align="center",
         )
+        
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
+        
+        self.dark_theme_switch = pn.widgets.Switch(
+            name="Light/Dark theme",
+            value=self.dark_theme,
+            align="center",
+        )
+        
         self.controller_toggle = pn.widgets.ToggleGroup(
             name="ControllerToggle",
             options=self.controller_names,
@@ -97,8 +120,10 @@ class WindowManager(Parameterized):
         )
         
         #TODO: Obsolete, to remove here and all other modules using it
-        self.notebook_mode = notebook_mode
+        self.notebook_mode = notebook_mode       
 
+        self.curdoc = curdoc()
+        
         self.plot = self.create_plot()
         self.app = self.create_app()
         if not testing_mode:
@@ -215,12 +240,30 @@ class WindowManager(Parameterized):
             self.start_toggle.value = True
             self.drag_n_drop.name = "Start Drag & Drop"
 
+    def dark_theme_switch_cb(self, event):
+        """Callback for the dark mode toggle button
+
+        :param event: The event for the new value of the button (True if dark theme)
+        """
+        self.pcb_plot.stop()
+        self.controller.close()
+        del self.controller
+        self.dark_theme = event.new
+        if event.new:
+            pn.state.location.param.update(search="?theme=dark")
+        else:
+            pn.state.location.param.update(search="?theme=light")
+        
+        pn.state.location.reload=False
+        pn.state.location.reload=True
+
     def create_plot(self):
         """Creates a bokeh plot for the simulator
 
         :return: A bokeh plot
         """
-        curdoc().theme = 'dark_minimal'
+        if self.dark_theme:
+            self.curdoc.theme = 'dark_minimal'
 
         p_tools = "crosshair,pan,wheel_zoom,box_zoom,reset,tap,box_select,lasso_select"
         p = figure(tools=p_tools, active_drag="box_select")
@@ -266,8 +309,9 @@ class WindowManager(Parameterized):
                 pn.Row(
                     self.start_toggle,
                     self.plot_fps,
-                    self.streaming_toggle,
+                    # self.streaming_toggle,
                     self.drag_n_drop,
+                    self.dark_theme_switch
                 ),
                 pn.panel(self.plot, sizing_mode="scale_width"),
             ),
@@ -289,8 +333,9 @@ class WindowManager(Parameterized):
         self.controller_toggle.param.watch(self.controller_toggle_cb, "value")
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
         self.plot_fps.param.watch(self.update_plot_fps, "value")
-        self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
+        # self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
+        self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
 
 
 if __name__ == "__main__":

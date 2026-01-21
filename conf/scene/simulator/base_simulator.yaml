@@ -7,6 +7,7 @@ client:
     client_names: []
     run_from: server
     simulation_running: false
+    close: false
     env:
       box_size: ${....env.kwargs.box_size}
       neighbor_radius: ${....env.kwargs.neighbor_radius}

@@ -135,7 +135,7 @@ class VivariumController:
             self._start(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
         lg.info("Simulator started on client")
             
-    def _start(self, num_steps=math.inf, catch_errors=True, use_streaming=True):
+    def _start(self, num_steps=math.inf, catch_errors=True, use_streaming=False):
         """Run the simulation for a given number of steps.
 
         :param num_steps: num_steps, defaults to math.inf
@@ -200,28 +200,45 @@ class VivariumController:
                 self.simulator_step()
                 changed_applied = True
         if not changed_applied:
-            self.apply_changes()             
+            self.apply_changes()
 
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
 
-    def apply_changes(self, changes=None): # TODO: should this be in SimulatorClient instead?
+    def apply_changes(self, changes=None, close_if_resquested=True): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
         # Use set_changes when streaming is active to avoid redundant state fetch
         update_from_server = not (hasattr(self.client, 'is_streaming') and self.client.is_streaming)
         self.client.set_changes(changes, update_from_server=update_from_server)
-            
-    def stop_session(self, safe_mode=False):
-        """Stop the session: simulation, server, interface, and ngrok tunnel"""
+        if self.simulator.close:
+            self.close() 
+        
+    def close(self):
         if self._is_started:
             self.stop()
-            sleep(1)  # wait for the simulation loop to stop
+            sleep(4)  # wait for the simulation loop to stop
         self.client.close()
-        stop_server_and_interface(safe_mode=safe_mode)
         
         # Close ngrok tunnel if one was created
         if getattr(self, '_ngrok_active', False):
             from vivarium.utils.handle_server_interface import close_ngrok_tunnel
             close_ngrok_tunnel()
             self._ngrok_active = False
+            
+    def close_all(self):
+        """Send signal to close all clients and the simulator."""
+        self.stop()
+        sleep(1)  # wait for the simulation loop to stop
+        self.simulator.close = True
+        lg.info("Waiting for all clients to close ...")
+        while len(self.simulator.client_names) != 1:  # wait for other clients to close
+            self.apply_changes(close_if_resquested=False)
+            sleep(0.1)
+        # Close our client
+        self.close()
+            
+    def close_session(self, safe_mode=False):
+        """Stop the session: simulation, server, interface, and ngrok tunnel"""
+        self.close_all()
+        stop_server_and_interface(safe_mode=safe_mode)
         
