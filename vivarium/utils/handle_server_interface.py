@@ -18,6 +18,141 @@ SERVER_PROCESS_NAME_WIN = "scripts\\run_server.py"
 INTERFACE_PROCESS_NAME_WIN = "scripts\\run_interface.py"
 
 
+def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_process_object=False):
+    """Start a Jupyter notebook server with iframe-friendly configuration
+
+    :param port: Port to run Jupyter on, defaults to 8889
+    :param notebook_dir: Directory to start Jupyter in, defaults to project root
+    :param show_output: Whether to show Jupyter server output
+    :param return_process_object: If True, return Popen object instead of multiprocessing.Process
+    :return: Process object (Popen or multiprocessing.Process)
+    :raises RuntimeError: If the requested port is already in use
+    """
+    # Check if the requested port is already in use
+    if check_jupyter_running(port):
+        raise RuntimeError(
+            f"Port {port} is already in use. Please stop the existing Jupyter server or choose a different port."
+        )
+
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+
+    if notebook_dir is None:
+        notebook_dir = project_root
+
+    config_path = os.path.join(project_root, "vivarium/interface/jupyter_config_iframe.py")
+
+    jupyter_command = [
+        "jupyter",
+        "notebook",
+        f"--config={config_path}",
+        f"--port={port}",
+        f"--notebook-dir={notebook_dir}",
+        "--no-browser",
+    ]
+
+    lg.info(f"Starting Jupyter notebook server on port {port}...")
+    lg.info(f"Notebook directory: {notebook_dir}")
+
+    if return_process_object:
+        # Return a Popen object for direct process management
+        jupyter_process = subprocess.Popen(
+            jupyter_command,
+            stdout=None if show_output else subprocess.DEVNULL,
+            stderr=None if show_output else subprocess.DEVNULL
+        )
+        lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
+    else:
+        # Return a multiprocessing.Process for background execution
+        jupyter_process = multiprocessing.Process(
+            target=subprocess.run,
+            args=(jupyter_command,),
+            kwargs={"stdout": None if show_output else subprocess.DEVNULL,
+                    "stderr": None if show_output else subprocess.DEVNULL}
+        )
+        jupyter_process.start()
+        lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
+
+    lg.info(f"Access it at: http://localhost:{port}")
+
+    return jupyter_process
+
+
+def check_jupyter_running(port=8889):
+    """Check if a Jupyter server is running on the specified port
+
+    :param port: Port to check
+    :return: True if Jupyter is running, False otherwise
+    """
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            result = s.connect_ex(('localhost', port))
+            return result == 0
+    except Exception:
+        return False
+
+
+def stop_jupyter_server(jupyter_process=None, port=8889):
+    """Stop a Jupyter server process
+
+    :param jupyter_process: Process object to terminate (if available)
+    :param port: Port to find and kill Jupyter on (fallback if process object not available)
+    """
+    killed = False
+
+    # Try to kill the process object if provided (use SIGKILL for Jupyter)
+    if jupyter_process:
+        try:
+            if hasattr(jupyter_process, 'kill'):
+                jupyter_process.kill()  # Use kill() directly, not terminate()
+                if hasattr(jupyter_process, 'wait'):
+                    jupyter_process.wait(timeout=3)
+                killed = True
+                lg.info("Jupyter server killed via process object")
+            elif hasattr(jupyter_process, 'terminate'):
+                # For multiprocessing.Process
+                jupyter_process.terminate()
+                jupyter_process.join(timeout=3)
+                if jupyter_process.is_alive():
+                    jupyter_process.kill()
+                killed = True
+                lg.info("Jupyter server terminated via multiprocessing.Process")
+        except Exception as e:
+            lg.warning(f"Failed to kill Jupyter via process object: {e}")
+
+    # Always check port and kill any remaining process (Jupyter can fork)
+    lg.info(f"Checking if Jupyter is still running on port {port}...")
+    if check_jupyter_running(port):
+        lg.warning(f"Jupyter still detected on port {port}, force killing...")
+        try:
+            # Find PID listening on the port
+            result = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True,
+                text=True
+            )
+            pids = result.stdout.strip().split('\n')
+            lg.info(f"Found PIDs on port {port}: {pids}")
+            for pid in pids:
+                if pid and pid.strip():
+                    try:
+                        # Use SIGKILL (9) to force kill Jupyter
+                        os.kill(int(pid), signal.SIGKILL)
+                        lg.info(f"Force killed Jupyter process with PID: {pid}")
+                        killed = True
+                    except Exception as e:
+                        lg.warning(f"Failed to kill PID {pid}: {e}")
+        except Exception as e:
+            lg.warning(f"Failed to find/kill Jupyter by port: {e}")
+    else:
+        lg.info(f"No Jupyter process found on port {port}")
+
+    if killed:
+        # Give it a moment to clean up
+        time.sleep(0.5)
+
+
 def get_process_pids_unix(process_name: str):
     """Get the processes IDs of a running process by name
 
@@ -161,7 +296,7 @@ def start_process(process_command, url_queue=None, show_output=True):
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False, jupyter_enabled=False
+    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False
 ):
     """Start the server and interface for the given scene
 
@@ -170,7 +305,6 @@ def start_server_and_interface(
     :param server_timeout: maximum seconds to wait for gRPC server to be ready
     :param safe_mode: whether to prompt before stopping existing processes
     :param allow_external_origins: whether to allow websocket connections from external origins (e.g., ngrok)
-    :param jupyter_enabled: whether Jupyter server is running (passed to interface)
     :return: URL of the interface if started, None otherwise
     :raises RuntimeError: if gRPC server doesn't start within timeout
     """
@@ -225,7 +359,6 @@ def start_server_and_interface(
             interface_command.append("--allow-websocket-origin=*")
 
         interface_command.append("--args")
-        interface_command.append(f"--jupyter_enabled={'True' if jupyter_enabled else 'False'}")
 
         # Create a queue to receive the URL from the subprocess
         url_queue = multiprocessing.Queue()

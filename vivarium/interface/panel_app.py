@@ -1,3 +1,4 @@
+import os
 import hydra
 import logging
 import threading
@@ -37,7 +38,7 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, jupyter_enabled=False, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
         
         
         super().__init__(**kwargs)
@@ -119,37 +120,65 @@ class WindowManager(Parameterized):
             value=self.controller_names,
         )
 
-        # Notebook iframe widgets - load from config
-        # Only show notebook section if Jupyter is enabled
-        self.jupyter_enabled = jupyter_enabled
+        # Notebook configuration - load from config
         notebook_config = getattr(self.scene_config.interface, 'notebook', None)
-        notebook_path = None
-        jupyter_port = 8889
+        self.notebook_path = None
+        self.jupyter_port = 8889
 
         if notebook_config is not None:
             if hasattr(notebook_config, 'path'):
-                notebook_path = notebook_config.path
+                self.notebook_path = notebook_config.path
             if hasattr(notebook_config, 'jupyter_port'):
-                jupyter_port = notebook_config.jupyter_port
+                self.jupyter_port = notebook_config.jupyter_port
 
-        # Build notebook URL if path is specified and Jupyter is enabled
-        default_url = ""
-        if jupyter_enabled and notebook_path:
-            import os
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-            # Check if it's an absolute path or relative
-            if not os.path.isabs(notebook_path):
-                notebook_path = os.path.join(project_root, notebook_path)
+        # Jupyter server management
+        self.jupyter_process = None
 
-            # Convert to URL path (relative to project root for Jupyter)
-            notebook_rel_path = os.path.relpath(notebook_path, project_root)
-            default_url = f"http://localhost:{jupyter_port}/notebooks/{notebook_rel_path}"
+        # UI for Jupyter control and notebook display
+        self.jupyter_status = pn.pane.Markdown("**Jupyter Status:** Checking...", sizing_mode="stretch_width")
+
+        self.jupyter_port_input = pn.widgets.IntInput(
+            name="Jupyter Port:",
+            value=self.jupyter_port,
+            start=8888,
+            end=9999,
+            step=1,
+            width=120,
+        )
+
+        self.start_jupyter_btn = pn.widgets.Button(
+            name="Start Jupyter Server",
+            button_type="success",
+            width=200,
+        )
+
+        self.stop_jupyter_btn = pn.widgets.Button(
+            name="Stop Jupyter Server",
+            button_type="danger",
+            width=200,
+            visible=False,
+        )
+
+        self.open_configured_notebook_btn = pn.widgets.Button(
+            name=f"Open {os.path.basename(self.notebook_path) if self.notebook_path else 'Configured Notebook'}",
+            button_type="primary",
+            width=250,
+            visible=False,
+        )
+
+        self.open_new_notebook_btn = pn.widgets.Button(
+            name="Open New Notebook",
+            button_type="primary",
+            width=200,
+            visible=False,
+        )
 
         self.notebook_url = pn.widgets.TextInput(
-            name="Notebook URL",
-            placeholder="http://localhost:8888/notebooks/path/to/notebook.ipynb",
-            value=default_url,
+            name="Or enter notebook URL:",
+            placeholder=f"http://localhost:{self.jupyter_port}/notebooks/path/to/notebook.ipynb",
+            value="",
             width=400,
+            visible=False,
         )
         
         #TODO: Obsolete, to remove here and all other modules using it
@@ -164,9 +193,6 @@ class WindowManager(Parameterized):
             # Start streaming if enabled
             if self.use_streaming:
                 self._start_streaming()
-            # Load notebook if configured
-            if self.jupyter_enabled and default_url:
-                self._update_notebook()
         self.update_plot_cb()
 
     def start_toggle_cb(self, event):
@@ -293,6 +319,79 @@ class WindowManager(Parameterized):
         pn.state.location.reload=False
         pn.state.location.reload=True
 
+    def start_jupyter_cb(self, event):
+        """Callback for starting Jupyter server"""
+        from vivarium.utils.handle_server_interface import start_jupyter_server, check_jupyter_running
+        import time
+
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+
+        # Use the port from the input field
+        port = self.jupyter_port_input.value
+
+        try:
+            lg.info(f"Starting Jupyter server on port {port}...")
+            self.jupyter_status.object = f"**Jupyter Status:** 🔄 Starting on port {port}..."
+
+            self.jupyter_process = start_jupyter_server(
+                port=port,
+                notebook_dir=project_root,
+                show_output=False,
+                return_process_object=True
+            )
+
+            # Update the configured port to match what was actually used
+            self.jupyter_port = port
+
+            # Wait a moment for Jupyter to fully start and bind to the port
+            for _ in range(10):
+                time.sleep(0.5)
+                if check_jupyter_running(port):
+                    lg.info(f"Jupyter server confirmed running on port {port}")
+                    break
+
+            # Update UI to reflect running state
+            self._check_jupyter_status()
+        except RuntimeError as e:
+            # Port already in use
+            error_msg = str(e)
+            lg.error(error_msg)
+            self.jupyter_status.object = f"**Jupyter Status:** ❌ {error_msg}"
+
+    def stop_jupyter_cb(self, event):
+        """Callback for stopping Jupyter server"""
+        from vivarium.utils.handle_server_interface import stop_jupyter_server
+
+        if self.jupyter_process:
+            lg.info("Stopping Jupyter server...")
+            
+            self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping..."
+            stop_jupyter_server(self.jupyter_process, port=self.jupyter_port)
+            self.jupyter_process = None
+            # Update UI to reflect stopped state
+            self._check_jupyter_status()
+
+    def open_configured_notebook_cb(self, event):
+        """Callback for opening the configured notebook"""
+        if self.notebook_path:
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+            if not os.path.isabs(self.notebook_path):
+                notebook_path = os.path.join(project_root, self.notebook_path)
+            else:
+                notebook_path = self.notebook_path
+
+            notebook_rel_path = os.path.relpath(notebook_path, project_root)
+            url = f"http://localhost:{self.jupyter_port}/notebooks/{notebook_rel_path}"
+            self.notebook_url.value = url
+            self._update_notebook()
+
+    def open_new_notebook_cb(self, event):
+        """Callback for opening a new notebook"""
+        # Open the Jupyter tree/home page in the iframe
+        url = f"http://localhost:{self.jupyter_port}/tree"
+        self.notebook_url.value = url
+        self._update_notebook()
+
     def notebook_url_cb(self, event):
         """Callback for when the notebook URL changes
 
@@ -300,6 +399,30 @@ class WindowManager(Parameterized):
         """
         if event.new:
             self._update_notebook()
+
+    def _check_jupyter_status(self):
+        """Check if Jupyter server is running and update UI accordingly"""
+        from vivarium.utils.handle_server_interface import check_jupyter_running
+
+        is_running = check_jupyter_running(self.jupyter_port)
+
+        if is_running:
+            self.jupyter_status.object = f"**Jupyter Status:** ✓ Running on port {self.jupyter_port}"
+            self.jupyter_port_input.visible = False
+            self.start_jupyter_btn.visible = False
+            self.stop_jupyter_btn.visible = True
+            self.open_configured_notebook_btn.visible = bool(self.notebook_path)
+            self.open_new_notebook_btn.visible = True
+            self.notebook_url.visible = True
+        else:
+            self.jupyter_status.object = f"**Jupyter Status:** ✗ Not running"
+            self.jupyter_port_input.visible = True
+            self.start_jupyter_btn.visible = True
+            self.stop_jupyter_btn.visible = False
+            self.open_configured_notebook_btn.visible = False
+            self.open_new_notebook_btn.visible = False
+            self.notebook_url.visible = False
+            self.notebook_iframe.object = ""
 
     def _update_notebook(self):
         """Update the notebook iframe with the current URL"""
@@ -378,18 +501,23 @@ class WindowManager(Parameterized):
                 pn.Row("### Show Configurations", self.controller_toggle),
                 pn.Row(*self.config_columns),
                 sizing_mode="stretch_both",
+            )),
+            ("Notebook", pn.Column(
+                self.jupyter_status,
+                pn.Row(
+                    self.jupyter_port_input,
+                    self.start_jupyter_btn,
+                    self.stop_jupyter_btn,
+                ),
+                pn.Row(
+                    self.open_configured_notebook_btn,
+                    self.open_new_notebook_btn,
+                ),
+                self.notebook_url,
+                self.notebook_iframe,
+                sizing_mode="stretch_both",
             ))
         ]
-
-        # Add notebook tab if Jupyter is enabled
-        if self.jupyter_enabled:
-            tabs_list.append(
-                ("Notebook", pn.Column(
-                    self.notebook_url,
-                    self.notebook_iframe,
-                    sizing_mode="stretch_both",
-                ))
-            )
 
         right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
 
@@ -423,6 +551,11 @@ class WindowManager(Parameterized):
         # self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
         self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
+        # Notebook callbacks
+        self.start_jupyter_btn.on_click(self.start_jupyter_cb)
+        self.stop_jupyter_btn.on_click(self.stop_jupyter_cb)
+        self.open_configured_notebook_btn.on_click(self.open_configured_notebook_cb)
+        self.open_new_notebook_btn.on_click(self.open_new_notebook_cb)
         self.notebook_url.param.watch(self.notebook_url_cb, "value")
 
 
