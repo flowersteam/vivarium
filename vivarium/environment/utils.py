@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 from jax import lax, vmap, random
 
-from jax_md.dataclasses import dataclass as md_dataclass, fields, is_dataclass
+from jax_md.dataclasses import dataclass as md_dataclass, fields
 from jax_md import space
 
 
@@ -13,15 +13,6 @@ def normal(theta):
     :return: cos and sin
     """
     return jnp.array([jnp.cos(theta), jnp.sin(theta)])
-
-
-def is_jax_md_dataclass(instance):
-    """Check if an instance is a jax md dataclass
-
-    :param instance: instance to check
-    :return: True if instance is a jax md dataclass, False otherwise
-    """
-    return is_dataclass(instance) and hasattr(instance, 'set') and callable(getattr(instance, 'set'))
 
 
 def distance(displacement_fn, point1, point2):
@@ -218,3 +209,5 @@ def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
     )
     mask = jnp.logical_and(mask_entity_type, mask_subtype)
     return mask
+
+

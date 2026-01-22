@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import jax.numpy as jnp
 
-from vivarium.controllers.dataclass_wrapper import Remote
+from vivarium.utils.dataclass_wrapper import Remote
 from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, changes_to_proto, proto_to_changes
 
 

@@ -4,7 +4,7 @@ from dataclasses import field, make_dataclass
 import jax.numpy as jnp
 import numpy as np
 
-from vivarium.environment.utils import is_jax_md_dataclass
+from vivarium.utils.jax_utils import is_jax_md_dataclass
 
 
 def create_dataclass_from_dict(class_name: str, data: dict):

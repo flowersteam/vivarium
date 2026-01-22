@@ -1,7 +1,7 @@
 from functools import reduce
 from operator import attrgetter
 
-from vivarium.controllers.dataclass_wrapper import Remote
+from vivarium.utils.dataclass_wrapper import Remote
 
 def set_nested_attr(obj, attr_path, value):
     *path, final = attr_path.split('.')

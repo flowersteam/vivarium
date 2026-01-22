@@ -1,4 +1,3 @@
-from dataclasses import is_dataclass
 import numpy as np
 
 import jax.numpy as jnp
@@ -6,7 +5,7 @@ import jax.numpy as jnp
 from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import fields
 
-from vivarium.controllers.dataclass_wrapper import create_dataclass_from_dict
+from vivarium.utils.dataclass_wrapper import create_dataclass_from_dict
 
 import simulator_pb2
 

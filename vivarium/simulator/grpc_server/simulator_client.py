@@ -11,7 +11,7 @@ import vivarium.simulator.grpc_server.simulator_pb2 as simulator_pb2
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 
 from vivarium.environment.state import create_state_cls
-from vivarium.controllers.dataclass_wrapper import Remote
+from vivarium.utils.dataclass_wrapper import Remote
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.utils.scene_configs import component_factories_from_config
 

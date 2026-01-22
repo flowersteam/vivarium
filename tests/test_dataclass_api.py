@@ -1,7 +1,7 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.controllers.dataclass_wrapper import *
+from vivarium.utils.dataclass_wrapper import *
 from vivarium.environment.state import to_rigid_body_state
 from vivarium.environment.components.entities.controller import EntityList, EntityWrapper
 

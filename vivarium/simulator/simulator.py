@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, is_dataclass
 from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
 
-from vivarium.controllers.dataclass_wrapper import (
+from vivarium.utils.dataclass_wrapper import (
     update_dataclass_from_change_list, create_dataclass_from_dict, Remote
 )
 from vivarium.utils.scene_configs import extend_controller_kwargs
