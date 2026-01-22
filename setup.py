@@ -20,6 +20,7 @@ setup(
         "psutil==7.2.1",
         "pytest==9.0.2",
         "python-dotenv==1.2.1",
+        "notebook==7.0.8",
     ],
     
     extras_require={
