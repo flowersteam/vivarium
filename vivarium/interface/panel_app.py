@@ -14,7 +14,7 @@ from bokeh.models import (
 
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config
-from vivarium.controllers.panel_controller import ParamSimulator
+from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 

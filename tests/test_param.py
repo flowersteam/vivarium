@@ -1,7 +1,7 @@
 import pytest
 import jax.numpy as jnp
 
-from vivarium.controllers.panel_controller import ParamSimulator
+from vivarium.interface.parameterized import ParamSimulator
 
 
 @pytest.mark.parametrize("client_fixture, scene_name, entity_type", 

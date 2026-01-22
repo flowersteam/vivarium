@@ -1,7 +1,7 @@
 import param
 from panel.layout import Column
 
-from vivarium.controllers.panel_controller import ParameterizedData
+from vivarium.interface.parameterized import ParameterizedData
 from vivarium.environment.components.interface import Interface
 
 
