@@ -13,6 +13,5 @@ python3 -m venv env_vivarium
 # activate the virtual environment
 source env_vivarium/bin/activate
 
-# install the required packages
-pip install -r requirements.txt
+# install
 pip install -e . 
