@@ -1,5 +1,4 @@
 import os
-import sys
 import hydra
 import logging
 import threading
@@ -15,6 +14,7 @@ from bokeh.models import (
 
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config
+from vivarium.utils.runtime import get_bundle_root
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -325,13 +325,7 @@ class WindowManager(Parameterized):
         from vivarium.utils.handle_server_interface import start_jupyter_server, check_jupyter_running
         import time
 
-        # Determine project root based on whether we're frozen or not
-        if getattr(sys, 'frozen', False):
-            # Running as PyInstaller bundle - use extracted directory
-            project_root = sys._MEIPASS
-        else:
-            # Running in development
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+        project_root = get_bundle_root()
 
         # Use the port from the input field
         port = self.jupyter_port_input.value
@@ -381,13 +375,7 @@ class WindowManager(Parameterized):
     def open_configured_notebook_cb(self, event):
         """Callback for opening the configured notebook"""
         if self.notebook_path:
-            # Determine project root based on whether we're frozen or not
-            if getattr(sys, 'frozen', False):
-                # Running as PyInstaller bundle - use extracted directory
-                project_root = sys._MEIPASS
-            else:
-                # Running in development
-                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+            project_root = get_bundle_root()
             if not os.path.isabs(self.notebook_path):
                 notebook_path = os.path.join(project_root, self.notebook_path)
             else:

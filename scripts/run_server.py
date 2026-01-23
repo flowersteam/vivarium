@@ -1,11 +1,11 @@
 import logging
-import os
 import sys
 
 from hydra import initialize_config_dir, compose
 
 from vivarium.simulator import Simulator
 from vivarium.simulator.grpc_server.simulator_server import serve
+from vivarium.utils.runtime import get_config_dir
 
 if not sys.warnoptions:
     import warnings
@@ -15,13 +15,7 @@ lg = logging.getLogger(__name__)
 
 
 def main() -> None:
-    # Determine config directory based on whether we're frozen or not
-    if getattr(sys, 'frozen', False):
-        # Running as PyInstaller bundle
-        config_dir = os.path.join(sys._MEIPASS, 'conf')
-    else:
-        # Running in development
-        config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../conf"))
+    config_dir = get_config_dir()
 
     # Initialize Hydra with the correct config directory
     with initialize_config_dir(version_base=None, config_dir=config_dir):

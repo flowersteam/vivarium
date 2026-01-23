@@ -9,6 +9,8 @@ import re
 import grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
+from vivarium.utils.runtime import get_bundle_root, get_jupyter_config_path, get_server_command, get_interface_command
+
 
 lg = logging.getLogger(__name__)
 
@@ -34,19 +36,9 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
             f"Port {port} is already in use. Please stop the existing Jupyter server or choose a different port."
         )
 
-    # Determine paths based on frozen state
-    if getattr(sys, 'frozen', False):
-        # Running as PyInstaller bundle - config is in _MEIPASS
-        bundle_root = sys._MEIPASS
-        config_path = os.path.join(bundle_root, "vivarium/interface/jupyter_config_iframe.py")
-        if notebook_dir is None:
-            notebook_dir = bundle_root
-    else:
-        # Running in development
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-        config_path = os.path.join(project_root, "vivarium/interface/jupyter_config_iframe.py")
-        if notebook_dir is None:
-            notebook_dir = project_root
+    config_path = get_jupyter_config_path()
+    if notebook_dir is None:
+        notebook_dir = get_bundle_root()
 
     jupyter_command = [
         "jupyter",
@@ -340,38 +332,7 @@ def start_server_and_interface(
         lg.warning("ERROR: New processes will not be started")
         return None
 
-    # find the path to the server and interface scripts
-    # Handle both development and PyInstaller frozen environments
-    if getattr(sys, 'frozen', False):
-        # Running in PyInstaller bundle
-        exe_path = sys.executable
-        exe_dir = os.path.dirname(exe_path)
-
-        # Check if running from a macOS .app bundle
-        if sys.platform == 'darwin' and '.app/Contents/MacOS' in exe_path:
-            # In .app bundle: all executables are in Contents/MacOS/ together
-            server_exe = os.path.join(exe_dir, 'vivarium-server')
-            interface_exe = os.path.join(exe_dir, 'vivarium-interface')
-        else:
-            # Folder structure: executables are in sibling directories
-            dist_dir = os.path.dirname(exe_dir)  # Parent directory (dist/)
-            server_exe = os.path.join(dist_dir, 'vivarium-server', 'vivarium-server')
-            interface_exe = os.path.join(dist_dir, 'vivarium-interface', 'vivarium-interface')
-
-        # On Windows, add .exe extension
-        if sys.platform == 'win32':
-            server_exe += '.exe'
-            interface_exe += '.exe'
-
-        server_command = [server_exe, *cmd_args]
-        interface_script = interface_exe
-    else:
-        # Running in development
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-        server_script = os.path.join(project_root, SERVER_PROCESS_NAME)
-        interface_script = os.path.join(project_root, INTERFACE_PROCESS_NAME)
-        # Use sys.executable to ensure we use the same Python interpreter (respects venv)
-        server_command = [sys.executable, server_script, *cmd_args]
+    server_command = get_server_command(cmd_args)
 
     print("\n🚀 Starting Vivarium server...")
     server_process = subprocess.Popen(
@@ -387,26 +348,7 @@ def start_server_and_interface(
     
     interface_url = None
     if start_interface:
-
-        if getattr(sys, 'frozen', False):
-            # Frozen mode - interface_script is the executable path
-            interface_command = [interface_script]
-            # TODO: Add arguments for external origins if needed
-        else:
-            # Development mode - use panel serve
-            interface_command = [
-                "panel",
-                "serve",
-                interface_script,
-            ]
-
-            # Allow external origins (e.g., ngrok) if requested
-            if allow_external_origins:
-                interface_command.append("--allow-websocket-origin=*")
-
-            interface_command.append("--args")
-
-        # start the interface
+        interface_command = get_interface_command(allow_external_origins)
         print("\n🌐 Starting web interface...")
         interface_process, interface_url = start_process_and_parse_url(
             interface_command,

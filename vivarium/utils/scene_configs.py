@@ -1,7 +1,5 @@
 import os
-import sys
 import random
-import logging
 from math import pi
 from collections.abc import Iterable
 
@@ -9,16 +7,11 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
+from vivarium.utils.runtime import get_config_dir
+
 OmegaConf.register_new_resolver("range", lambda start, end: list(range(start, end)))
 
-# Determine config directory based on whether we're frozen or not
-if getattr(sys, 'frozen', False):
-    # Running as PyInstaller bundle
-    abs_config_dir_path = os.path.join(sys._MEIPASS, 'conf')
-else:
-    # Running in development
-    abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
-
+abs_config_dir_path = get_config_dir()
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
 
 

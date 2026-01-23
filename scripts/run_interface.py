@@ -1,14 +1,8 @@
 import argparse
-import sys
 
 import panel as pn
 from vivarium.interface.panel_app import WindowManager
-
-# import sys
-
-# if not sys.warnoptions:
-#     import warnings
-#     warnings.simplefilter("ignore")
+from vivarium.utils.runtime import is_frozen
 
 
 parser = argparse.ArgumentParser(description="Run the Vivarium interface.")
@@ -28,7 +22,7 @@ else:
 
 # If running as PyInstaller bundle, start the server programmatically
 # Otherwise, mark as servable for `panel serve` to handle
-if getattr(sys, 'frozen', False):
+if is_frozen():
     # Frozen mode - start Panel server programmatically
     # Pass a function that creates the app so it's created after event loop starts
     def create_app():

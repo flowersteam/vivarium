@@ -19,3 +19,7 @@ c.NotebookApp.tornado_settings = {
 # Optional: Disable token for easier local development
 # c.NotebookApp.token = ''
 # c.NotebookApp.password = ''
+
+# Set default kernel to vivarium environment
+# Might require: python -m ipykernel install --user --name vivarium --display-name "Python (vivarium)"
+c.MappingKernelManager.default_kernel_name = 'vivarium'
