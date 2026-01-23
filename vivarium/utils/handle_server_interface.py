@@ -369,19 +369,19 @@ def start_server_and_interface(
 def wait_for_grpc_server(host="localhost", port=50051, timeout=30.0, poll_interval=0.5):
     """
     Wait for the gRPC server to be ready using the standard health checking protocol.
-    
+
     Args:
         host: Server hostname
         port: Server port
         timeout: Maximum seconds to wait
         poll_interval: Seconds between connection attempts
-        
+
     Returns:
         True if server is ready, False if timeout reached
     """
     channel = grpc.insecure_channel(f"{host}:{port}")
     health_stub = health_pb2_grpc.HealthStub(channel)
-    
+
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
@@ -393,9 +393,85 @@ def wait_for_grpc_server(host="localhost", port=50051, timeout=30.0, poll_interv
         except grpc.RpcError:
             pass
         time.sleep(poll_interval)
-    
+
     channel.close()
     return False
+
+
+def check_server_running(host="localhost", port=50051):
+    """Check if the gRPC server is currently running.
+
+    Args:
+        host: Server hostname
+        port: Server port
+
+    Returns:
+        True if server is running and responding to health checks, False otherwise
+    """
+    return wait_for_grpc_server(host=host, port=port, timeout=1.0, poll_interval=0.2)
+
+
+def start_simulation_server(scene_name, timeout=30.0, show_output=False):
+    """Start the simulation server for a given scene.
+
+    Args:
+        scene_name: Name of the scene configuration to load (e.g., 'session_1')
+        timeout: Maximum seconds to wait for server to be ready
+        show_output: Whether to show server output in console
+
+    Returns:
+        Popen process object for the server
+
+    Raises:
+        RuntimeError: If server doesn't start within timeout
+    """
+    cmd_args = [f"scene={scene_name}"]
+    server_command = get_server_command(cmd_args)
+
+    lg.info(f"Starting Vivarium server with scene '{scene_name}'...")
+
+    server_process = subprocess.Popen(
+        server_command,
+        stdout=None if show_output else subprocess.DEVNULL,
+        stderr=None if show_output else subprocess.DEVNULL
+    )
+
+    # Wait for gRPC server to be ready
+    if not wait_for_grpc_server(timeout=timeout):
+        server_process.terminate()
+        try:
+            server_process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            server_process.kill()
+        raise RuntimeError(f"gRPC server did not start within {timeout} seconds")
+
+    lg.info(f"Server started successfully (PID: {server_process.pid})")
+    return server_process
+
+
+def stop_simulation_server(server_process):
+    """Stop a simulation server process.
+
+    Args:
+        server_process: Popen process object to terminate
+    """
+    if server_process is None:
+        return
+
+    lg.info(f"Stopping simulation server (PID: {server_process.pid})...")
+
+    try:
+        server_process.terminate()
+        try:
+            server_process.wait(timeout=5)
+            lg.info("Server terminated gracefully")
+        except subprocess.TimeoutExpired:
+            lg.warning("Server did not terminate gracefully, forcing kill...")
+            server_process.kill()
+            server_process.wait(timeout=3)
+            lg.info("Server killed")
+    except Exception as e:
+        lg.warning(f"Error stopping server: {e}")
 
 
 def get_ngrok_token():

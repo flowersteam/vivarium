@@ -13,8 +13,9 @@ from bokeh.models import (
 )
 
 from vivarium.controllers import VivariumController
-from vivarium.utils.scene_configs import load_scene_config
+from vivarium.utils.scene_configs import load_scene_config, get_available_scenes
 from vivarium.utils.runtime import get_bundle_root
+from vivarium.utils.handle_server_interface import check_server_running
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -40,20 +41,25 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 class WindowManager(Parameterized):
 
     def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
-        
-        
         super().__init__(**kwargs)
 
-        if controller is None:
-            client = SimulatorGRPCClient()
-            self.scene_config = load_scene_config(client.scene_name)
-            self.controller = VivariumController.from_client(client=client)
-        else:
-            self.controller = controller
-            client = self.controller.client
-            self.scene_config = load_scene_config(client.scene_name)
+        # Basic state
+        self.apply_changes = apply_changes
+        self.testing_mode = testing_mode
+        self._streaming_active = False
+        self._pending_state_update = threading.Event()
+        self._state_lock = threading.Lock()
 
-        self.dark_theme = self.scene_config.interface.dark_mode
+        # Track whether we started the server (for UI logic, actual process is managed by controller)
+        self._started_server = False
+
+        # TODO: Obsolete, to remove here and all other modules using it
+        self.notebook_mode = notebook_mode
+
+        self.curdoc = curdoc()
+
+        # Check theme from URL query params (before server connection)
+        self.dark_theme = False
         if pn.state.location is not None:
             query_params = pn.state.location.query_params
             if 'theme' in query_params:
@@ -62,30 +68,150 @@ class WindowManager(Parameterized):
                 pn.config.theme = 'dark'
             else:
                 pn.config.theme = 'default'
-        
 
-        self.apply_changes = apply_changes
+        # Initialize controller and scene_config as None
+        self.controller = None
+        self.scene_config = None
+
+        # Initialize interfaces and config_columns (will be populated when connected)
+        self.interfaces = {}
+        self.config_columns = pn.Row()  # Empty row initially
+
+        # Create scene selection UI components
+        self._setup_scene_selection_ui()
+
+        # Create main container that will hold either scene selection or simulation UI
+        self.main_container = pn.Column(sizing_mode="stretch_both")
+
+        # Determine initial state and initialize appropriately
+        if controller is not None:
+            # Controller provided - initialize normally
+            self._initialize_connected_ui(controller)
+        elif check_server_running():
+            # Server running - connect and initialize
+            try:
+                client = SimulatorGRPCClient()
+                controller = VivariumController.from_client(client=client)
+                self._initialize_connected_ui(controller)
+            except Exception as e:
+                lg.error(f"Failed to connect to running server: {e}")
+                self._show_scene_selection(error_message=f"Failed to connect: {e}")
+        else:
+            # No server - show scene selection
+            self._show_scene_selection()
+
+        # The app is always the main container
+        self.app = self.main_container
+
+    def _setup_scene_selection_ui(self):
+        """Setup UI components for scene selection (shown when no server is running)."""
+        # Get available scenes grouped by category
+        scenes_grouped = get_available_scenes()
+
+        # Build options dict with group structure for Select widget
+        # Panel Select widget supports grouped options via nested dict
+        scene_options = {}
+        for category, scene_list in scenes_grouped.items():
+            if scene_list:  # Only add non-empty categories
+                for scene in scene_list:
+                    scene_options[f"{category}: {scene}"] = scene
+
+        # Scene selection widgets
+        self.scene_select = pn.widgets.Select(
+            name='Select Scene',
+            options=scene_options,
+            value=list(scene_options.values())[0] if scene_options else None,
+            width=300,
+        )
+
+        self.start_server_btn = pn.widgets.Button(
+            name='Start Simulation',
+            button_type='success',
+            width=200,
+        )
+        self.start_server_btn.on_click(self._start_server_cb)
+
+        self.server_status = pn.pane.Markdown(
+            "### Select a scene to start the simulation",
+            sizing_mode="stretch_width"
+        )
+
+        # Scene selection panel layout
+        self.scene_selection_panel = pn.Column(
+            pn.pane.Markdown("# Vivarium", align="center", styles={'font-size': '2em'}),
+            pn.layout.Spacer(height=20),
+            self.server_status,
+            pn.layout.Spacer(height=20),
+            pn.Row(self.scene_select, align="center"),
+            pn.layout.Spacer(height=10),
+            pn.Row(self.start_server_btn, align="center"),
+            pn.layout.Spacer(height=20),
+            align="center",
+            sizing_mode="stretch_both",
+        )
+
+    def _show_scene_selection(self, error_message=None):
+        """Show the scene selection screen."""
+        if error_message:
+            self.server_status.object = f"### {error_message}"
+        else:
+            self.server_status.object = "### Select a scene to start the simulation"
+
+        self.start_server_btn.disabled = False
+        self.main_container.clear()
+        self.main_container.append(self.scene_selection_panel)
+
+    def _initialize_connected_ui(self, controller):
+        """Initialize the full simulation UI after connecting to a server."""
+        self.controller = controller
+        client = self.controller.client
+        self.scene_config = load_scene_config(client.scene_name)
+
+        # Update dark theme from scene config if not set via URL
+        if pn.state.location is None or 'theme' not in pn.state.location.query_params:
+            self.dark_theme = self.scene_config.interface.dark_mode
+            if self.dark_theme:
+                pn.config.theme = 'dark'
+
         self.use_streaming = self.scene_config.interface.use_streaming
-        self._streaming_active = False
-        self._pending_state_update = threading.Event()
-        self._state_lock = threading.Lock()
-        
         self.controller_names = list(self.controller.controllers.keys())
-        
+
         self.interfaces = create_interfaces(
             self.scene_config.environment.components.component_list,
             self.controller.controllers,
             self.controller.client.state,
             panel_cls=pn.Column
         )
-        
+
         for name, interface in self.interfaces.items():
             interface.udpate_other_interfaces(self.interfaces)
-        
+
         # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
         self.param_simulator = ParamSimulator(self.controller.controllers['simulator'])
         self.param_simulator.update_from_server = True
 
+        # Create simulation control widgets
+        self._setup_simulation_widgets()
+
+        # Create notebook widgets
+        self._setup_notebook_widgets()
+
+        self.plot = self.create_plot()
+
+        # Build and show the simulation UI
+        simulation_ui = self._create_simulation_ui()
+        self.main_container.clear()
+        self.main_container.append(simulation_ui)
+
+        if not self.testing_mode:
+            self.set_callbacks()
+            # Start streaming if enabled
+            if self.use_streaming:
+                self._start_streaming()
+        self.update_plot_cb()
+
+    def _setup_simulation_widgets(self):
+        """Setup widgets for simulation control."""
         self.start_toggle = pn.widgets.Toggle(
             **(
                 {"name": "Pause simulator", "value": True}
@@ -94,20 +220,20 @@ class WindowManager(Parameterized):
             ),
             align="center",
         )
-        
+
         self.plot_fps = pn.widgets.FloatInput(
             name="Plot FPS", value=15, width=80
         )
-        
+
         # Currently not displayed
         self.streaming_toggle = pn.widgets.Toggle(
             name="Use Streaming" if not self.use_streaming else "Using Streaming",
             value=self.use_streaming,
             align="center",
         )
-        
+
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
-        
+
         self.dark_theme_switch = pn.widgets.Switch(
             name="Light/Dark theme",
             value=self.dark_theme,
@@ -121,6 +247,29 @@ class WindowManager(Parameterized):
             value=self.controller_names,
         )
 
+        # Close scene button
+        self.close_scene_btn = pn.widgets.Button(
+            name='Close Scene',
+            button_type='warning',
+            width=120,
+        )
+        self.close_scene_btn.on_click(self._close_scene_cb)
+
+        # Confirmation dialog widgets
+        self.close_confirm_panel = pn.Column(
+            pn.pane.Markdown("### Are you sure you want to close this scene?"),
+            pn.Row(
+                pn.widgets.Button(name="Yes, Close", button_type="danger", width=100),
+                pn.widgets.Button(name="Cancel", button_type="default", width=100),
+            ),
+            visible=False,
+        )
+        # Wire up confirmation buttons
+        self.close_confirm_panel[1][0].on_click(self._confirm_close_cb)
+        self.close_confirm_panel[1][1].on_click(self._cancel_close_cb)
+
+    def _setup_notebook_widgets(self):
+        """Setup widgets for notebook/Jupyter control."""
         # Notebook configuration - load from config
         notebook_config = getattr(self.scene_config.interface, 'notebook', None)
         self.notebook_path = None
@@ -181,20 +330,66 @@ class WindowManager(Parameterized):
             width=400,
             visible=False,
         )
-        
-        #TODO: Obsolete, to remove here and all other modules using it
-        self.notebook_mode = notebook_mode       
 
-        self.curdoc = curdoc()
-        
-        self.plot = self.create_plot()
-        self.app = self.create_app()
-        if not testing_mode:
-            self.set_callbacks()
-            # Start streaming if enabled
-            if self.use_streaming:
-                self._start_streaming()
-        self.update_plot_cb()
+    def _start_server_cb(self, event):
+        """Callback for starting the simulation server."""
+        scene_name = self.scene_select.value
+        if scene_name is None:
+            self.server_status.object = "### Please select a scene"
+            return
+
+        self.server_status.object = f"### Starting simulation with scene '{scene_name}'..."
+        self.start_server_btn.disabled = True
+
+        try:
+            # Start the server and get a controller (controller manages server lifecycle)
+            controller = VivariumController.start_server(scene_name, timeout=30.0)
+            self._started_server = True
+
+            # Transition to full simulation UI
+            self._initialize_connected_ui(controller)
+
+        except Exception as e:
+            lg.error(f"Failed to start server: {e}")
+            self.server_status.object = f"### Error: {e}"
+            self.start_server_btn.disabled = False
+            self._started_server = False
+
+    def _close_scene_cb(self, event):
+        """Callback for the close scene button - shows confirmation."""
+        self.close_confirm_panel.visible = True
+
+    def _cancel_close_cb(self, event):
+        """Callback to cancel closing the scene."""
+        self.close_confirm_panel.visible = False
+
+    def _confirm_close_cb(self, event):
+        """Callback to confirm closing the scene."""
+        self.close_confirm_panel.visible = False
+
+        # Stop the periodic callback
+        if hasattr(self, 'pcb_plot') and self.pcb_plot.running:
+            self.pcb_plot.stop()
+
+        # Stop streaming if active
+        if self._streaming_active:
+            self._stop_streaming()
+
+        # Close controller connection (this also stops the server if we started it)
+        if self.controller:
+            try:
+                self.controller.close()
+            except Exception as e:
+                lg.warning(f"Error closing controller: {e}")
+            self.controller = None
+
+        # Reset state
+        self.scene_config = None
+        self.interfaces = {}
+        self._started_server = False
+
+        # Return to scene selection
+        self._show_scene_selection()
 
     def start_toggle_cb(self, event):
         """Callback for the start/stop button
@@ -252,7 +447,11 @@ class WindowManager(Parameterized):
         """Stop receiving state updates via streaming."""
         if not self._streaming_active:
             return
-        
+
+        if self.controller is None:
+            self._streaming_active = False
+            return
+
         client = self.controller.client
         if hasattr(client, 'stop_state_stream'):
             client.stop_state_stream()
@@ -275,6 +474,10 @@ class WindowManager(Parameterized):
 
     def update_plot_cb(self):
         """Periodic callback for the plot update"""
+        # Guard against being called when not connected
+        if self.controller is None:
+            return
+
         for interface in self.interfaces.values():
             if interface.renderer is not None:
                 interface.renderer.update()
@@ -470,10 +673,10 @@ class WindowManager(Parameterized):
                 interface.renderer.plot(p)
         return p
 
-    def create_app(self):
-        """Creates a panel app
+    def _create_simulation_ui(self):
+        """Creates the simulation UI panel.
 
-        :return: the panel app
+        :return: the simulation UI panel
         """
         self.config_columns = pn.Row(
             *[
@@ -522,21 +725,24 @@ class WindowManager(Parameterized):
 
         right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
 
-        # Build the main app
-        app = pn.Row(
+        # Build the simulation UI
+        simulation_ui = pn.Row(
             pn.Column(
                 pn.Row(
                     self.start_toggle,
                     self.plot_fps,
                     # self.streaming_toggle,
                     self.drag_n_drop,
-                    self.dark_theme_switch
+                    self.dark_theme_switch,
+                    pn.layout.Spacer(width=20),
+                    self.close_scene_btn,
+                    self.close_confirm_panel,
                 ),
                 pn.panel(self.plot, sizing_mode="scale_width"),
             ),
             right_side_tabs,
         )
-        return app
+        return simulation_ui
 
     def set_callbacks(self):
         """

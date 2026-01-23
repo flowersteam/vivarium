@@ -4,7 +4,14 @@ import logging
 import threading
 from time import sleep
 
-from vivarium.utils.handle_server_interface import start_server_and_interface, stop_server_and_interface, create_ngrok_tunnel
+from vivarium.utils.handle_server_interface import (
+    start_server_and_interface,
+    stop_server_and_interface,
+    create_ngrok_tunnel,
+    start_simulation_server,
+    stop_simulation_server,
+    check_server_running,
+)
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.simulator.controller import SimulatorController
 from vivarium.utils.scene_configs import load_scene_config
@@ -17,22 +24,25 @@ lg = logging.getLogger(__name__)
 
 class VivariumController:
 
-    def __init__(self, client=None, subtypes=[], **controllers):
+    def __init__(self, client=None, subtypes=[], server_process=None, **controllers):
         self.client = client or SimulatorGRPCClient()
         self.subtypes = subtypes
-        
+
         self.controllers = controllers
-        
+
         self.time = 0
         self._is_started = False
-        
+
+        # Track server process if we started it (for cleanup on close)
+        self._server_process = server_process
+
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
 
     @classmethod
-    def from_client(cls, client=None, scene_config=None):
+    def from_client(cls, client=None, scene_config=None, server_process=None):
         client = client or SimulatorGRPCClient()
         scene_config = scene_config or load_scene_config(client.scene_name)
-        components_config = scene_config.environment.components       
+        components_config = scene_config.environment.components
         controllers = {}
         for name, c_config in components_config.component_list.items():
             if 'client' in c_config and 'controller_cls' in c_config.client:
@@ -41,9 +51,46 @@ class VivariumController:
         return cls(
             client=client,
             subtypes=components_config.subtype_labels,
+            server_process=server_process,
             **controllers
-        )   
-        
+        )
+
+    @classmethod
+    def start_server(cls, scene_name, timeout=30.0):
+        """Start a simulation server and return a controller connected to it.
+
+        This is a convenience method for starting a server without the web interface.
+        Useful for Jupyter notebooks or programmatic control.
+
+        Args:
+            scene_name: Name of the scene configuration to load (e.g., 'quickstart', 'session_1')
+            timeout: Maximum seconds to wait for server to be ready
+
+        Returns:
+            VivariumController instance connected to the server.
+            The controller tracks the server process and will stop it when close() is called.
+
+        Example:
+            controller = VivariumController.start_server('quickstart')
+            controller.simulator.simulation_running = True
+            # ... interact with the simulation ...
+            controller.close()  # This also stops the server
+        """
+        # Check if server is already running
+        if check_server_running():
+            lg.warning("Server is already running. Connecting to existing server.")
+            return cls.from_client()
+
+        # Start the server
+        server_process = start_simulation_server(scene_name, timeout=timeout)
+        lg.info(f"Server started for scene '{scene_name}'")
+
+        # Connect and create controller
+        client = SimulatorGRPCClient()
+        controller = cls.from_client(client=client, server_process=server_process)
+
+        return controller
+
     @classmethod
     def start_session(cls, scene_name,
                       client=None,
@@ -218,12 +265,27 @@ class VivariumController:
             self.stop()
             sleep(4)  # wait for the simulation loop to stop
         self.client.close()
-        
+
         # Close ngrok tunnel if one was created
         if getattr(self, '_ngrok_active', False):
             from vivarium.utils.handle_server_interface import close_ngrok_tunnel
             close_ngrok_tunnel()
             self._ngrok_active = False
+
+        # Stop server if we started it
+        if self._server_process is not None:
+            self.stop_server()
+
+    def stop_server(self):
+        """Stop the server if this controller started it.
+
+        This is called automatically by close() if the controller started the server.
+        Can also be called explicitly if you want to stop the server without closing the controller.
+        """
+        if self._server_process is not None:
+            stop_simulation_server(self._server_process)
+            self._server_process = None
+            lg.info("Server stopped")
             
     def close_all(self):
         """Send signal to close all clients and the simulator."""
