@@ -1,4 +1,5 @@
-import os 
+import os
+import sys
 import random
 import logging
 from math import pi
@@ -10,7 +11,14 @@ import hydra
 
 OmegaConf.register_new_resolver("range", lambda start, end: list(range(start, end)))
 
-abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
+# Determine config directory based on whether we're frozen or not
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    abs_config_dir_path = os.path.join(sys._MEIPASS, 'conf')
+else:
+    # Running in development
+    abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
+
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
 
 

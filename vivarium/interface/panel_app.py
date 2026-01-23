@@ -1,4 +1,5 @@
 import os
+import sys
 import hydra
 import logging
 import threading
@@ -324,7 +325,13 @@ class WindowManager(Parameterized):
         from vivarium.utils.handle_server_interface import start_jupyter_server, check_jupyter_running
         import time
 
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+        # Determine project root based on whether we're frozen or not
+        if getattr(sys, 'frozen', False):
+            # Running as PyInstaller bundle - use extracted directory
+            project_root = sys._MEIPASS
+        else:
+            # Running in development
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 
         # Use the port from the input field
         port = self.jupyter_port_input.value
@@ -374,7 +381,13 @@ class WindowManager(Parameterized):
     def open_configured_notebook_cb(self, event):
         """Callback for opening the configured notebook"""
         if self.notebook_path:
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+            # Determine project root based on whether we're frozen or not
+            if getattr(sys, 'frozen', False):
+                # Running as PyInstaller bundle - use extracted directory
+                project_root = sys._MEIPASS
+            else:
+                # Running in development
+                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
             if not os.path.isabs(self.notebook_path):
                 notebook_path = os.path.join(project_root, self.notebook_path)
             else:

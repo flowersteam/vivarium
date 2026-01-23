@@ -1,5 +1,7 @@
 import argparse
+import sys
 
+import panel as pn
 from vivarium.interface.panel_app import WindowManager
 
 # import sys
@@ -24,6 +26,23 @@ else:
         f"Invalid value for notebook_mode: {args.notebook_mode}. Use either 'True' or 'False'."
     )
 
-# Serve the app to launch the interface
-wm = WindowManager(notebook_mode=notebook_mode)
-wm.app.servable(title="Vivarium")
+# If running as PyInstaller bundle, start the server programmatically
+# Otherwise, mark as servable for `panel serve` to handle
+if getattr(sys, 'frozen', False):
+    # Frozen mode - start Panel server programmatically
+    # Pass a function that creates the app so it's created after event loop starts
+    def create_app():
+        wm = WindowManager(notebook_mode=notebook_mode)
+        return wm.app
+
+    pn.serve(
+        {'/run_interface': create_app},
+        port=5006,
+        title="Vivarium",
+        show=False,  # Don't auto-open browser
+        threaded=False,  # Block until server stops
+    )
+else:
+    # Development mode - create app and mark as servable for `panel serve` command
+    wm = WindowManager(notebook_mode=notebook_mode)
+    wm.app.servable(title="Vivarium")

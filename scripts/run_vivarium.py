@@ -2,6 +2,8 @@ import logging
 import argparse
 import webbrowser
 import time
+import sys
+import os
 
 from vivarium.utils.handle_server_interface import (
     get_server_interface_pids,
@@ -11,8 +13,6 @@ from vivarium.utils.handle_server_interface import (
 
 
 lg = logging.getLogger(__name__)
-
-
 
 
 def main(cmd_args):
@@ -29,6 +29,51 @@ def main(cmd_args):
 
 
 if __name__ == "__main__":
+    # CRITICAL: PyInstaller safety guards to prevent recursive process spawning
+
+    # Guard 1: Detect if running as a frozen PyInstaller executable
+    if getattr(sys, 'frozen', False):
+        # We're running as a PyInstaller bundle
+
+        # Guard 2: Check if this is already a child process
+        if os.environ.get('VIVARIUM_CHILD_PROCESS') == '1':
+            # This is a child process that was spawned by a frozen parent
+            # Don't execute main logic to prevent infinite recursion
+            print("WARNING: Child process detected, exiting to prevent recursive spawning.")
+            sys.exit(0)
+
+        # Guard 3: Mark that we're in a frozen environment
+        # Child processes spawned from here will inherit this flag
+        os.environ['VIVARIUM_FROZEN'] = '1'
+
+    # Guard 4: Spawn limit counter (emergency brake)
+    # This will catch any edge cases where the above guards fail
+    _spawn_count_file = os.path.join(os.path.expanduser('~'), '.vivarium_spawn_count')
+    MAX_SPAWN_COUNT = 5
+
+    try:
+        if os.path.exists(_spawn_count_file):
+            with open(_spawn_count_file, 'r') as f:
+                spawn_count = int(f.read().strip())
+            spawn_count += 1
+        else:
+            spawn_count = 1
+
+        if spawn_count > MAX_SPAWN_COUNT:
+            print(f"ERROR: Spawn limit exceeded ({spawn_count}). Preventing potential fork bomb.")
+            print("If you see this error repeatedly, please report it as a bug.")
+            # Clean up the counter file
+            if os.path.exists(_spawn_count_file):
+                os.remove(_spawn_count_file)
+            sys.exit(1)
+
+        # Write updated count
+        with open(_spawn_count_file, 'w') as f:
+            f.write(str(spawn_count))
+    except Exception:
+        # If we can't read/write the counter, continue anyway
+        pass
+
     parser = argparse.ArgumentParser(
         description="Run Vivarium simulator with web interface"
     )
@@ -61,3 +106,10 @@ if __name__ == "__main__":
         stop_server_and_interface(safe_mode=False)
         print("\n✓ Vivarium stopped. Goodbye!\n")
         print("Note: Jupyter servers (if running) are not stopped automatically.")
+    finally:
+        # Clean up spawn counter when exiting normally
+        try:
+            if os.path.exists(_spawn_count_file):
+                os.remove(_spawn_count_file)
+        except Exception:
+            pass

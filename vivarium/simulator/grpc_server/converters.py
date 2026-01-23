@@ -7,7 +7,7 @@ from jax_md.dataclasses import fields
 
 from vivarium.utils.dataclass_wrapper import create_dataclass_from_dict
 
-import simulator_pb2
+from vivarium.simulator.grpc_server import simulator_pb2
 
 from vivarium.simulator.grpc_server.numproto.numproto import (
     proto_to_ndarray,

@@ -2,13 +2,12 @@ import time
 import logging
 from threading import Lock
 from concurrent import futures
-from collections import defaultdict
 from contextlib import contextmanager
 
 
 from numproto.numproto import proto_to_ndarray
-import simulator_pb2_grpc
-import simulator_pb2
+from vivarium.simulator.grpc_server import simulator_pb2_grpc
+from vivarium.simulator.grpc_server import simulator_pb2
 import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 

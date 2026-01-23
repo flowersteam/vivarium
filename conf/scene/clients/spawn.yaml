@@ -1,2 +1,2 @@
-controller_cls: vivarium.environment.components.eco_evo.SpawnController
-interface_cls: vivarium.environment.components.eco_evo.SpawnInterface
+controller_cls: vivarium.environment.components.eco_evo.spawn.controller.SpawnController
+interface_cls: vivarium.environment.components.eco_evo.spawn.interface.SpawnInterface

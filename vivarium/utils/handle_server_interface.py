@@ -1,7 +1,7 @@
 import os
+import sys
 import time
 import psutil
-import multiprocessing
 import subprocess
 import signal
 import logging
@@ -18,14 +18,14 @@ SERVER_PROCESS_NAME_WIN = "scripts\\run_server.py"
 INTERFACE_PROCESS_NAME_WIN = "scripts\\run_interface.py"
 
 
-def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_process_object=False):
+def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_process_object=True):
     """Start a Jupyter notebook server with iframe-friendly configuration
 
     :param port: Port to run Jupyter on, defaults to 8889
     :param notebook_dir: Directory to start Jupyter in, defaults to project root
     :param show_output: Whether to show Jupyter server output
-    :param return_process_object: If True, return Popen object instead of multiprocessing.Process
-    :return: Process object (Popen or multiprocessing.Process)
+    :param return_process_object: Deprecated parameter (kept for backward compatibility), always returns Popen object
+    :return: Popen process object
     :raises RuntimeError: If the requested port is already in use
     """
     # Check if the requested port is already in use
@@ -34,12 +34,19 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
             f"Port {port} is already in use. Please stop the existing Jupyter server or choose a different port."
         )
 
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-
-    if notebook_dir is None:
-        notebook_dir = project_root
-
-    config_path = os.path.join(project_root, "vivarium/interface/jupyter_config_iframe.py")
+    # Determine paths based on frozen state
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle - config is in _MEIPASS
+        bundle_root = sys._MEIPASS
+        config_path = os.path.join(bundle_root, "vivarium/interface/jupyter_config_iframe.py")
+        if notebook_dir is None:
+            notebook_dir = bundle_root
+    else:
+        # Running in development
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+        config_path = os.path.join(project_root, "vivarium/interface/jupyter_config_iframe.py")
+        if notebook_dir is None:
+            notebook_dir = project_root
 
     jupyter_command = [
         "jupyter",
@@ -53,24 +60,13 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
     lg.info(f"Starting Jupyter notebook server on port {port}...")
     lg.info(f"Notebook directory: {notebook_dir}")
 
-    if return_process_object:
-        # Return a Popen object for direct process management
-        jupyter_process = subprocess.Popen(
-            jupyter_command,
-            stdout=None if show_output else subprocess.DEVNULL,
-            stderr=None if show_output else subprocess.DEVNULL
-        )
-        lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
-    else:
-        # Return a multiprocessing.Process for background execution
-        jupyter_process = multiprocessing.Process(
-            target=subprocess.run,
-            args=(jupyter_command,),
-            kwargs={"stdout": None if show_output else subprocess.DEVNULL,
-                    "stderr": None if show_output else subprocess.DEVNULL}
-        )
-        jupyter_process.start()
-        lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
+    # Always use subprocess.Popen for PyInstaller compatibility
+    jupyter_process = subprocess.Popen(
+        jupyter_command,
+        stdout=None if show_output else subprocess.DEVNULL,
+        stderr=None if show_output else subprocess.DEVNULL
+    )
+    lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
 
     lg.info(f"Access it at: http://localhost:{port}")
 
@@ -111,13 +107,14 @@ def stop_jupyter_server(jupyter_process=None, port=8889):
                 killed = True
                 lg.info("Jupyter server killed via process object")
             elif hasattr(jupyter_process, 'terminate'):
-                # For multiprocessing.Process
+                # For subprocess.Popen
                 jupyter_process.terminate()
-                jupyter_process.join(timeout=3)
-                if jupyter_process.is_alive():
+                try:
+                    jupyter_process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
                     jupyter_process.kill()
                 killed = True
-                lg.info("Jupyter server terminated via multiprocessing.Process")
+                lg.info("Jupyter server terminated via subprocess.Popen")
         except Exception as e:
             lg.warning(f"Failed to kill Jupyter via process object: {e}")
 
@@ -262,41 +259,56 @@ def stop_server_and_interface(safe_mode=True):
     return processes_running
 
 
-def start_process(process_command, url_queue=None, show_output=True):
-    """Start a process with the given command
+def start_process_and_parse_url(process_command, show_output=True, timeout=10):
+    """Start a process and parse URL from its output
 
     :param process_command: command to start the process
-    :param url_queue: optional Queue to send the URL back to parent process
     :param show_output: whether to echo subprocess stdout/stderr
+    :param timeout: seconds to wait for URL to appear in output
+    :return: tuple of (Popen process object, URL string or None)
     """
-    if url_queue is None:
-        subprocess.run(process_command, stdout=None if show_output else subprocess.DEVNULL, stderr=None if show_output else subprocess.DEVNULL)
-    else:
-        # Capture output to extract URL
-        process = subprocess.Popen(
-            process_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1
-        )
-        
-        # Parse output for URL
+    import threading
+
+    process = subprocess.Popen(
+        process_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
+    )
+
+    url_found = [None]  # Use list to allow modification in thread
+
+    def read_output():
         url_pattern = re.compile(r'(http://[^\s]+)')
-        for line in process.stdout:
-            if show_output:
-                print(line, end='')  # Still print to console
-            match = url_pattern.search(line)
-            if match:
-                url = match.group(1)
-                url_queue.put(url)
-        
-        process.wait()
+        try:
+            for line in process.stdout:
+                if show_output:
+                    print(line, end='')
+                if url_found[0] is None:
+                    match = url_pattern.search(line)
+                    if match:
+                        url_found[0] = match.group(1)
+        except:
+            pass
+
+    # Start thread to read output
+    output_thread = threading.Thread(target=read_output, daemon=True)
+    output_thread.start()
+
+    # Wait for URL with timeout
+    start_time = time.time()
+    while url_found[0] is None and time.time() - start_time < timeout:
+        if process.poll() is not None:  # Process terminated
+            break
+        time.sleep(0.1)
+
+    return process, url_found[0]
 
 
 # Define parameters of the simulator
 def start_server_and_interface(
-    cmd_args, start_interface: bool = True, server_timeout: float = 30.0, safe_mode=True, show_output=True, allow_external_origins=False
+    cmd_args, start_interface: bool = True, server_timeout: float = 40.0, safe_mode=True, show_output=True, allow_external_origins=False
 ):
     """Start the server and interface for the given scene
 
@@ -329,53 +341,83 @@ def start_server_and_interface(
         return None
 
     # find the path to the server and interface scripts
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-    server_script = os.path.join(project_root, SERVER_PROCESS_NAME)
-    interface_script = os.path.join(project_root, INTERFACE_PROCESS_NAME)
+    # Handle both development and PyInstaller frozen environments
+    if getattr(sys, 'frozen', False):
+        # Running in PyInstaller bundle
+        exe_path = sys.executable
+        exe_dir = os.path.dirname(exe_path)
 
-    server_command = ["python3", server_script, *cmd_args]
+        # Check if running from a macOS .app bundle
+        if sys.platform == 'darwin' and '.app/Contents/MacOS' in exe_path:
+            # In .app bundle: all executables are in Contents/MacOS/ together
+            server_exe = os.path.join(exe_dir, 'vivarium-server')
+            interface_exe = os.path.join(exe_dir, 'vivarium-interface')
+        else:
+            # Folder structure: executables are in sibling directories
+            dist_dir = os.path.dirname(exe_dir)  # Parent directory (dist/)
+            server_exe = os.path.join(dist_dir, 'vivarium-server', 'vivarium-server')
+            interface_exe = os.path.join(dist_dir, 'vivarium-interface', 'vivarium-interface')
+
+        # On Windows, add .exe extension
+        if sys.platform == 'win32':
+            server_exe += '.exe'
+            interface_exe += '.exe'
+
+        server_command = [server_exe, *cmd_args]
+        interface_script = interface_exe
+    else:
+        # Running in development
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
+        server_script = os.path.join(project_root, SERVER_PROCESS_NAME)
+        interface_script = os.path.join(project_root, INTERFACE_PROCESS_NAME)
+        # Use sys.executable to ensure we use the same Python interpreter (respects venv)
+        server_command = [sys.executable, server_script, *cmd_args]
 
     print("\n🚀 Starting Vivarium server...")
-    server_process = multiprocessing.Process(
-        target=start_process, args=(server_command,), kwargs={"show_output": show_output}
+    server_process = subprocess.Popen(
+        server_command,
+        stdout=None if show_output else subprocess.DEVNULL,
+        stderr=None if show_output else subprocess.DEVNULL
     )
-    server_process.start()
-    
+
     # Wait for gRPC server to be ready
     if not wait_for_grpc_server(timeout=server_timeout):
+        server_process.terminate()
         raise RuntimeError(f"gRPC server did not start within {server_timeout} seconds")
     
     interface_url = None
     if start_interface:
 
-        interface_command = [
-            "panel",
-            "serve",
-            interface_script,
-        ]
+        if getattr(sys, 'frozen', False):
+            # Frozen mode - interface_script is the executable path
+            interface_command = [interface_script]
+            # TODO: Add arguments for external origins if needed
+        else:
+            # Development mode - use panel serve
+            interface_command = [
+                "panel",
+                "serve",
+                interface_script,
+            ]
 
-        # Allow external origins (e.g., ngrok) if requested
-        if allow_external_origins:
-            interface_command.append("--allow-websocket-origin=*")
+            # Allow external origins (e.g., ngrok) if requested
+            if allow_external_origins:
+                interface_command.append("--allow-websocket-origin=*")
 
-        interface_command.append("--args")
-
-        # Create a queue to receive the URL from the subprocess
-        url_queue = multiprocessing.Queue()
+            interface_command.append("--args")
 
         # start the interface
         print("\n🌐 Starting web interface...")
-        interface_process = multiprocessing.Process(
-            target=start_process, args=(interface_command, url_queue), kwargs={"show_output": show_output}
+        interface_process, interface_url = start_process_and_parse_url(
+            interface_command,
+            show_output=show_output,
+            timeout=10
         )
-        interface_process.start()
-        
-        # Wait for URL with timeout
-        try:
-            interface_url = url_queue.get(timeout=10)
+
+        if interface_url:
             print(f"\n✓ Interface available at: {interface_url}")
-        except:
-            # If we can't get the URL from the queue, construct it
+        else:
+            # If we can't parse the URL from output, construct it
             interface_url = "http://localhost:5006/run_interface"
             print(f"\n✓ Interface should be available at: {interface_url}")
     

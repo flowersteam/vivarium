@@ -1,8 +1,8 @@
 defaults:
   - default_entity_client
 
-controller_cls: vivarium.environment.components.entities.braitenberg.BraitenbergController
-interface_cls: vivarium.environment.components.entities.braitenberg.BraitenbergInterface
+controller_cls: vivarium.environment.components.entities.braitenberg.controller.BraitenbergController
+interface_cls: vivarium.environment.components.entities.braitenberg.interface.BraitenbergInterface
 
 controller_kwargs:
   behaviors:
