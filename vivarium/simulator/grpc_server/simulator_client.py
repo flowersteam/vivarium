@@ -28,7 +28,8 @@ class SimulatorGRPCClient:
 
     def __init__(self, name=None, server=None):
         self.name = name if name is not None else str(uuid.uuid4())
-        self.channel = grpc.insecure_channel(server or "localhost:50051")
+        self.server_address = server or "localhost:50051"
+        self.channel = grpc.insecure_channel(self.server_address)
         self.stub = simulator_pb2_grpc.SimulatorServerStub(self.channel)
         self.register_client(self.name)
         config = load_scene_config(self.scene_name)
@@ -56,6 +57,16 @@ class SimulatorGRPCClient:
     def is_streaming(self):
         """Check if state streaming is currently active."""
         return self._stream_thread is not None and self._stream_thread.is_alive()
+
+    @property
+    def server_host(self):
+        """Extract host from server address."""
+        return self.server_address.rsplit(":", 1)[0]
+
+    @property
+    def server_port(self):
+        """Extract port from server address."""
+        return int(self.server_address.rsplit(":", 1)[1])
 
     def set_changes(self, changes, update_from_server=True):
         """Apply changes to the simulator server
