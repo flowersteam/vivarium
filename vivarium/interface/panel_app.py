@@ -15,7 +15,11 @@ from bokeh.models import (
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config, get_available_scenes
 from vivarium.utils.runtime import get_bundle_root
-from vivarium.utils.handle_server_interface import check_server_running
+from vivarium.utils.handle_server_interface import (
+    check_server_running,
+    get_server_interface_pids,
+    terminate_process,
+)
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -88,14 +92,8 @@ class WindowManager(Parameterized):
             # Controller provided - initialize normally
             self._initialize_connected_ui(controller)
         elif check_server_running():
-            # Server running - connect and initialize
-            try:
-                client = SimulatorGRPCClient()
-                controller = VivariumController.from_client(client=client)
-                self._initialize_connected_ui(controller)
-            except Exception as e:
-                lg.error(f"Failed to connect to running server: {e}")
-                self._show_scene_selection(error_message=f"Failed to connect: {e}")
+            # Server running - show scene selection with connect/stop options
+            self._show_scene_selection()
         else:
             # No server - show scene selection
             self._show_scene_selection()
@@ -131,10 +129,37 @@ class WindowManager(Parameterized):
         )
         self.start_server_btn.on_click(self._start_server_cb)
 
+        # Buttons for when a server is already running
+        self.connect_existing_btn = pn.widgets.Button(
+            name='Connect to Server',
+            button_type='primary',
+            width=200,
+        )
+        self.connect_existing_btn.on_click(self._connect_existing_cb)
+
+        self.stop_existing_btn = pn.widgets.Button(
+            name='Stop Server',
+            button_type='warning',
+            width=200,
+        )
+        self.stop_existing_btn.on_click(self._stop_existing_cb)
+
         self.server_status = pn.pane.Markdown(
             "### Select a scene to start the simulation",
             sizing_mode="stretch_width"
         )
+
+        # Row for existing server options (hidden by default)
+        self.existing_server_row = pn.Row(
+            self.connect_existing_btn,
+            self.stop_existing_btn,
+            align="center",
+            visible=False,
+        )
+
+        # Row for scene selection (hidden when server is running)
+        self.scene_select_row = pn.Row(self.scene_select, align="center")
+        self.start_server_row = pn.Row(self.start_server_btn, align="center")
 
         # Scene selection panel layout
         self.scene_selection_panel = pn.Column(
@@ -142,9 +167,11 @@ class WindowManager(Parameterized):
             pn.layout.Spacer(height=20),
             self.server_status,
             pn.layout.Spacer(height=20),
-            pn.Row(self.scene_select, align="center"),
+            self.existing_server_row,
             pn.layout.Spacer(height=10),
-            pn.Row(self.start_server_btn, align="center"),
+            self.scene_select_row,
+            pn.layout.Spacer(height=10),
+            self.start_server_row,
             pn.layout.Spacer(height=20),
             align="center",
             sizing_mode="stretch_both",
@@ -152,14 +179,55 @@ class WindowManager(Parameterized):
 
     def _show_scene_selection(self, error_message=None):
         """Show the scene selection screen."""
-        if error_message:
+        self.start_server_btn.disabled = False
+
+        # Check if a server is already running
+        if check_server_running():
+            # Get the scene name from the running server
+            try:
+                client = SimulatorGRPCClient()
+                running_scene = client.scene_name
+                client.close()
+                self.server_status.object = f"### Server is running with scene '{running_scene}'"
+            except Exception as e:
+                lg.warning(f"Could not get scene name from server: {e}")
+                self.server_status.object = "### A server is running"
+            # Show connect/stop options, hide scene selection
+            self.existing_server_row.visible = True
+            self.scene_select_row.visible = False
+            self.start_server_row.visible = False
+        elif error_message:
             self.server_status.object = f"### {error_message}"
+            self.existing_server_row.visible = False
+            self.scene_select_row.visible = True
+            self.start_server_row.visible = True
         else:
             self.server_status.object = "### Select a scene to start the simulation"
+            self.existing_server_row.visible = False
+            self.scene_select_row.visible = True
+            self.start_server_row.visible = True
 
-        self.start_server_btn.disabled = False
         self.main_container.clear()
         self.main_container.append(self.scene_selection_panel)
+
+    def _connect_existing_cb(self, event):
+        """Callback to connect to an existing server."""
+        try:
+            client = SimulatorGRPCClient()
+            controller = VivariumController(client=client)
+            self._initialize_connected_ui(controller)
+        except Exception as e:
+            lg.error(f"Failed to connect to server: {e}")
+            self._show_scene_selection(error_message=f"Failed to connect: {e}")
+
+    def _stop_existing_cb(self, event):
+        """Callback to stop the existing server."""
+        _, server_pids = get_server_interface_pids()
+        if server_pids:
+            terminate_process(server_pids)
+            lg.info("Server stopped")
+        # Refresh the scene selection screen
+        self._show_scene_selection()
 
     def _initialize_connected_ui(self, controller):
         """Initialize the full simulation UI after connecting to a server."""
@@ -247,26 +315,27 @@ class WindowManager(Parameterized):
             value=self.controller_names,
         )
 
-        # Close scene button
-        self.close_scene_btn = pn.widgets.Button(
-            name='Close Scene',
+        # Stop server button
+        self.stop_server_btn = pn.widgets.Button(
+            name='Stop Server',
             button_type='warning',
             width=120,
         )
-        self.close_scene_btn.on_click(self._close_scene_cb)
+        self.stop_server_btn.on_click(self._stop_server_cb)
 
         # Confirmation dialog widgets
-        self.close_confirm_panel = pn.Column(
-            pn.pane.Markdown("### Are you sure you want to close this scene?"),
+        self.stop_confirm_panel = pn.Column(
+            pn.pane.Markdown("### Are you sure you want to stop the server?"),
+            pn.pane.Markdown("This will disconnect all clients."),
             pn.Row(
-                pn.widgets.Button(name="Yes, Close", button_type="danger", width=100),
+                pn.widgets.Button(name="Yes, Stop", button_type="danger", width=100),
                 pn.widgets.Button(name="Cancel", button_type="default", width=100),
             ),
             visible=False,
         )
         # Wire up confirmation buttons
-        self.close_confirm_panel[1][0].on_click(self._confirm_close_cb)
-        self.close_confirm_panel[1][1].on_click(self._cancel_close_cb)
+        self.stop_confirm_panel[2][0].on_click(self._confirm_stop_cb)
+        self.stop_confirm_panel[2][1].on_click(self._cancel_stop_cb)
 
     def _setup_notebook_widgets(self):
         """Setup widgets for notebook/Jupyter control."""
@@ -343,7 +412,7 @@ class WindowManager(Parameterized):
 
         try:
             # Start the server and get a controller (controller manages server lifecycle)
-            controller = VivariumController.start_server(scene_name, timeout=30.0)
+            controller = VivariumController(start_server=True, scene_name=scene_name, timeout=30.0)
             self._started_server = True
 
             # Transition to full simulation UI
@@ -355,17 +424,17 @@ class WindowManager(Parameterized):
             self.start_server_btn.disabled = False
             self._started_server = False
 
-    def _close_scene_cb(self, event):
-        """Callback for the close scene button - shows confirmation."""
-        self.close_confirm_panel.visible = True
+    def _stop_server_cb(self, event):
+        """Callback for the stop server button - shows confirmation."""
+        self.stop_confirm_panel.visible = True
 
-    def _cancel_close_cb(self, event):
-        """Callback to cancel closing the scene."""
-        self.close_confirm_panel.visible = False
+    def _cancel_stop_cb(self, event):
+        """Callback to cancel stopping the server."""
+        self.stop_confirm_panel.visible = False
 
-    def _confirm_close_cb(self, event):
-        """Callback to confirm closing the scene."""
-        self.close_confirm_panel.visible = False
+    def _confirm_stop_cb(self, event):
+        """Callback to confirm stopping the server."""
+        self.stop_confirm_panel.visible = False
 
         # Stop the periodic callback
         if hasattr(self, 'pcb_plot') and self.pcb_plot.running:
@@ -375,13 +444,19 @@ class WindowManager(Parameterized):
         if self._streaming_active:
             self._stop_streaming()
 
-        # Close controller connection (this also stops the server if we started it)
+        # Disconnect the controller (don't close - we'll stop server separately)
         if self.controller:
             try:
-                self.controller.close()
+                self.controller.disconnect()
             except Exception as e:
-                lg.warning(f"Error closing controller: {e}")
+                lg.warning(f"Error disconnecting controller: {e}")
             self.controller = None
+
+        # Stop the server (regardless of who started it)
+        _, server_pids = get_server_interface_pids()
+        if server_pids:
+            terminate_process(server_pids)
+            lg.info("Server stopped")
 
         # Reset state
         self.scene_config = None
@@ -735,8 +810,8 @@ class WindowManager(Parameterized):
                     self.drag_n_drop,
                     self.dark_theme_switch,
                     pn.layout.Spacer(width=20),
-                    self.close_scene_btn,
-                    self.close_confirm_panel,
+                    self.stop_server_btn,
+                    self.stop_confirm_panel,
                 ),
                 pn.panel(self.plot, sizing_mode="scale_width"),
             ),
