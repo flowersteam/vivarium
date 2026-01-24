@@ -27,6 +27,7 @@ class SimulatorGRPCClient:
     """
 
     def __init__(self, name=None, server=None):
+        self.is_grpc_client = True
         self.name = name if name is not None else str(uuid.uuid4())
         self.server_address = server or "localhost:50051"
         self.channel = grpc.insecure_channel(self.server_address)

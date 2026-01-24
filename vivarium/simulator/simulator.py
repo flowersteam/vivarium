@@ -68,6 +68,8 @@ class Simulator:
         self.records = None
         self.saving_dir = None
         
+        self.is_grpc_client = False
+        
         lg.info("Simulator initialized")
         
     @classmethod
