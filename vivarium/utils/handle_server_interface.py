@@ -298,74 +298,6 @@ def start_process_and_parse_url(process_command, show_output=True, timeout=10):
     return process, url_found[0]
 
 
-# Define parameters of the simulator
-def start_server_and_interface(
-    cmd_args, start_interface: bool = True, server_timeout: float = 40.0, safe_mode=True, show_output=True, allow_external_origins=False
-):
-    """Start the server and interface for the given scene
-
-    :param cmd_args: command line arguments to pass to the server script
-    :param start_interface: whether to start the interface, defaults to True
-    :param server_timeout: maximum seconds to wait for gRPC server to be ready
-    :param safe_mode: whether to prompt before stopping existing processes
-    :param allow_external_origins: whether to allow websocket connections from external origins (e.g., ngrok)
-    :return: URL of the interface if started, None otherwise
-    :raises RuntimeError: if gRPC server doesn't start within timeout
-    """
-    if os.name == "nt":
-        lg.warning(
-            "The 'start_server_and_interface' function is not supported on Windows OS"
-        )
-        lg.warning(
-            "Instead, start the server and interface by running the following command from the root directory in a Windows Powershell (make sure to activate the virtual environment before). Then click on the link to open the web interface:"
-        )
-        lg.warning(f"\nstart_all.bat {cmd_args[0] if cmd_args else ''}")
-        return None
-
-    # first ensure no interface or server is running
-    processes_running = stop_server_and_interface(safe_mode=safe_mode)
-
-    if processes_running:
-        lg.warning(
-            "\nServer and Interface processes are still running, please stop them before starting new ones"
-        )
-        lg.warning("ERROR: New processes will not be started")
-        return None
-
-    server_command = get_server_command(cmd_args)
-
-    print("\n🚀 Starting Vivarium server...")
-    server_process = subprocess.Popen(
-        server_command,
-        stdout=None if show_output else subprocess.DEVNULL,
-        stderr=None if show_output else subprocess.DEVNULL
-    )
-
-    # Wait for gRPC server to be ready
-    if not wait_for_grpc_server(timeout=server_timeout):
-        server_process.terminate()
-        raise RuntimeError(f"gRPC server did not start within {server_timeout} seconds")
-    
-    interface_url = None
-    if start_interface:
-        interface_command = get_interface_command(allow_external_origins)
-        print("\n🌐 Starting web interface...")
-        interface_process, interface_url = start_process_and_parse_url(
-            interface_command,
-            show_output=show_output,
-            timeout=10
-        )
-
-        if interface_url:
-            print(f"\n✓ Interface available at: {interface_url}")
-        else:
-            # If we can't parse the URL from output, construct it
-            interface_url = "http://localhost:5006/run_interface"
-            print(f"\n✓ Interface should be available at: {interface_url}")
-    
-    return interface_url
-
-
 def wait_for_grpc_server(host="localhost", port=50051, timeout=30.0, poll_interval=0.5):
     """
     Wait for the gRPC server to be ready using the standard health checking protocol.
@@ -411,11 +343,12 @@ def check_server_running(host="localhost", port=50051):
     return wait_for_grpc_server(host=host, port=port, timeout=1.0, poll_interval=0.2)
 
 
-def start_simulation_server(scene_name, timeout=30.0, show_output=False):
+def start_simulation_server(scene_name=None, timeout=30.0, show_output=False):
     """Start the simulation server for a given scene.
 
     Args:
-        scene_name: Name of the scene configuration to load (e.g., 'session_1')
+        scene_name: Name of the scene configuration to load (e.g., 'session_1').
+                   If None, uses Hydra's default configuration.
         timeout: Maximum seconds to wait for server to be ready
         show_output: Whether to show server output in console
 
@@ -425,10 +358,14 @@ def start_simulation_server(scene_name, timeout=30.0, show_output=False):
     Raises:
         RuntimeError: If server doesn't start within timeout
     """
-    cmd_args = [f"scene={scene_name}"]
+
+    if check_server_running():
+        raise RuntimeError("A simulation server is already running")
+
+    cmd_args = [f"scene={scene_name}"] if scene_name else []
     server_command = get_server_command(cmd_args)
 
-    lg.info(f"Starting Vivarium server with scene '{scene_name}'...")
+    lg.info(f"Starting Vivarium server{f' with scene {scene_name!r}' if scene_name else ''}...")
 
     server_process = subprocess.Popen(
         server_command,
@@ -472,6 +409,62 @@ def stop_simulation_server(server_process):
             lg.info("Server killed")
     except Exception as e:
         lg.warning(f"Error stopping server: {e}")
+
+
+def start_panel_interface(allow_external_origins=False, show_output=True, timeout=10):
+    """Start only the Panel web interface (assumes server is running).
+
+    Args:
+        allow_external_origins: Whether to allow websocket connections from
+                               external origins (e.g., ngrok).
+        show_output: Whether to show interface output in console.
+        timeout: Seconds to wait for URL to appear in output.
+
+    Returns:
+        tuple: (Popen process, interface_url or None)
+    """
+    interface_command = get_interface_command(allow_external_origins)
+    lg.info("Starting web interface...")
+
+    interface_process, interface_url = start_process_and_parse_url(
+        interface_command,
+        show_output=show_output,
+        timeout=timeout
+    )
+
+    if interface_url:
+        lg.info(f"Interface available at: {interface_url}")
+    else:
+        # If we can't parse the URL from output, construct it
+        interface_url = "http://localhost:5006/run_interface"
+        lg.info(f"Interface should be available at: {interface_url}")
+
+    return interface_process, interface_url
+
+
+def stop_panel_interface(interface_process):
+    """Stop a Panel interface process.
+
+    Args:
+        interface_process: Popen process object to terminate
+    """
+    if interface_process is None:
+        return
+
+    lg.info(f"Stopping Panel interface (PID: {interface_process.pid})...")
+
+    try:
+        interface_process.terminate()
+        try:
+            interface_process.wait(timeout=5)
+            lg.info("Interface terminated gracefully")
+        except subprocess.TimeoutExpired:
+            lg.warning("Interface did not terminate gracefully, forcing kill...")
+            interface_process.kill()
+            interface_process.wait(timeout=3)
+            lg.info("Interface killed")
+    except Exception as e:
+        lg.warning(f"Error stopping interface: {e}")
 
 
 def get_ngrok_token():
@@ -602,4 +595,5 @@ if __name__ == "__main__":
     print(f"Interface PIDs: {interface_pids}")
     print(f"Server PIDs: {server_pids}")
     stop_server_and_interface(safe_mode=False)
-    start_server_and_interface("session_1", notebook_mode=True, wait_time=6)
+    start_simulation_server("session_1")
+    start_panel_interface()
