@@ -5,12 +5,13 @@ import threading
 from time import sleep
 
 from vivarium.utils.handle_server_interface import (
-    start_server_and_interface,
-    stop_server_and_interface,
     create_ngrok_tunnel,
     start_simulation_server,
     stop_simulation_server,
     check_server_running,
+    start_panel_interface,
+    stop_panel_interface,
+    stop_server_and_interface,
 )
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.simulator.controller import SimulatorController
@@ -24,111 +25,304 @@ lg = logging.getLogger(__name__)
 
 class VivariumController:
 
-    def __init__(self, client=None, subtypes=[], server_process=None, **controllers):
-        self.client = client or SimulatorGRPCClient()
-        self.subtypes = subtypes
+    def __init__(self,
+                 client=None,
+                 connect_to_server=False,
+                 start_server=False,
+                 scene_name=None,
+                 timeout=30.0):
+        """Initialize a VivariumController.
 
-        self.controllers = controllers
+        Args:
+            client: Existing SimulatorGRPCClient or Simulator to use. If provided,
+                    the controller will initialize immediately using this client.
+            connect_to_server: If True and no client provided, attempt to connect
+                              to an existing gRPC server.
+            start_server: If True and no client provided, start a new server.
+                         Requires scene_name to be set.
+            scene_name: Name of the scene configuration (required if start_server=True).
+            timeout: Timeout in seconds for server connection/startup.
 
+        Behavior matrix:
+            | client | connect_to_server | start_server | Behavior |
+            |--------|-------------------|--------------|----------|
+            | Provided | - | - | Use client directly, initialize controllers |
+            | None | False | False | Disconnected state - no client |
+            | None | True | False | Connect if server running, else warning |
+            | None | False | True | Start server (requires scene_name), then connect |
+            | None | True | True | If server running: connect. If not: start, then connect |
+        """
         self.time = 0
         self._is_started = False
+        self._server_process = None
+        self._interface_process = None
+        self._ngrok_active = False
+        self.interface_url = None
 
-        # Track server process if we started it (for cleanup on close)
-        self._server_process = server_process
+        # Initialize in disconnected state
+        self.client = None
+        self.controllers = {}
 
-        self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
+        if client is not None:
+            # Use provided client directly
+            self._initialize_from_client(client)
+        elif start_server:
+            # Start server and connect
+            if scene_name is None:
+                raise ValueError("scene_name is required when start_server=True")
+            self.start_server_process(scene_name, timeout=timeout)
+        elif connect_to_server:
+            # Try to connect to existing server
+            self.connect(timeout=timeout)
 
-    @classmethod
-    def from_client(cls, client=None, scene_config=None, server_process=None):
-        client = client or SimulatorGRPCClient()
+    def _initialize_from_client(self, client, scene_config=None):
+        """Initialize controllers from an existing client.
+
+        Args:
+            client: SimulatorGRPCClient or Simulator instance.
+            scene_config: Optional scene configuration. If not provided,
+                         will be loaded based on client.scene_name.
+        """
+        self.client = client
         scene_config = scene_config or load_scene_config(client.scene_name)
         components_config = scene_config.environment.components
+
+        # Load controllers from scene config
         controllers = {}
         for name, c_config in components_config.component_list.items():
             if 'client' in c_config and 'controller_cls' in c_config.client:
                 c_cls = hydra.utils.get_class(c_config.client.controller_cls)
                 controllers[name] = c_cls.from_config(name, client.remote)
-        return cls(
-            client=client,
-            subtypes=components_config.subtype_labels,
-            server_process=server_process,
-            **controllers
-        )
 
-    @classmethod
-    def start_server(cls, scene_name, timeout=30.0):
-        """Start a simulation server and return a controller connected to it.
+        self.controllers = controllers
+        self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
+        self.start()
 
-        This is a convenience method for starting a server without the web interface.
-        Useful for Jupyter notebooks or programmatic control.
+    def is_connected(self, verify=True):
+        """Check if connected to a server.
 
         Args:
-            scene_name: Name of the scene configuration to load (e.g., 'quickstart', 'session_1')
-            timeout: Maximum seconds to wait for server to be ready
+            verify: If True (default), actively ping the server to verify it's still
+                   responding. If False, only check local state.
 
         Returns:
-            VivariumController instance connected to the server.
-            The controller tracks the server process and will stop it when close() is called.
+            True if connected to a server, False otherwise.
+        """
+        if self.client is None:
+            return False
+        else:
+            if not self.client.is_grpc_client:
+                lg.warning("Client is not a gRPC client; assuming connected.")
+                return True  # gRPC client assumed to be connected if client exists
 
-        Example:
-            controller = VivariumController.start_server('quickstart')
-            controller.simulator.simulation_running = True
-            # ... interact with the simulation ...
-            controller.close()  # This also stops the server
+        if verify:
+            # Actually check if server is still responding
+            host = self.client.server_host
+            port = self.client.server_port
+            if not check_server_running(host=host, port=port):
+                # Server is down, clean up local state
+                lg.warning("Server is no longer responding. Marking as disconnected.")
+                self.client = None
+                self.controllers = {}
+                return False
+
+        return True
+
+    def ensure_connected(self, verify=False):
+        """Guard method - raises RuntimeError if not connected."""
+        if not self.is_connected(verify=verify):
+            raise RuntimeError(
+                "Not connected to a server. Use connect(), start_server_process(), "
+                "or pass a client/start_server=True to the constructor."
+            )
+
+    def connect(self, timeout=30.0, reconnect=False):
+        """Connect to an existing gRPC server.
+
+        Args:
+            timeout: Timeout in seconds for connection attempt.
+            reconnect: If True, clean up any existing (potentially stale) connection
+                      and establish a fresh one. Useful when the server was restarted
+                      by another client.
+
+        Returns:
+            True if connected successfully, False otherwise.
+        """
+        if reconnect and self.client is not None:
+            # Clean up potentially stale connection
+            if check_server_running():
+                lg.info("Reconnecting to server...")
+                try:
+                    self.stop()
+                    self.client.close()
+                except Exception:
+                    pass  # Ignore errors from stale connection
+                self.client = None
+                self.controllers = {}
+            else:
+                lg.warning("No server running. Use start_server_process() to start one.")
+                return False
+        elif self.is_connected():
+            lg.warning("Already connected to a server. Use reconnect=True to force reconnection.")
+            return True
+
+        if not check_server_running():
+            lg.warning("No server running. Use start_server_process() to start one.")
+            return False
+
+        try:
+            client = SimulatorGRPCClient()
+            self._initialize_from_client(client)
+            self.start()
+            lg.info("Connected to gRPC server")
+            return True
+        except Exception as e:
+            lg.error(f"Failed to connect to server: {e}")
+            return False
+
+    def disconnect(self):
+        """Disconnect from the server and clean up controllers."""
+        if not self.is_connected():
+            lg.info("Already disconnected")
+            return
+
+        # Close the client connection
+        try:
+            self.client.close()
+        except Exception as e:
+            lg.warning(f"Error closing client: {e}")
+        self.stop()
+        self.client = None
+        self.controllers = {}
+        lg.info("Disconnected from server")
+
+    def start_server_process(self, scene_name, timeout=30.0):
+        """Start a server process and connect to it.
+
+        Args:
+            scene_name: Name of the scene configuration to load.
+            timeout: Timeout in seconds for server startup.
+
+        Raises:
+            RuntimeError: If server fails to start within timeout.
         """
         # Check if server is already running
         if check_server_running():
-            lg.warning("Server is already running. Connecting to existing server.")
-            return cls.from_client()
+            # Check which scene is running (use existing client if connected)
+            if self.client is not None:
+                running_scene = self.client.scene_name
+            else:
+                client = SimulatorGRPCClient()
+                running_scene = client.scene_name
+
+            if running_scene != scene_name:
+                if self.client is None:
+                    client.close()
+                lg.warning(
+                    f"Server is already running with scene '{running_scene}' (requested: '{scene_name}'). "
+                    f"Use connect() to connect to it, or stop_server_and_interface() to stop it first."
+                )
+                return
+
+            # Same scene - connect if not already connected
+            if self.client is None:
+                lg.info(f"Server already running with scene '{scene_name}'. Connecting.")
+                self._initialize_from_client(client)
+            else:
+                lg.info(f"Already connected to server with scene '{scene_name}'.")
+            return
 
         # Start the server
-        server_process = start_simulation_server(scene_name, timeout=timeout)
+        self._server_process = start_simulation_server(scene_name, timeout=timeout)
         lg.info(f"Server started for scene '{scene_name}'")
 
-        # Connect and create controller
+        # Connect to it
         client = SimulatorGRPCClient()
-        controller = cls.from_client(client=client, server_process=server_process)
+        self._initialize_from_client(client)
 
-        return controller
+    def stop_server_process(self):
+        """Stop the server process if we started it.
+
+        This also disconnects the controller since the server no longer exists.
+        Called automatically by close() if the controller started the server.
+        Can also be called explicitly if you want to stop the server.
+        """
+        if self._server_process is not None:
+            stop_simulation_server(self._server_process)
+            self._server_process = None
+            lg.info("Server stopped")
+            # Also disconnect since the server we were connected to no longer exists
+            self.disconnect()
+
+    def start_interface(self, allow_external_origins=False, show_output=True, timeout=10):
+        """Start the Panel web interface.
+
+        Args:
+            allow_external_origins: Whether to allow websocket connections from
+                                   external origins (e.g., ngrok).
+            show_output: Whether to show interface output in console.
+            timeout: Timeout in seconds for interface startup.
+
+        Returns:
+            Interface URL if started successfully, None otherwise.
+        """
+
+        if self._interface_process is not None:
+            lg.warning("Interface is already running")
+            return self.interface_url
+
+        self._interface_process, self.interface_url = start_panel_interface(
+            allow_external_origins=allow_external_origins,
+            show_output=show_output,
+            timeout=timeout
+        )
+
+        if self.interface_url:
+            lg.info(f"Interface started at: {self.interface_url}")
+        return self.interface_url
+
+    def stop_interface(self):
+        """Stop the Panel interface if we started it."""
+        if self._interface_process is not None:
+            stop_panel_interface(self._interface_process)
+            self._interface_process = None
+            self.interface_url = None
+            lg.info("Interface stopped")
 
     @classmethod
     def start_session(cls, scene_name,
                       client=None,
                       start_interface=True,
-                      safe_mode=False,
-                      step_from_controller=True, 
+                      step_from_controller=True,
                       run_simulation=True,
                       start=True,
                       server_timeout=30.0,
                       ngrok=False,
                       ngrok_token=None):
         """Start a Vivarium session with server, simulation, and optionally interface.
-        
+
         Args:
             scene_name: Name of the scene configuration to load
             client: Existing SimulatorGRPCClient or Simulator, or None to start a new server
             start_interface: Whether to start the Panel web interface
-            safe_mode: Whether to prompt before stopping existing processes
             step_from_controller: Whether this controller drives simulation steps
             run_simulation: Whether to start the simulation running immediately
             server_timeout: Maximum seconds to wait for gRPC server to be ready
             ngrok: Whether to create an ngrok tunnel for public access
             ngrok_token: ngrok auth token (reads from NGROK_TOKEN env var if None)
-            
+
         Returns:
             VivariumController instance with interface_url attribute set
         """
-        interface_url = None
-        if client is None:
-            interface_url = start_server_and_interface(cmd_args=[f'scene={scene_name}'], 
-                                    start_interface=start_interface,
-                                    safe_mode=safe_mode,
-                                    server_timeout=server_timeout,
-                                    allow_external_origins=ngrok)
-        controller = cls.from_client(client=client)
-        controller.interface_url = interface_url
-        controller._ngrok_active = False
-        
+        # Create controller - either with provided client or in disconnected state
+        if client is not None:
+            controller = cls(client=client)
+        else:
+            controller = cls()  # disconnected state
+            controller.start_server_process(scene_name, timeout=server_timeout)
+            if start_interface:
+                controller.start_interface(allow_external_origins=ngrok)
+
         # Create ngrok tunnel if requested
         if ngrok:
             try:
@@ -137,7 +331,7 @@ class VivariumController:
                 controller._ngrok_active = True
             except Exception as e:
                 lg.warning(f"Failed to create ngrok tunnel: {e}")
-        
+
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
         if start:
@@ -145,12 +339,12 @@ class VivariumController:
         if run_simulation:
             controller.simulator.simulation_running = True
         lg.info(f"VivariumController session '{scene_name}' is started")
-        
+
         # Print the URL the user should use
         if controller.interface_url:
             print(f"\n🌐 Open the interface at: {controller.interface_url}\n")
-        
-        return controller                 
+
+        return controller
 
     def __getattr__(self, name):
         if name in self.controllers:
@@ -164,13 +358,15 @@ class VivariumController:
         :param use_streaming: Use bidirectional streaming (True) or unary RPC (False), defaults to True
         :raises RuntimeError: if the simulator is already started
         """
+        self.ensure_connected()
+
         if self.is_started():
             lg.info("Simulator is already started")
             return
 
         # automatically catch errors only if not in debug mode
         catch_errors = not debug_mode
-        
+
         self._is_started = True
         if threaded:
             run_thread = threading.Thread(
@@ -181,7 +377,7 @@ class VivariumController:
         else:
             self._start(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
         lg.info("Simulator started on client")
-            
+
     def _start(self, num_steps=math.inf, catch_errors=True, use_streaming=False):
         """Run the simulation for a given number of steps.
 
@@ -189,20 +385,20 @@ class VivariumController:
         :param catch_errors: wether to catch errors or not, defaults to False
         :param use_streaming: Use bidirectional streaming (True) or unary RPC (False)
         """
-        
+
         if use_streaming:
             # Use synchronized bidirectional streaming
             def compute_changes():
                 """Compute motor commands and return changes for the next step."""
                 if not self._is_started:
                     return None  # Signal to stop
-                
+
                 with sleep_timer(freq=self.controllers['simulator'].freq):
                     self.controller_step(catch_errors=catch_errors)
                     self.time += 1
-                    
+
                 return self.fetch_changes()
-            
+
             for state_and_cp in self.client.bidirectional_step_sync(num_steps, compute_changes):
                 if not self._is_started:
                     break  # Stop if we've been told to stop
@@ -214,7 +410,7 @@ class VivariumController:
                     self.step(catch_errors=catch_errors)
                     self.time += 1
                     run_time += 1
-                
+
         # finally stop the simulation
         if self.is_started():
             self.stop()
@@ -233,11 +429,11 @@ class VivariumController:
     def simulator_step(self):
         changes = self.fetch_changes()
         self.client.step(changes)
-        
+
     def controller_step(self, catch_errors=True):
         # Step through controllers (e.g. routines and behaviors)
         for _, controller in self.controllers.items():
-            controller.step(time=self.time, catch_errors=catch_errors)        
+            controller.step(time=self.time, catch_errors=catch_errors)
 
     def step(self, catch_errors=True):
         changed_applied = False
@@ -258,13 +454,18 @@ class VivariumController:
         update_from_server = not (hasattr(self.client, 'is_streaming') and self.client.is_streaming)
         self.client.set_changes(changes, update_from_server=update_from_server)
         if self.simulator.close:
-            self.close() 
-        
+            self.close()
+
     def close(self):
         if self._is_started:
             self.stop()
             sleep(4)  # wait for the simulation loop to stop
-        self.client.close()
+
+        # Close client if connected
+        if self.is_connected():
+            self.client.close()
+            self.client = None
+            self.controllers = {}
 
         # Close ngrok tunnel if one was created
         if getattr(self, '_ngrok_active', False):
@@ -272,35 +473,30 @@ class VivariumController:
             close_ngrok_tunnel()
             self._ngrok_active = False
 
+        # Stop interface if we started it
+        if self._interface_process is not None:
+            self.stop_interface()
+
         # Stop server if we started it
         if self._server_process is not None:
-            self.stop_server()
+            self.stop_server_process()
 
-    def stop_server(self):
-        """Stop the server if this controller started it.
-
-        This is called automatically by close() if the controller started the server.
-        Can also be called explicitly if you want to stop the server without closing the controller.
-        """
-        if self._server_process is not None:
-            stop_simulation_server(self._server_process)
-            self._server_process = None
-            lg.info("Server stopped")
-            
     def close_all(self):
         """Send signal to close all clients and the simulator."""
         self.stop()
         sleep(1)  # wait for the simulation loop to stop
-        self.simulator.close = True
-        lg.info("Waiting for all clients to close ...")
-        while len(self.simulator.client_names) != 1:  # wait for other clients to close
-            self.apply_changes(close_if_resquested=False)
-            sleep(0.1)
+        if 'simulator' in self.controllers:
+            self.simulator.close = True
+            lg.info("Waiting for all clients to close ...")
+            while len(self.simulator.client_names) != 1:  # wait for other clients to close
+                self.apply_changes(close_if_resquested=False)
+                sleep(0.1)
+        # close all processes
+        stop_server_and_interface(safe_mode=False)
         # Close our client
         self.close()
-            
+
     def close_session(self, safe_mode=False):
         """Stop the session: simulation, server, interface, and ngrok tunnel"""
         self.close_all()
         stop_server_and_interface(safe_mode=safe_mode)
-        
