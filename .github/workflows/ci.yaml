@@ -38,6 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: 'pip'
+          cache-dependency-path: setup.py
 
       - name: Install dependencies
         run: |
@@ -71,6 +72,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: setup.py
 
       - name: Install dependencies
         run: |
@@ -96,6 +98,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: setup.py
 
       - name: Install dependencies
         run: |
@@ -119,6 +122,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: setup.py
 
       - name: Install dependencies
         run: pip install -e .
