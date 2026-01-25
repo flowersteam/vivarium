@@ -12,7 +12,7 @@ from vivarium.environment.components.entities.braitenberg.component import Brait
 from vivarium.environment.components.proximity_map.component import ProximityMapComponent
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
-from vivarium.utils.handle_server_interface import wait_for_grpc_server
+from vivarium.utils.handle_server_interface import wait_for_grpc_server, kill_all_vivarium_processes
 from vivarium.simulator.grpc_server.simulator_server import SimulatorServerServicer, create_grpc_server
 from vivarium.environment.components.physics.step.component import StepComponent
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
@@ -23,6 +23,21 @@ from vivarium.interface.panel_app import create_interfaces
 from vivarium.controllers import VivariumController
 from vivarium.environment import Environment
 from vivarium.simulator import Simulator
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_vivarium_processes_session():
+    """Clean up any leftover Vivarium processes before and after the test session."""
+    kill_all_vivarium_processes(include_clients=False)
+    yield
+    kill_all_vivarium_processes(include_clients=False)
+
+
+@pytest.fixture
+def clean_server_state():
+    """Ensure no server is running before a test. Use for tests that spawn subprocess servers."""
+    kill_all_vivarium_processes(include_clients=False)
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -68,9 +83,7 @@ def simulator_from_config(scene_config):
 @pytest.fixture
 def vivarium_controller():
     def fn(client):
-        return VivariumController.from_client(
-            client=client
-        )
+        return VivariumController(client=client, start_controller_loop=False)
     return fn
 
 
@@ -78,9 +91,7 @@ def vivarium_controller():
 def vivarium_controller_from_config(simulator_from_config):
     def fn(scene_name, overrides=[]):
         client = simulator_from_config(scene_name, overrides=overrides)
-        return VivariumController.from_client(
-            client=client
-        )
+        return VivariumController(client=client, start_controller_loop=False)
     return fn
 
 
@@ -93,7 +104,7 @@ def vivarium_controller_start_session(grpc_client):
             scene_name=scene_name,
             client=client,
             start_interface=False,
-            start=False
+            start_controller_loop=False
         )
         controllers.append(controller)
         return controller
@@ -125,7 +136,7 @@ def grpc_server(simulator_from_config):
     
     def fn(scene_name, overrides=[]):
         simulator = simulator_from_config(scene_name, overrides=overrides)
-        server, port = create_grpc_server(simulator, port=0)  # Random available port
+        server, port = create_grpc_server(simulator, port=50051)
         servers.append(server)
         
         # Wait for server to be ready using health check
