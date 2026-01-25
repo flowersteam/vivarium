@@ -76,6 +76,10 @@ jobs:
           cache: 'pip'
           cache-dependency-path: setup.py
 
+      - name: Install jax-md from git (Intel Mac only)
+        if: matrix.os == 'macos-15-intel'
+        run: pip install "jax-md @ git+https://github.com/jax-md/jax-md.git@6bd17d29ce5f9fe35a5582a42a9973b1ecd0859f"
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip

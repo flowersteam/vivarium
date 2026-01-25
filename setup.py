@@ -8,13 +8,12 @@ setup(
         
     install_requires=[
         # JAX 0.8.x only supports Apple Silicon and Linux/Windows
-        # Intel Macs (x86_64 darwin) need older JAX 0.4.x and jax-md from specific commit
+        # Intel Macs (x86_64 darwin) need older JAX 0.4.x (jax-md installed separately in CI)
         "jax==0.8.2; platform_machine != 'x86_64' or sys_platform != 'darwin'",
         "jaxlib==0.8.2; platform_machine != 'x86_64' or sys_platform != 'darwin'",
         "jax-md==0.2.27; platform_machine != 'x86_64' or sys_platform != 'darwin'",
         "jax==0.4.38; platform_machine == 'x86_64' and sys_platform == 'darwin'",
         "jaxlib==0.4.38; platform_machine == 'x86_64' and sys_platform == 'darwin'",
-        "jax-md @ git+https://github.com/jax-md/jax-md.git@6bd17d29ce5f9fe35a5582a42a9973b1ecd0859f; platform_machine == 'x86_64' and sys_platform == 'darwin'",
         "protobuf==5.29.5",
         "grpcio==1.71.2",
         "grpcio-tools==1.71.2",
