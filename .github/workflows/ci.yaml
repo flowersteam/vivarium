@@ -151,14 +151,14 @@ jobs:
 
       - name: Test run_vivarium.py startup
         run: |
-          # run_vivarium.py starts both server+interface and opens browser
-          # Run with timeout and verify both services start
-          timeout 30 python scripts/run_vivarium.py || true
-          # Give processes time to start
-          sleep 5
+          # run_vivarium.py starts both server+interface
+          python scripts/run_vivarium.py --no-browser &
+          VIVARIUM_PID=$!
+          sleep 45
           # Verify server is running
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not running'"
           # Verify interface is responding
           curl -sf http://localhost:5006/run_interface -o /dev/null && echo "Interface OK"
           # Cleanup
+          kill $VIVARIUM_PID || true
           python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"

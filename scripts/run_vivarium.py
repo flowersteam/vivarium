@@ -93,6 +93,11 @@ if __name__ == "__main__":
         default=None,
         help="Scene configuration to load (e.g., session_1, prey_predator)"
     )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Don't open the browser automatically"
+    )
 
     args = parser.parse_args()
 
@@ -101,7 +106,8 @@ if __name__ == "__main__":
 
     main(cmd_args)
 
-    webbrowser.open("http://localhost:5006/run_interface")
+    if not args.no_browser:
+        webbrowser.open("http://localhost:5006/run_interface")
 
     try:
         # Keep the script running to allow the servers to run
