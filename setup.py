@@ -15,6 +15,7 @@ setup(
         "jax==0.4.23; platform_machine == 'x86_64' and sys_platform == 'darwin'",
         "jaxlib==0.4.23; platform_machine == 'x86_64' and sys_platform == 'darwin'",
         "jax-md==0.2.8; platform_machine == 'x86_64' and sys_platform == 'darwin'",
+        "numpy<2; platform_machine == 'x86_64' and sys_platform == 'darwin'",
         "protobuf==5.29.5",
         "grpcio==1.71.2",
         "grpcio-tools==1.71.2",
