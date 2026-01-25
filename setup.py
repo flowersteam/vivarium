@@ -33,6 +33,6 @@ setup(
     
     author="Clément Moulin-Frier",
     author_email="clement.moulinfrier@gmail.com",
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     description="Vivarium enables configuring and running large-scale multi-agents simulations using Jax, with real-time interactions.",
 )
