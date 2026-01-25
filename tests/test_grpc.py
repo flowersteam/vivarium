@@ -131,8 +131,6 @@ def test_bidirectional_streaming(grpc_client):
         assert state_and_cp.state is not None
         assert state_and_cp.controller_parameters is not None
     
-    client.close()
-
 
 def test_set_changes(grpc_client):
     """Test RPC for streaming mode."""
@@ -154,4 +152,3 @@ def test_set_changes(grpc_client):
     client.set_changes([], update_from_server=True)
     assert client.state is not initial_state
     
-    client.close()
