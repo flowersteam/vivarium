@@ -4,4 +4,5 @@ from .handle_server_interface import (
     stop_simulation_server,
     start_panel_interface,
     stop_panel_interface,
+    kill_all_vivarium_processes,
 )

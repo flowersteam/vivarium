@@ -251,6 +251,88 @@ def stop_server_and_interface(safe_mode=True):
     return processes_running
 
 
+def kill_port_processes(port, servers_only=True):
+    """Kill processes on a specific port.
+
+    Args:
+        port: Port number to clear
+        servers_only: If True, only kill processes LISTENING on the port (servers).
+                     If False, kill all processes on the port including clients.
+
+    Returns:
+        List of PIDs that were killed
+    """
+    killed_pids = []
+    try:
+        # Use lsof to find processes on the port
+        if servers_only:
+            # Only get servers (LISTEN state), not client connections
+            cmd = ["lsof", "-ti", f"TCP:{port}", "-sTCP:LISTEN"]
+        else:
+            # Get all processes on the port (servers and clients)
+            cmd = ["lsof", "-ti", f":{port}"]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        pids = result.stdout.strip().split('\n')
+        for pid in pids:
+            if pid and pid.strip():
+                try:
+                    os.kill(int(pid), signal.SIGKILL)
+                    killed_pids.append(pid)
+                    lg.info(f"Killed process {pid} on port {port}")
+                except (ProcessLookupError, ValueError):
+                    pass
+    except Exception as e:
+        lg.warning(f"Failed to check port {port}: {e}")
+    return killed_pids
+
+
+def kill_all_vivarium_processes(grpc_port=50051, interface_port=5006, include_clients=True):
+    """Forcefully kill all Vivarium-related processes.
+
+    This function aggressively cleans up any remaining processes by:
+    1. Killing server and interface processes by name
+    2. Killing any process listening on the gRPC port (default 50051)
+    3. Killing any process listening on the interface port (default 5006)
+
+    Use this when normal cleanup fails or to ensure a clean state.
+
+    Args:
+        grpc_port: Port used by the gRPC server (default 50051)
+        interface_port: Port used by the Panel interface (default 5006)
+        include_clients: If True (default), also kill client connections to the ports.
+                        Set to False when calling from tests to avoid killing the test process.
+
+    Returns:
+        dict with 'by_name' and 'by_port' keys listing killed PIDs
+    """
+    killed = {'by_name': [], 'by_port': []}
+
+    # Kill by process name
+    interface_pids, server_pids = get_server_interface_pids()
+    if interface_pids:
+        terminate_process(interface_pids)
+        killed['by_name'].extend(interface_pids)
+    if server_pids:
+        terminate_process(server_pids)
+        killed['by_name'].extend(server_pids)
+
+    # Give processes time to terminate
+    time.sleep(0.5)
+
+    # Kill processes on the ports (servers only if include_clients=False)
+    killed['by_port'].extend(kill_port_processes(grpc_port, servers_only=not include_clients))
+    killed['by_port'].extend(kill_port_processes(interface_port, servers_only=not include_clients))
+
+    total = len(killed['by_name']) + len(killed['by_port'])
+    if total > 0:
+        lg.info(f"Killed {total} Vivarium process(es)")
+    else:
+        lg.info("No Vivarium processes found")
+
+    return killed
+
+
 def start_process_and_parse_url(process_command, show_output=True, timeout=10):
     """Start a process and parse URL from its output
 
