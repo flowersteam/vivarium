@@ -7,8 +7,9 @@ import os
 
 from vivarium.utils.handle_server_interface import (
     get_server_interface_pids,
-    start_server_and_interface,
     stop_server_and_interface,
+    start_simulation_server,
+    start_panel_interface,
 )
 
 
@@ -25,7 +26,16 @@ def main(cmd_args):
     print(f"Server PIDs: {server_pids}")
     stop_server_and_interface(safe_mode=True)
 
-    start_server_and_interface(cmd_args)
+    # Extract scene name from cmd_args (format: "scene=name")
+    scene_name = None
+    for arg in cmd_args:
+        if arg.startswith("scene="):
+            scene_name = arg.replace("scene=", "")
+            break
+    print("\n🚀 Starting Vivarium server...")
+    start_simulation_server(scene_name)
+    print("\n🌐 Starting web interface...")
+    start_panel_interface()
 
 
 if __name__ == "__main__":
