@@ -114,26 +114,10 @@ def stop_jupyter_server(jupyter_process=None, port=8889):
     lg.info(f"Checking if Jupyter is still running on port {port}...")
     if check_jupyter_running(port):
         lg.warning(f"Jupyter still detected on port {port}, force killing...")
-        try:
-            # Find PID listening on the port
-            result = subprocess.run(
-                ["lsof", "-ti", f":{port}"],
-                capture_output=True,
-                text=True
-            )
-            pids = result.stdout.strip().split('\n')
-            lg.info(f"Found PIDs on port {port}: {pids}")
-            for pid in pids:
-                if pid and pid.strip():
-                    try:
-                        # Use SIGKILL (9) to force kill Jupyter
-                        os.kill(int(pid), signal.SIGKILL)
-                        lg.info(f"Force killed Jupyter process with PID: {pid}")
-                        killed = True
-                    except Exception as e:
-                        lg.warning(f"Failed to kill PID {pid}: {e}")
-        except Exception as e:
-            lg.warning(f"Failed to find/kill Jupyter by port: {e}")
+        killed_pids = kill_port_processes(port, servers_only=True)
+        if killed_pids:
+            killed = True
+            lg.info(f"Killed Jupyter processes: {killed_pids}")
     else:
         lg.info(f"No Jupyter process found on port {port}")
 
@@ -254,6 +238,8 @@ def stop_server_and_interface(safe_mode=True):
 def kill_port_processes(port, servers_only=True):
     """Kill processes on a specific port.
 
+    Cross-platform: Uses lsof on Unix, netstat+taskkill on Windows.
+
     Args:
         port: Port number to clear
         servers_only: If True, only kill processes LISTENING on the port (servers).
@@ -263,27 +249,55 @@ def kill_port_processes(port, servers_only=True):
         List of PIDs that were killed
     """
     killed_pids = []
-    try:
-        # Use lsof to find processes on the port
-        if servers_only:
-            # Only get servers (LISTEN state), not client connections
-            cmd = ["lsof", "-ti", f"TCP:{port}", "-sTCP:LISTEN"]
-        else:
-            # Get all processes on the port (servers and clients)
-            cmd = ["lsof", "-ti", f":{port}"]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        pids = result.stdout.strip().split('\n')
-        for pid in pids:
-            if pid and pid.strip():
-                try:
-                    os.kill(int(pid), signal.SIGKILL)
-                    killed_pids.append(pid)
-                    lg.info(f"Killed process {pid} on port {port}")
-                except (ProcessLookupError, ValueError):
-                    pass
-    except Exception as e:
-        lg.warning(f"Failed to check port {port}: {e}")
+    if os.name == 'nt':  # Windows
+        try:
+            result = subprocess.run(
+                ['netstat', '-ano', '-p', 'TCP'],
+                capture_output=True, text=True
+            )
+            for line in result.stdout.splitlines():
+                if f':{port}' in line:
+                    if servers_only and 'LISTENING' not in line:
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 5:
+                        pid = parts[-1]
+                        if pid.isdigit():
+                            try:
+                                subprocess.run(
+                                    ['taskkill', '/F', '/PID', pid],
+                                    capture_output=True
+                                )
+                                killed_pids.append(pid)
+                                lg.info(f"Killed process {pid} on port {port}")
+                            except Exception:
+                                pass
+        except Exception as e:
+            lg.warning(f"Failed to check port {port} on Windows: {e}")
+    else:  # Unix (macOS, Linux)
+        try:
+            # Use lsof to find processes on the port
+            if servers_only:
+                # Only get servers (LISTEN state), not client connections
+                cmd = ["lsof", "-ti", f"TCP:{port}", "-sTCP:LISTEN"]
+            else:
+                # Get all processes on the port (servers and clients)
+                cmd = ["lsof", "-ti", f":{port}"]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            pids = result.stdout.strip().split('\n')
+            for pid in pids:
+                if pid and pid.strip():
+                    try:
+                        os.kill(int(pid), signal.SIGKILL)
+                        killed_pids.append(pid)
+                        lg.info(f"Killed process {pid} on port {port}")
+                    except (ProcessLookupError, ValueError):
+                        pass
+        except Exception as e:
+            lg.warning(f"Failed to check port {port}: {e}")
+
     return killed_pids
 
 

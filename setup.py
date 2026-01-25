@@ -19,6 +19,7 @@ setup(
         "hydra-core==1.3.2",
         "psutil==7.2.1",
         "pytest==9.0.2",
+        "pytest-timeout>=2.3.1",
         "python-dotenv==1.2.1",
         "notebook==7.0.8",
     ],
