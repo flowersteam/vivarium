@@ -1,5 +1,5 @@
 defaults:
-  - scene: base_scene
+  - scene: braitenberg
 
 log_level: INFO
 num_steps: 10
