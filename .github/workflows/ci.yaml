@@ -5,33 +5,29 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
-  workflow_dispatch:  # Manual trigger from any branch
+  workflow_dispatch:
+    inputs:
+      os:
+        description: 'Operating system to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - ubuntu
+          - macos
+          - windows
 
 jobs:
-  test:
-    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+  test-ubuntu:
+    name: Tests (ubuntu-latest, Python ${{ matrix.python }})
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Full Python version coverage on Ubuntu
-          - os: ubuntu-latest
-            python: '3.10'
-          - os: ubuntu-latest
-            python: '3.11'
-          - os: ubuntu-latest
-            python: '3.12'
-          # macOS Apple Silicon
-          - os: macos-latest
-            python: '3.12'
-          # macOS Intel
-          - os: macos-13
-            python: '3.12'
-          # Windows
-          - os: windows-latest
-            python: '3.12'
+        python: ['3.10', '3.11', '3.12']
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
@@ -52,8 +48,67 @@ jobs:
       - name: Run pytest
         run: pytest -v --timeout=120
 
+  test-macos:
+    name: Tests (${{ matrix.os }}, Python 3.12)
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'macos'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon
+          - os: macos-latest
+          # macOS Intel
+          - os: macos-13
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
+  test-windows:
+    name: Tests (windows-latest, Python 3.12)
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'windows'
+
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
   script-smoke-test:
     name: Script Smoke Tests
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
