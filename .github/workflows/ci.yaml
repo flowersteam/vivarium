@@ -116,24 +116,46 @@ jobs:
         run: pytest -v --timeout=120
 
   script-smoke-test:
-    name: Script Smoke Tests
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Smoke Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.12'
+            shell: bash
+          - os: macos-latest
+            python: '3.12'
+            shell: bash
+          - os: macos-15-intel
+            python: '3.11'
+            shell: bash
+          - os: windows-latest
+            python: '3.12'
+            shell: pwsh
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
           cache: 'pip'
           cache-dependency-path: setup.py
 
       - name: Install dependencies
         run: pip install -e .
 
-      - name: Test run_server.py startup
+      - name: Patch jax-md for Intel Mac
+        if: matrix.os == 'macos-15-intel'
+        run: python scripts/patch_jax_md.py
+
+      # Unix smoke tests (Linux + macOS)
+      - name: Test run_server.py startup (Unix)
+        if: runner.os != 'Windows'
         run: |
           python scripts/run_server.py &
           SERVER_PID=$!
@@ -141,30 +163,62 @@ jobs:
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not responding'"
           kill $SERVER_PID || true
 
-      - name: Test run_interface.py with Panel
+      - name: Test run_interface.py with Panel (Unix)
+        if: runner.os != 'Windows'
         run: |
-          # Start server first (required by interface)
           python scripts/run_server.py &
           SERVER_PID=$!
           sleep 15
-          # Start Panel interface
           panel serve scripts/run_interface.py --show=False &
           PANEL_PID=$!
           sleep 10
-          # Check Panel is responding (HTTP 200)
           curl -sf http://localhost:5006/run_interface -o /dev/null && echo "Panel interface OK"
           kill $PANEL_PID $SERVER_PID || true
 
-      - name: Test run_vivarium.py startup
+      - name: Test run_vivarium.py startup (Unix)
+        if: runner.os != 'Windows'
         run: |
-          # run_vivarium.py starts both server+interface
           python scripts/run_vivarium.py --no-browser &
           VIVARIUM_PID=$!
           sleep 45
-          # Verify server is running
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not running'"
-          # Verify interface is responding
           curl -sf http://localhost:5006/run_interface -o /dev/null && echo "Interface OK"
-          # Cleanup
           kill $VIVARIUM_PID || true
+          python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"
+
+      # Windows smoke tests (PowerShell)
+      - name: Test run_server.py startup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $serverJob = Start-Job { python scripts/run_server.py }
+          Start-Sleep -Seconds 20
+          python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not responding'"
+          Stop-Job $serverJob -ErrorAction SilentlyContinue
+          Remove-Job $serverJob -Force -ErrorAction SilentlyContinue
+
+      - name: Test run_interface.py with Panel (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $serverJob = Start-Job { python scripts/run_server.py }
+          Start-Sleep -Seconds 20
+          $panelJob = Start-Job { panel serve scripts/run_interface.py --show=False }
+          Start-Sleep -Seconds 15
+          $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
+          if ($response.StatusCode -eq 200) { Write-Host "Panel interface OK" }
+          Stop-Job $panelJob, $serverJob -ErrorAction SilentlyContinue
+          Remove-Job $panelJob, $serverJob -Force -ErrorAction SilentlyContinue
+
+      - name: Test run_vivarium.py startup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vivariumJob = Start-Job { python scripts/run_vivarium.py --no-browser }
+          Start-Sleep -Seconds 50
+          python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not running'"
+          $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
+          if ($response.StatusCode -eq 200) { Write-Host "Interface OK" }
+          Stop-Job $vivariumJob -ErrorAction SilentlyContinue
+          Remove-Job $vivariumJob -Force -ErrorAction SilentlyContinue
           python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"
