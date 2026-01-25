@@ -82,6 +82,10 @@ jobs:
           pip install -e .
           pip install pytest-timeout
 
+      - name: Patch jax-md for Intel Mac
+        if: matrix.os == 'macos-15-intel'
+        run: python scripts/patch_jax_md.py
+
       - name: Run pytest
         run: pytest -v --timeout=120
 
