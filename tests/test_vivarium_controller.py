@@ -6,10 +6,9 @@ import jax.numpy as jnp
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 from vivarium.controllers.vivarium_controller import VivariumController
 from vivarium.utils.handle_server_interface import (
-    start_simulation_server,
-    stop_simulation_server,
     check_server_running,
     stop_server_and_interface,
+    stop_simulation_server,
 )
 
 NUM_STEPS = 10
@@ -215,7 +214,7 @@ def test_is_connected_verify_true_with_running_server(client_fixture, request):
     assert controller.client is not None
 
 
-def test_reconnect_after_external_server_restart(clean_server_state):
+def test_reconnect_after_external_server_restart(server_fixture):
     """Integration test: reconnect after server is stopped and restarted externally.
 
     Scenario:
@@ -226,46 +225,36 @@ def test_reconnect_after_external_server_restart(clean_server_state):
     5. VivariumController reconnects to the new server
     """
     # Step 1: Start server as subprocess
-    server_process_1 = start_simulation_server('braitenberg', timeout=30.0)
+    server_process_1 = server_fixture.start('braitenberg', timeout=30.0)
     assert check_server_running()
 
-    try:
-        # Step 2: Connect controller to server
-        controller = VivariumController(connect_to_server=True, start_controller_loop=False)
-        assert controller.is_connected()
-        original_client = controller.client
+    # Step 2: Connect controller to server
+    controller = VivariumController(connect_to_server=True, start_controller_loop=False)
+    assert controller.is_connected()
+    original_client = controller.client
 
-        # Step 3: Stop server externally
-        stop_simulation_server(server_process_1)
-        sleep(1)  # Give time for server to fully stop
-        assert not check_server_running()
+    # Step 3: Stop server externally
+    server_fixture.stop(server_process_1)
+    sleep(1)  # Give time for server to fully stop
+    assert not check_server_running()
 
-        # Controller still thinks it's connected (local state only)
-        assert controller.is_connected(verify=False) == True
-        # But verify=True should detect server is down
-        assert controller.is_connected(verify=True) == False
-        assert controller.client is None  # State cleaned up
+    # Controller still thinks it's connected (local state only)
+    assert controller.is_connected(verify=False) == True
+    # But verify=True should detect server is down
+    assert controller.is_connected(verify=True) == False
+    assert controller.client is None  # State cleaned up
 
-        # Step 4: Start a new server
-        server_process_2 = start_simulation_server('braitenberg', timeout=30.0)
-        assert check_server_running()
+    # Step 4: Start a new server
+    server_fixture.start('braitenberg', timeout=30.0)
+    assert check_server_running()
 
-        try:
-            # Step 5: Connect to the new server
-            result = controller.connect(start_controller_loop=False)
+    # Step 5: Connect to the new server
+    result = controller.connect(start_controller_loop=False)
 
-            assert result == True
-            assert controller.is_connected()
-            assert controller.client is not original_client  # New client instance
-            assert 'simulator' in controller.controllers  # Controllers reinitialized
-
-        finally:
-            stop_simulation_server(server_process_2)
-
-    finally:
-        # Ensure first server is stopped even if test fails early
-        if check_server_running():
-            stop_simulation_server(server_process_1)
+    assert result == True
+    assert controller.is_connected()
+    assert controller.client is not original_client  # New client instance
+    assert 'simulator' in controller.controllers  # Controllers reinitialized
 
 
 def test_two_controllers_server_handoff(clean_server_state):
