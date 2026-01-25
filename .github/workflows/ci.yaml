@@ -59,7 +59,7 @@ jobs:
           # macOS Apple Silicon
           - os: macos-latest
           # macOS Intel
-          - os: macos-13
+          - os: macos-15-intel
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
