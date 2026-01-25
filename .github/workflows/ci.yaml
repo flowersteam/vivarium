@@ -50,7 +50,7 @@ jobs:
         run: pytest -v --timeout=120
 
   test-macos:
-    name: Tests (${{ matrix.os }}, Python 3.12)
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'macos'
     strategy:
       fail-fast: false
@@ -58,8 +58,10 @@ jobs:
         include:
           # macOS Apple Silicon
           - os: macos-latest
-          # macOS Intel
+            python: '3.12'
+          # macOS Intel - use Python 3.11 (grpcio has no 3.12 wheel for x86_64)
           - os: macos-15-intel
+            python: '3.11'
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -67,10 +69,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
           cache: 'pip'
           cache-dependency-path: setup.py
 
