@@ -169,7 +169,7 @@ jobs:
           python scripts/run_server.py &
           SERVER_PID=$!
           sleep 15
-          panel serve scripts/run_interface.py --show=False &
+          panel serve scripts/run_interface.py &
           PANEL_PID=$!
           sleep 10
           curl -sf http://localhost:5006/run_interface -o /dev/null && echo "Panel interface OK"
@@ -207,7 +207,7 @@ jobs:
           $serverProc = Start-Process -FilePath python -ArgumentList "scripts/run_server.py" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 20
           # Start Panel with output redirected to files for debugging
-          $panelProc = Start-Process -FilePath python -ArgumentList "-m", "panel", "serve", "scripts/run_interface.py", "--show=False" -PassThru -NoNewWindow -RedirectStandardOutput "panel_stdout.log" -RedirectStandardError "panel_stderr.log"
+          $panelProc = Start-Process -FilePath python -ArgumentList "-m", "panel", "serve", "scripts/run_interface.py" -PassThru -NoNewWindow -RedirectStandardOutput "panel_stdout.log" -RedirectStandardError "panel_stderr.log"
           Start-Sleep -Seconds 5
           Write-Host "Panel process started with PID: $($panelProc.Id)"
           # Check if process is still running
