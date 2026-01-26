@@ -186,39 +186,37 @@ jobs:
           kill $VIVARIUM_PID || true
           python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"
 
-      # Windows smoke tests (PowerShell)
+      # Windows smoke tests (PowerShell) - using Start-Process for proper background execution
       - name: Test run_server.py startup (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $serverJob = Start-Job { python scripts/run_server.py }
+          $serverProc = Start-Process -FilePath python -ArgumentList "scripts/run_server.py" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 20
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not responding'"
-          Stop-Job $serverJob -ErrorAction SilentlyContinue
-          Remove-Job $serverJob -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
 
       - name: Test run_interface.py with Panel (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $serverJob = Start-Job { python scripts/run_server.py }
+          $serverProc = Start-Process -FilePath python -ArgumentList "scripts/run_server.py" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 20
-          $panelJob = Start-Job { panel serve scripts/run_interface.py --show=False }
+          $panelProc = Start-Process -FilePath panel -ArgumentList "serve", "scripts/run_interface.py", "--show=False" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 15
           $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
           if ($response.StatusCode -eq 200) { Write-Host "Panel interface OK" }
-          Stop-Job $panelJob, $serverJob -ErrorAction SilentlyContinue
-          Remove-Job $panelJob, $serverJob -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $panelProc.Id -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
 
       - name: Test run_vivarium.py startup (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $vivariumJob = Start-Job { python scripts/run_vivarium.py --no-browser }
+          $vivariumProc = Start-Process -FilePath python -ArgumentList "scripts/run_vivarium.py", "--no-browser" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 50
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not running'"
           $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
           if ($response.StatusCode -eq 200) { Write-Host "Interface OK" }
-          Stop-Job $vivariumJob -ErrorAction SilentlyContinue
-          Remove-Job $vivariumJob -Force -ErrorAction SilentlyContinue
+          Stop-Process -Id $vivariumProc.Id -Force -ErrorAction SilentlyContinue
           python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"
