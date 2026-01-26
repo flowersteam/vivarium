@@ -192,12 +192,13 @@ check_python() {
 
         if [ -n "$found_python" ]; then
             print_error "Found $found_python, but Vivarium requires Python 3.11 or 3.12."
+            echo ""
+            print_wrong_version_instructions
         else
             print_error "Python 3.11 or 3.12 is required but not found."
+            echo ""
+            print_python_not_found_instructions
         fi
-
-        echo ""
-        print_python_install_instructions
         exit 1
     fi
 
@@ -223,7 +224,31 @@ check_python() {
     print_success "Python $python_version found ($python_cmd)"
 }
 
-print_python_install_instructions() {
+print_wrong_version_instructions() {
+    echo "=== How to Fix This ==="
+    echo ""
+    echo "You have Python installed, but it's the wrong version."
+    echo "Create a conda environment with Python 3.11 or 3.12:"
+    echo ""
+
+    case "$PLATFORM" in
+        macos_intel)
+            echo "  conda create -n vivarium python=3.11"
+            echo "  conda activate vivarium"
+            echo ""
+            echo "(Intel Mac requires Python 3.11, not 3.12)"
+            ;;
+        *)
+            echo "  conda create -n vivarium python=3.12"
+            echo "  conda activate vivarium"
+            ;;
+    esac
+
+    echo ""
+    echo "Then run this script again."
+}
+
+print_python_not_found_instructions() {
     echo "=== How to Install Python ==="
     echo ""
 
@@ -233,15 +258,12 @@ print_python_install_instructions() {
             echo ""
             echo "  1. Download from: https://www.anaconda.com/download"
             echo "  2. Run the installer"
-            echo "  3. IMPORTANT: During installation, enable these options:"
-            echo "     - 'Add Anaconda to my PATH environment variable'"
-            echo "     - 'Register Anaconda as my default Python'"
-            echo "  4. Restart your terminal after installation"
+            echo "  3. Restart your terminal after installation"
             echo ""
             if [ "$PLATFORM" = "macos_intel" ]; then
-                echo "  5. Create a Python 3.11 environment (required for Intel Mac):"
-                echo "     conda create -n py311 python=3.11"
-                echo "     conda activate py311"
+                echo "  4. Create a Python 3.11 environment (required for Intel Mac):"
+                echo "     conda create -n vivarium python=3.11"
+                echo "     conda activate vivarium"
                 echo ""
             fi
             echo "Alternative: Install via Homebrew:"

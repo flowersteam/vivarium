@@ -426,7 +426,7 @@ def print_success_message(base_path, platform_info, branch=None):
     print_header("Installation Complete!")
 
     if platform_info['is_windows']:
-        run_cmd = "run_vivarium.bat"
+        run_cmd = ".\\run_vivarium.bat"
         activate_cmd = r"venv_vivarium\Scripts\activate"
     else:
         run_cmd = "./run_vivarium.sh"
