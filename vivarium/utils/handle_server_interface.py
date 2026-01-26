@@ -439,6 +439,50 @@ def check_server_running(host="localhost", port=50051):
     return wait_for_grpc_server(host=host, port=port, timeout=1.0, poll_interval=0.2)
 
 
+def wait_for_http(url, retries=1, delay=5.0, timeout=10.0):
+    """Wait for an HTTP endpoint to respond with status 200.
+
+    Useful for checking if a web server (e.g., Panel interface) is ready.
+    Can be used programmatically or from command line for CI health checks.
+
+    Args:
+        url: The URL to check (e.g., 'http://localhost:5006/run_interface')
+        retries: Maximum number of attempts (default: 1, no retries)
+        delay: Seconds to wait between retries (default: 5.0)
+        timeout: Timeout in seconds for each HTTP request (default: 10.0)
+
+    Returns:
+        True if URL responded with 200, False otherwise
+
+    Example:
+        # Programmatic use
+        if wait_for_http('http://localhost:5006/run_interface', retries=12, delay=5):
+            print("Panel is ready!")
+
+        # CI use (will exit with code 1 on failure)
+        python -c "from vivarium.utils.handle_server_interface import wait_for_http; \\
+                   assert wait_for_http('http://localhost:5006/run_interface', retries=12)"
+    """
+    import urllib.request
+    import urllib.error
+
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(url, method='GET')
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                if response.status == 200:
+                    lg.info(f"HTTP check OK: {url} (attempt {attempt}/{retries})")
+                    return True
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
+            lg.debug(f"HTTP check attempt {attempt}/{retries} for {url}: {e}")
+
+        if attempt < retries:
+            time.sleep(delay)
+
+    lg.warning(f"HTTP check failed after {retries} attempts: {url}")
+    return False
+
+
 def start_simulation_server(scene_name=None, timeout=30.0, show_output=False):
     """Start the simulation server for a given scene.
 

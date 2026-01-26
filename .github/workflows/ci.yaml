@@ -203,9 +203,9 @@ jobs:
           $serverProc = Start-Process -FilePath python -ArgumentList "scripts/run_server.py" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 20
           $panelProc = Start-Process -FilePath panel -ArgumentList "serve", "scripts/run_interface.py", "--show=False" -PassThru -WindowStyle Hidden
-          Start-Sleep -Seconds 15
-          $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
-          if ($response.StatusCode -eq 200) { Write-Host "Panel interface OK" }
+          Start-Sleep -Seconds 5
+          python -c "from vivarium.utils.handle_server_interface import wait_for_http; assert wait_for_http('http://localhost:5006/run_interface', retries=12, delay=5), 'Panel interface not responding'"
+          Write-Host "Panel interface OK"
           Stop-Process -Id $panelProc.Id -Force -ErrorAction SilentlyContinue
           Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
 
@@ -216,7 +216,7 @@ jobs:
           $vivariumProc = Start-Process -FilePath python -ArgumentList "scripts/run_vivarium.py", "--no-browser" -PassThru -WindowStyle Hidden
           Start-Sleep -Seconds 50
           python -c "from vivarium.utils.handle_server_interface import check_server_running; assert check_server_running(), 'Server not running'"
-          $response = Invoke-WebRequest -Uri http://localhost:5006/run_interface -UseBasicParsing -ErrorAction Stop
-          if ($response.StatusCode -eq 200) { Write-Host "Interface OK" }
+          python -c "from vivarium.utils.handle_server_interface import wait_for_http; assert wait_for_http('http://localhost:5006/run_interface', retries=12, delay=5), 'Interface not responding'"
+          Write-Host "Interface OK"
           Stop-Process -Id $vivariumProc.Id -Force -ErrorAction SilentlyContinue
           python -c "from vivarium.utils.handle_server_interface import kill_all_vivarium_processes; kill_all_vivarium_processes()"
