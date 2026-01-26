@@ -114,3 +114,60 @@ jobs:
 
       - name: Run pytest
         run: pytest -v --timeout=120
+
+  # Test the installation script on all platforms
+  test-installer:
+    name: Test Installer (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.12'
+          - os: macos-latest
+            python: '3.12'
+          - os: macos-15-intel
+            python: '3.11'
+          - os: windows-latest
+            python: '3.12'
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run installer (CI mode)
+        run: python install/install.py --ci
+
+      - name: Verify vivarium import (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source venv_vivarium/bin/activate
+          python -c "import vivarium; print('Vivarium imported successfully!')"
+
+      - name: Verify vivarium import (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv_vivarium\Scripts\activate
+          python -c "import vivarium; print('Vivarium imported successfully!')"
+
+      - name: Run basic tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source venv_vivarium/bin/activate
+          pip install pytest-timeout
+          pytest tests/ -v --timeout=120
+
+      - name: Run basic tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv_vivarium\Scripts\activate
+          pip install pytest-timeout
+          pytest tests/ -v --timeout=120
