@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/main/install/i
 ### Windows (PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; . .\install.ps1
 ```
 
 If you encounter errors, read the [Prerequisites](#prerequisites) section below.
@@ -56,26 +56,35 @@ Visit [https://www.anaconda.com/download/success](https://www.anaconda.com/downl
 
 #### Step 2: Run the Installer
 
-Follow the installer prompts. Default options are usually fine.
+Follow the installer prompts. Default options are fine.
 
-#### Step 3: Initialize Conda for PowerShell (Windows only)
+#### Step 3: Initialize Conda (Windows only)
 
 After installation, you need to enable conda in PowerShell:
 
 1. Press the **Windows key** and search for **"Anaconda Prompt"**
-2. Open it (this is a special terminal where conda works)
-3. Run:
+2. Open it and run:
    ```
    conda init powershell
    ```
-4. Close the Anaconda Prompt
-5. Now you can use conda and Python from regular PowerShell
+3. Close the Anaconda Prompt and the PowerShell
+4. Reopen PowerShell
+   If you get an execution policy error when opening PowerShell, run:
+   ```powershell
+   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+   ```
+   then close and reopen PowerShell.
+
 
 On macOS/Linux, conda is usually initialized automatically during installation.
 
-#### Step 4: Restart Your Terminal
+#### Step 4: Create a Python 3.11 Environment (if needed)
 
-Close and reopen your terminal (Terminal on macOS, PowerShell on Windows).
+If your default Python is not 3.11 or 3.12, create a new environment:
+
+```bash
+conda create -n vivarium python=3.11 -y && conda activate vivarium
+```
 
 #### Step 5: Verify Installation
 
@@ -83,13 +92,12 @@ Close and reopen your terminal (Terminal on macOS, PowerShell on Windows).
 python --version
 ```
 
-This should show something like `Python 3.12.x` or `Python 3.11.x`.
+This should show `Python 3.11.x` or `Python 3.12.x`.
 
 ### Installing Python on Ubuntu/Debian Linux
 
 ```bash
-sudo apt update
-sudo apt install python3.11 python3.11-venv git
+sudo apt update && sudo apt install -y python3.11 python3.11-venv git
 ```
 
 ### Installing Git
@@ -102,13 +110,11 @@ xcode-select --install
 ```
 
 **Windows:**
-Download from [https://git-scm.com/download/win](https://git-scm.com/download/win)
-
-During installation, select "Git from the command line and also from 3rd-party software".
+Download from [https://git-scm.com/download/win](https://git-scm.com/download/win). Keep default options during installation. **Restart PowerShell after installing.**
 
 **Ubuntu/Debian:**
 ```bash
-sudo apt install git
+sudo apt install -y git
 ```
 
 ---
@@ -131,7 +137,15 @@ Choose where you want Vivarium to be installed. For example:
 cd ~/Documents
 ```
 
-### Step 3: Run the Installation Script
+### Step 3: Activate Your Conda Environment (if using Anaconda)
+
+If you created a conda environment with Python 3.11:
+
+```bash
+conda activate vivarium
+```
+
+### Step 4: Run the Installation Script
 
 **macOS / Linux:**
 ```bash
@@ -140,10 +154,10 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/main/install/i
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; . .\install.ps1
 ```
 
-### Step 4: Wait for Installation
+### Step 5: Wait for Installation
 
 The script will:
 1. Check your Python and git installation
@@ -153,14 +167,14 @@ The script will:
 
 This may take several minutes depending on your internet connection.
 
-### Step 5: Run Vivarium
+### Step 6: Run Vivarium
 
 After installation completes:
 
 ```bash
 cd vivarium
 ./run_vivarium.sh    # macOS/Linux
-run_vivarium.bat     # Windows
+.\run_vivarium.bat   # Windows (PowerShell)
 ```
 
 Your web browser will open automatically with the Vivarium interface at http://localhost:5006
@@ -192,40 +206,38 @@ uname -m
 Intel Macs **require Python 3.11** (not 3.12) due to dependency compatibility issues. If you have Anaconda with Python 3.12, create a Python 3.11 environment:
 
 ```bash
-conda create -n py311 python=3.11
-conda activate py311
+conda create -n vivarium python=3.11 -y && conda activate vivarium
 ```
 
-Then run the installation script. The installer will create a virtual environment using Python 3.11, which will work independently of conda.
+Then run the installation script.
 
 ### Windows
 
-**PowerShell Execution Policy:**
+**Execution Policy Errors:**
 
-The installation command includes `-ExecutionPolicy Bypass` to handle this automatically. If you still see an error about execution policy, you can set it permanently:
+If you see an execution policy error when opening PowerShell or running scripts:
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-Then try the installation again.
+Then close and reopen PowerShell.
 
-**PATH Issues:**
+**Conda Environment Not Detected:**
 
-If `python` is not found after installing Anaconda, you need to initialize conda for PowerShell:
+Make sure to activate your conda environment before running the installer, and use dot-sourcing (`. .\install.ps1` with a space after the dot):
 
-1. Press the **Windows key** and search for **"Anaconda Prompt"**
-2. Open it (this is a special terminal where conda works)
-3. Run: `conda init powershell`
-4. Close the Anaconda Prompt
-5. Open a **new PowerShell** window and try the installation again
+```powershell
+conda activate vivarium
+. .\install.ps1
+```
 
 ### Ubuntu/Debian Linux
 
 Make sure you have the venv module:
 
 ```bash
-sudo apt install python3.11-venv
+sudo apt install -y python3.11-venv
 ```
 
 ---
@@ -234,14 +246,19 @@ sudo apt install python3.11-venv
 
 ### "Python not found" or wrong version
 
-1. Verify Python is installed: `python --version` or `python3 --version`
-2. If installed but not found, restart your terminal
-3. For Windows: Ensure "Add to PATH" was checked during installation
-4. Install Python following the [Prerequisites](#prerequisites) section
+1. Verify Python is installed: `python --version`
+2. If using Anaconda, make sure conda is initialized and environment is activated:
+   ```bash
+   conda activate vivarium
+   ```
+3. If the version is wrong, create a new environment:
+   ```bash
+   conda create -n vivarium python=3.11 -y && conda activate vivarium
+   ```
 
 ### "git not found"
 
-Install git following the instructions in [Prerequisites](#prerequisites).
+Install git following the instructions in [Prerequisites](#prerequisites). **On Windows, restart PowerShell after installing git.**
 
 ### Permission denied (Unix)
 
@@ -273,11 +290,20 @@ Ensure you're using Python 3.11, not 3.12:
 python --version  # Should show 3.11.x
 ```
 
-If using Anaconda:
+If not:
 ```bash
-conda create -n py311 python=3.11
-conda activate py311
-# Run installation again
+conda create -n vivarium python=3.11 -y && conda activate vivarium
+```
+
+Then run the installation again.
+
+### Windows: Script doesn't detect conda environment
+
+Use dot-sourcing to run the script (note the space between `.` and `.\`):
+
+```powershell
+conda activate vivarium
+. .\install.ps1
 ```
 
 ---
@@ -297,7 +323,7 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/in
 
 ```powershell
 # Replace BRANCH_NAME with the branch you want
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1 -Branch BRANCH_NAME
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/install/install.ps1 -OutFile install.ps1; . .\install.ps1 -Branch BRANCH_NAME
 ```
 
 ---
@@ -342,8 +368,8 @@ Remove-Item -Recurse -Force vivarium    # Windows
 Start Vivarium:
 ```bash
 cd vivarium
-./run_vivarium.sh    # macOS/Linux
-run_vivarium.bat     # Windows
+./run_vivarium.sh     # macOS/Linux
+.\run_vivarium.bat    # Windows
 ```
 
 You should see:

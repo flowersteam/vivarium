@@ -211,11 +211,9 @@ check_python() {
             echo ""
             echo "If you installed Anaconda, create a Python 3.11 environment:"
             echo ""
-            echo "  conda create -n py311 python=3.11"
-            echo "  conda activate py311"
+            echo -e "  ${GREEN}conda create -n vivarium python=3.11 -y && conda activate vivarium${NC}"
             echo ""
-            echo "Then run this script again. The installer will create a virtual environment"
-            echo "using Python 3.11, which will work independently of conda."
+            echo "Then run this script again."
             exit 1
         fi
     fi
@@ -233,14 +231,12 @@ print_wrong_version_instructions() {
 
     case "$PLATFORM" in
         macos_intel)
-            echo "  conda create -n vivarium python=3.11"
-            echo "  conda activate vivarium"
+            echo -e "  ${GREEN}conda create -n vivarium python=3.11 -y && conda activate vivarium${NC}"
             echo ""
             echo "(Intel Mac requires Python 3.11, not 3.12)"
             ;;
         *)
-            echo "  conda create -n vivarium python=3.12"
-            echo "  conda activate vivarium"
+            echo -e "  ${GREEN}conda create -n vivarium python=3.12 -y && conda activate vivarium${NC}"
             ;;
     esac
 
@@ -262,8 +258,7 @@ print_python_not_found_instructions() {
             echo ""
             if [ "$PLATFORM" = "macos_intel" ]; then
                 echo "  4. Create a Python 3.11 environment (required for Intel Mac):"
-                echo "     conda create -n vivarium python=3.11"
-                echo "     conda activate vivarium"
+                echo "     conda create -n vivarium python=3.11 -y && conda activate vivarium"
                 echo ""
             fi
             echo "Alternative: Install via Homebrew:"

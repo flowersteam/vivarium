@@ -8,11 +8,13 @@
 #   3. Invokes install.py for the rest
 #
 # Usage:
-#   # Download and run (main branch)
-#   iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1
+#   # Download and run (main branch) - run this as a single line:
+#   iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; . .\install.ps1
 #
-#   # Specific branch
-#   iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1 -Branch BRANCH
+#   # Specific branch - run this as a single line:
+#   iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH/install/install.ps1 -OutFile install.ps1; . .\install.ps1 -Branch BRANCH
+#
+# Note: The ". \" prefix (dot-sourcing) is required to inherit the conda environment.
 #
 # =============================================================================
 
@@ -30,6 +32,7 @@ $ErrorActionPreference = "Stop"
 
 $REPO_URL = "https://github.com/flowersteam/vivarium.git"
 $INSTALL_DIR = "vivarium"
+$CURRENT_DIR = Get-Location
 
 # ============================================================================
 # Output Functions
@@ -81,18 +84,48 @@ function Test-Git {
         Write-Host ""
         Write-Host "=== How to Install Git ===" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "Download from: https://git-scm.com/download/win"
+        Write-Host "1. Download from: " -NoNewline
+        Write-Host "https://git-scm.com/download/win" -ForegroundColor Cyan
+        Write-Host "2. Run the installer (keep default options)"
+        Write-Host "3. Close this PowerShell window completely"
+        Write-Host "4. Open a new PowerShell and run:" -NoNewline
         Write-Host ""
-        Write-Host "During installation, keep the default options and make sure to enable:"
-        Write-Host '  "Git from the command line and also from 3rd-party software"'
+        Write-Host "   cd $CURRENT_DIR; . .\install.ps1 -Branch $Branch" -ForegroundColor Green
         Write-Host ""
-        Write-Host "After installing git, restart PowerShell and run this script again."
         return $false
     }
 }
 
 function Test-Python {
     Write-Step "Checking for Python..."
+
+    # First, check if we're in an active conda environment
+    $condaPrefix = $env:CONDA_PREFIX
+    if ($condaPrefix) {
+        # Use Python from the active conda environment directly
+        $condaPython = Join-Path $condaPrefix "python.exe"
+        if (Test-Path $condaPython) {
+            try {
+                $versionOutput = & $condaPython --version 2>&1
+                if ($versionOutput -match "Python (\d+)\.(\d+)") {
+                    $major = [int]$Matches[1]
+                    $minor = [int]$Matches[2]
+                    if ($major -eq 3 -and ($minor -eq 11 -or $minor -eq 12)) {
+                        $script:PYTHON_CMD = $condaPython
+                        Write-Success "Python $major.$minor found (conda env: $($env:CONDA_DEFAULT_ENV))"
+                        return $true
+                    }
+                    else {
+                        Write-Error "Conda environment '$($env:CONDA_DEFAULT_ENV)' has Python $major.$minor, but Vivarium requires 3.11 or 3.12."
+                        Write-Host ""
+                        Write-WrongVersionInstructions
+                        return $false
+                    }
+                }
+            }
+            catch {}
+        }
+    }
 
     # Try different Python commands
     $pythonCmd = $null
@@ -147,41 +180,51 @@ function Test-Python {
 }
 
 function Write-WrongVersionInstructions {
+    # Check if conda is available
+    $hasConda = $null -ne (Get-Command conda -ErrorAction SilentlyContinue)
+
     Write-Host "=== How to Fix This ===" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "You have Python installed, but it's the wrong version."
-    Write-Host "Create a conda environment with Python 3.11 or 3.12:"
-    Write-Host ""
-    Write-Host "  conda create -n vivarium python=3.11" -ForegroundColor Green
-    Write-Host "  conda activate vivarium" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Then run this script again."
+
+    if ($hasConda) {
+        Write-Host "Create and activate a conda environment with Python 3.11:"
+        Write-Host ""
+        Write-Host "  conda create -n vivarium python=3.11 -y && conda activate vivarium" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Then run this script again:"
+        Write-Host "  cd $CURRENT_DIR; . .\install.ps1 -Branch $Branch" -ForegroundColor Green
+    }
+    else {
+        Write-Host "Install Anaconda, then create a Python 3.11 environment."
+        Write-Host ""
+        Write-PythonNotFoundInstructions
+    }
     Write-Host ""
 }
 
 function Write-PythonNotFoundInstructions {
-    Write-Host "=== How to Fix This ===" -ForegroundColor Yellow
+    Write-Host "=== How to Install Python ===" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "If you already have Anaconda installed:" -ForegroundColor Cyan
+    Write-Host "Option A - Anaconda (recommended):" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  1. Press the Windows key and search for 'Anaconda Prompt'"
-    Write-Host "  2. Open it"
-    Write-Host "  3. Run: " -NoNewline
-    Write-Host "conda init powershell" -ForegroundColor Green
-    Write-Host "  4. Close the Anaconda Prompt"
-    Write-Host "  5. Open a new PowerShell window and run this script again"
+    Write-Host "  1. Download from: https://www.anaconda.com/download/success"
+    Write-Host "  2. Run the installer (default options are fine)"
+    Write-Host "  3. Open 'Anaconda Prompt' from Start menu and run:"
+    Write-Host "       conda init powershell" -ForegroundColor Green
+    Write-Host "  4. If you get an execution policy error when opening PowerShell, run:"
+    Write-Host "       Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned" -ForegroundColor Green
+    Write-Host "  5. Open a new PowerShell and run:"
+    Write-Host "       conda create -n vivarium python=3.11 -y && conda activate vivarium" -ForegroundColor Green
+    Write-Host "  6. Then run:"
+    Write-Host "       cd $CURRENT_DIR; . .\install.ps1 -Branch $Branch" -ForegroundColor Green
     Write-Host ""
-    Write-Host "If you don't have Python installed:" -ForegroundColor Cyan
+    Write-Host "Option B - Python from python.org:" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  Option A - Anaconda (recommended):"
-    Write-Host "    1. Download from: https://www.anaconda.com/download/success"
-    Write-Host "    2. Run the installer"
-    Write-Host "    3. Follow the steps above to initialize conda"
-    Write-Host ""
-    Write-Host "  Option B - Python from python.org:"
-    Write-Host "    1. Download from: https://www.python.org/downloads/"
-    Write-Host "    2. During installation, check 'Add Python to PATH'"
-    Write-Host "    3. Restart PowerShell and run this script again"
+    Write-Host "  1. Download Python 3.11 from: https://www.python.org/downloads/"
+    Write-Host "  2. During installation, check 'Add Python to PATH'"
+    Write-Host "  3. Open a new PowerShell and run:"
+    Write-Host "       cd $CURRENT_DIR; . .\install.ps1 -Branch $Branch" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -248,7 +291,7 @@ function Main {
     Write-Host "Installation details:"
     Write-Host "  - Repository: $REPO_URL"
     Write-Host "  - Branch: $Branch"
-    Write-Host "  - Install directory: $(Get-Location)\$INSTALL_DIR"
+    Write-Host "  - Install directory: $CURRENT_DIR\$INSTALL_DIR"
     Write-Host ""
     Write-Host "Detected platform: Windows"
     Write-Host ""
