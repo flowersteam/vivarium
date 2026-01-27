@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/main/install/i
 ### Windows (PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; .\install.ps1
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 If you encounter errors, read the [Prerequisites](#prerequisites) section below.
@@ -56,18 +56,28 @@ Visit [https://www.anaconda.com/download/success](https://www.anaconda.com/downl
 
 #### Step 2: Run the Installer
 
-**Important options to enable during installation:**
+Follow the installer prompts. Default options are usually fine.
 
-- **macOS/Windows**: Check "Add Anaconda to my PATH environment variable"
-- **Windows**: Check "Register Anaconda as my default Python"
+#### Step 3: Initialize Conda for PowerShell (Windows only)
 
-These options make Python available from the command line.
+After installation, you need to enable conda in PowerShell:
 
-#### Step 3: Restart Your Terminal
+1. Press the **Windows key** and search for **"Anaconda Prompt"**
+2. Open it (this is a special terminal where conda works)
+3. Run:
+   ```
+   conda init powershell
+   ```
+4. Close the Anaconda Prompt
+5. Now you can use conda and Python from regular PowerShell
 
-Close and reopen your terminal (Terminal on macOS, PowerShell on Windows) after installation.
+On macOS/Linux, conda is usually initialized automatically during installation.
 
-#### Step 4: Verify Installation
+#### Step 4: Restart Your Terminal
+
+Close and reopen your terminal (Terminal on macOS, PowerShell on Windows).
+
+#### Step 5: Verify Installation
 
 ```bash
 python --version
@@ -130,7 +140,7 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/main/install/i
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; .\install.ps1
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 ### Step 4: Wait for Installation
@@ -192,7 +202,7 @@ Then run the installation script. The installer will create a virtual environmen
 
 **PowerShell Execution Policy:**
 
-If you see an error about execution policy, run:
+The installation command includes `-ExecutionPolicy Bypass` to handle this automatically. If you still see an error about execution policy, you can set it permanently:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -202,10 +212,13 @@ Then try the installation again.
 
 **PATH Issues:**
 
-If `python` is not found after installing Anaconda:
-1. Restart PowerShell completely (close all windows)
-2. If still not working, check that Anaconda was installed with "Add to PATH" enabled
-3. You may need to add Python to PATH manually through System Properties > Environment Variables
+If `python` is not found after installing Anaconda, you need to initialize conda for PowerShell:
+
+1. Press the **Windows key** and search for **"Anaconda Prompt"**
+2. Open it (this is a special terminal where conda works)
+3. Run: `conda init powershell`
+4. Close the Anaconda Prompt
+5. Open a **new PowerShell** window and try the installation again
 
 ### Ubuntu/Debian Linux
 
@@ -284,7 +297,7 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/in
 
 ```powershell
 # Replace BRANCH_NAME with the branch you want
-iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/install/install.ps1 -OutFile install.ps1; .\install.ps1 -Branch "BRANCH_NAME"
+iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/BRANCH_NAME/install/install.ps1 -OutFile install.ps1; powershell -ExecutionPolicy Bypass -File install.ps1 -Branch BRANCH_NAME
 ```
 
 ---
