@@ -33,7 +33,7 @@ def main(cmd_args):
             scene_name = arg.replace("scene=", "")
             break
     print("\n🚀 Starting Vivarium server...")
-    start_simulation_server(scene_name)
+    start_simulation_server(scene_name, timeout=90.)
     print("\n🌐 Starting web interface...")
     start_panel_interface()
 
@@ -112,7 +112,6 @@ if __name__ == "__main__":
     try:
         # Keep the script running to allow the servers to run
         print("\nVivarium is running. Press Ctrl+C to stop.\n")
-        print("💡 Tip: Start Jupyter from the Notebook tab in the web interface\n")
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
