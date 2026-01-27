@@ -16,8 +16,8 @@ lg = logging.getLogger(__name__)
 
 SERVER_PROCESS_NAME = "scripts/run_server.py"
 INTERFACE_PROCESS_NAME = "scripts/run_interface.py"
-SERVER_PROCESS_NAME_WIN = "scripts\\run_server.py"
-INTERFACE_PROCESS_NAME_WIN = "scripts\\run_interface.py"
+SERVER_PROCESS_NAME_WIN = "run_server.py"
+INTERFACE_PROCESS_NAME_WIN = "run_interface.py"
 
 
 def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_process_object=True):
