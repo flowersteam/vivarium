@@ -174,7 +174,7 @@ function Write-PythonNotFoundInstructions {
     Write-Host "If you don't have Python installed:" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  Option A - Anaconda (recommended):"
-    Write-Host "    1. Download from: https://www.anaconda.com/download"
+    Write-Host "    1. Download from: https://www.anaconda.com/download/success"
     Write-Host "    2. Run the installer"
     Write-Host "    3. Follow the steps above to initialize conda"
     Write-Host ""

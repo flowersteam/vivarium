@@ -256,7 +256,7 @@ print_python_not_found_instructions() {
         macos_arm|macos_intel)
             echo "For macOS, we recommend installing Anaconda:"
             echo ""
-            echo "  1. Download from: https://www.anaconda.com/download"
+            echo "  1. Download from: https://www.anaconda.com/download/success"
             echo "  2. Run the installer"
             echo "  3. Restart your terminal after installation"
             echo ""

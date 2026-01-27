@@ -52,7 +52,7 @@ Anaconda is a Python distribution that includes many useful tools. We recommend 
 
 #### Step 1: Download Anaconda
 
-Visit [https://www.anaconda.com/download](https://www.anaconda.com/download) and download the installer for your operating system.
+Visit [https://www.anaconda.com/download/success](https://www.anaconda.com/download/success) and download the installer for your operating system.
 
 #### Step 2: Run the Installer
 
