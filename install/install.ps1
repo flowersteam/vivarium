@@ -83,7 +83,7 @@ function Test-Git {
         Write-Host ""
         Write-Host "Download from: https://git-scm.com/download/win"
         Write-Host ""
-        Write-Host "During installation, select:"
+        Write-Host "During installation, keep the default options and make sure to enable:"
         Write-Host '  "Git from the command line and also from 3rd-party software"'
         Write-Host ""
         Write-Host "After installing git, restart PowerShell and run this script again."
