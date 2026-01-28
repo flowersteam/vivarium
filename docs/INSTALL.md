@@ -153,6 +153,11 @@ curl -fsSL https://raw.githubusercontent.com/flowersteam/vivarium/main/install/i
 ```
 
 **Windows (PowerShell):**
+First execute:
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+Then:
 ```powershell
 iwr -useb https://raw.githubusercontent.com/flowersteam/vivarium/main/install/install.ps1 -OutFile install.ps1; . .\install.ps1
 ```
