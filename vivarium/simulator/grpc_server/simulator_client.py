@@ -148,6 +148,9 @@ class SimulatorGRPCClient:
         
     def close(self):
         """Close the gRPC channel."""
+        if self.channel is None:
+            return
+        lg.info(f"Closing gRPC client '{self.name}' ...")
         self.unregister_client(self.name)
         self.stop_state_stream(blocking=True)
         self.channel.close()
