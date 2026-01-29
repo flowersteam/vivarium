@@ -239,7 +239,7 @@ def vivarium_controller_start_session(grpc_client):
     yield fn
     
     for controller in controllers:
-        controller.stop()
+        controller.close()
 
 
 @pytest.fixture
