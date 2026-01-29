@@ -104,8 +104,7 @@ def get_interface_command(allow_external_origins: bool = False) -> list:
         return [interface_exe]
     else:
         interface_script = os.path.join(get_bundle_root(), 'scripts/run_interface.py')
-        command = ["panel", "serve", interface_script]
+        command = [sys.executable, interface_script, "--dont-open-browser"]
         if allow_external_origins:
-            command.append("--allow-websocket-origin=*")
-        command.append("--args")
+            command.append("--allow-external-origins")
         return command

@@ -2,41 +2,28 @@ import argparse
 
 import panel as pn
 from vivarium.interface.panel_app import WindowManager
-from vivarium.utils.runtime import is_frozen
-
 
 parser = argparse.ArgumentParser(description="Run the Vivarium interface.")
 parser.add_argument(
-    "--notebook_mode", type=str, default="False", help="Run in notebook mode."
+    "--dont-open-browser", action="store_true", help="Don't open the interface in a browser window."
 )
-args = parser.parse_args()
+parser.add_argument(
+    "--allow-external-origins", action="store_true", help="Allow websocket connections from external origins (e.g., ngrok)."
+)
+args = parser.parse_args()    
+    
+def create_app():
+    wm = WindowManager()
+    return wm.app
 
-if args.notebook_mode == "True":
-    notebook_mode = True
-elif args.notebook_mode == "False":
-    notebook_mode = False
-else:
-    raise ValueError(
-        f"Invalid value for notebook_mode: {args.notebook_mode}. Use either 'True' or 'False'."
-    )
+serve_kwargs = {
+    'port': 5006,
+    'title': "Vivarium",
+    'show': not args.dont_open_browser,
+    'threaded': False,  # Block until server stops
+}
 
-# If running as PyInstaller bundle, start the server programmatically
-# Otherwise, mark as servable for `panel serve` to handle
-if is_frozen():
-    # Frozen mode - start Panel server programmatically
-    # Pass a function that creates the app so it's created after event loop starts
-    def create_app():
-        wm = WindowManager(notebook_mode=notebook_mode)
-        return wm.app
+if args.allow_external_origins:
+    serve_kwargs['websocket_origin'] = '*'
 
-    pn.serve(
-        {'/run_interface': create_app},
-        port=5006,
-        title="Vivarium",
-        show=False,  # Don't auto-open browser
-        threaded=False,  # Block until server stops
-    )
-else:
-    # Development mode - create app and mark as servable for `panel serve` command
-    wm = WindowManager(notebook_mode=notebook_mode)
-    wm.app.servable(title="Vivarium")
+pn.serve({'/run_interface': create_app}, **serve_kwargs)
