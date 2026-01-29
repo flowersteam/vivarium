@@ -32,7 +32,7 @@ def test_start_stop_server_and_interface(server_and_interface_fixture):
     - Server responds to gRPC health checks
     - Interface responds to HTTP requests
     """
-    scene_name = "session_3"
+    scene_name = "braitenberg"
     server_process, interface_process = server_and_interface_fixture(scene_name, timeout=60.0)
     assert server_process is not None
     assert interface_process is not None
