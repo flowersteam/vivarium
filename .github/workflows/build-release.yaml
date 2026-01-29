@@ -75,29 +75,71 @@ jobs:
       - name: Sign macOS binaries (ad-hoc)
         if: runner.os == 'macOS'
         run: |
-          # Ad-hoc sign all executables and the .app bundle
+          # Ad-hoc sign all executables
           find dist -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
-          if [ -d "dist/Vivarium.app" ]; then
-            codesign --force --deep --sign - dist/Vivarium.app
-          fi
+
+      - name: Create launcher script (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cat > dist/Start-Vivarium.command << 'EOF'
+          #!/bin/bash
+          # Vivarium Launcher - double-click to start
+          # Close this terminal window to quit Vivarium
+
+          cd "$(dirname "$0")"
+          echo "Starting Vivarium..."
+          echo "Close this terminal window to quit."
+          echo ""
+          ./vivarium-interface/vivarium-interface
+          EOF
+          chmod +x dist/Start-Vivarium.command
+
+      - name: Create launcher script (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cat > dist/start-vivarium.sh << 'EOF'
+          #!/bin/bash
+          # Vivarium Launcher
+          # Close this terminal window to quit Vivarium
+
+          cd "$(dirname "$0")"
+          echo "Starting Vivarium..."
+          echo "Close this terminal window to quit."
+          echo ""
+          ./vivarium-interface/vivarium-interface
+          EOF
+          chmod +x dist/start-vivarium.sh
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
           cd dist
-          # For macOS, include the .app bundle if it exists
-          if [ -d "Vivarium.app" ]; then
-            tar -czvf ../${{ matrix.artifact_name }}.tar.gz Vivarium.app vivarium-server vivarium-interface
-          else
-            tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface
-          fi
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface Start-Vivarium.command start-vivarium.sh 2>/dev/null || \
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface Start-Vivarium.command 2>/dev/null || \
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface start-vivarium.sh
+
+      - name: Create launcher script (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @"
+          @echo off
+          REM Vivarium Launcher - double-click to start
+          REM Close this window to quit Vivarium
+
+          cd /d "%~dp0"
+          echo Starting Vivarium...
+          echo Close this window to quit.
+          echo.
+          vivarium-interface\vivarium-interface.exe
+          "@ | Out-File -FilePath dist\Start-Vivarium.bat -Encoding ASCII
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path vivarium-server, vivarium-interface -DestinationPath ../${{ matrix.artifact_name }}.zip
+          Compress-Archive -Path vivarium-server, vivarium-interface, Start-Vivarium.bat -DestinationPath ../${{ matrix.artifact_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

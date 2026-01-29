@@ -157,25 +157,28 @@ interface_coll = COLLECT(
 )
 
 # ============================================================================
-# macOS APPLICATION BUNDLE
+# NOTE: macOS .app bundle removed for alpha version
 # ============================================================================
-# Creates a proper .app bundle containing both executables
-# The server executable is placed in Contents/Resources/
-
-import sys
-if sys.platform == 'darwin':
-    app = BUNDLE(
-        interface_coll,
-        server_coll,
-        name='Vivarium.app',
-        icon=None,  # Add path to .icns file if you have one
-        bundle_identifier='com.vivarium.app',
-        info_plist={
-            'CFBundleName': 'Vivarium',
-            'CFBundleDisplayName': 'Vivarium',
-            'CFBundleVersion': '1.0.0',
-            'CFBundleShortVersionString': '1.0.0',
-            'NSHighResolutionCapable': True,
-            'LSMinimumSystemVersion': '10.15.0',
-        },
-    )
+# For alpha, we distribute raw executables with a launcher script.
+# Users double-click the .command script which opens Terminal and runs the app.
+# This allows users to see logs and quit cleanly by closing the terminal.
+#
+# To restore .app bundle in the future, uncomment below:
+#
+# import sys
+# if sys.platform == 'darwin':
+#     app = BUNDLE(
+#         interface_coll,
+#         server_coll,
+#         name='Vivarium.app',
+#         icon=None,
+#         bundle_identifier='com.vivarium.app',
+#         info_plist={
+#             'CFBundleName': 'Vivarium',
+#             'CFBundleDisplayName': 'Vivarium',
+#             'CFBundleVersion': '1.0.0',
+#             'CFBundleShortVersionString': '1.0.0',
+#             'NSHighResolutionCapable': True,
+#             'LSMinimumSystemVersion': '10.15.0',
+#         },
+#     )
