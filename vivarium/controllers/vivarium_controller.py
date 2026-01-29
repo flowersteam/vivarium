@@ -157,7 +157,7 @@ class VivariumController:
             if check_server_running():
                 lg.info("Reconnecting to server...")
                 try:
-                    self.stop()
+                    self.stop_controller_loop()
                     self.client.close()
                 except Exception:
                     pass  # Ignore errors from stale connection
@@ -189,12 +189,13 @@ class VivariumController:
             lg.info("Already disconnected")
             return
 
+        self.stop_controller_loop()
+        sleep(1)  # wait for the simulation loop to stop
         # Close the client connection
         try:
             self.client.close()
         except Exception as e:
             lg.warning(f"Error closing client: {e}")
-        self.stop()
         self.client = None
         self.controllers = {}
         lg.info("Disconnected from server")
@@ -419,13 +420,13 @@ class VivariumController:
 
         # finally stop the simulation
         if self.is_started():
-            self.stop()
+            self.stop_controller_loop()
 
 
-    def stop(self):
-        """Stop simulation loop on this client."""
+    def stop_controller_loop(self):
+        """Stop controller loop on this client."""
         if not self.is_started():
-            lg.info("Simulator is already stopped")
+            lg.info("Controller loop is already stopped")
         self._is_started = False
 
     def is_started(self):
@@ -464,8 +465,8 @@ class VivariumController:
 
     def close(self):
         if self._is_started:
-            self.stop()
-            sleep(4)  # wait for the simulation loop to stop
+            self.stop_controller_loop()
+            sleep(1)  # wait for the simulation loop to stop
 
         # Close client if connected
         if self.is_connected():
@@ -489,7 +490,7 @@ class VivariumController:
 
     def close_all(self):
         """Send signal to close all clients and the simulator."""
-        self.stop()
+        self.stop_controller_loop()
         sleep(1)  # wait for the simulation loop to stop
         if 'simulator' in self.controllers:
             self.simulator.close = True
