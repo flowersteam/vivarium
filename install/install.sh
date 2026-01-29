@@ -138,7 +138,7 @@ check_git() {
             ;;
         linux)
             echo "For Ubuntu/Debian:"
-            echo "  sudo apt update && sudo apt install git"
+            echo "  sudo apt update && sudo apt install -y git"
             echo ""
             echo "For Fedora:"
             echo "  sudo dnf install git"
