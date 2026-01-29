@@ -72,6 +72,15 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller vivarium_multi.spec --noconfirm
 
+      - name: Sign macOS binaries (ad-hoc)
+        if: runner.os == 'macOS'
+        run: |
+          # Ad-hoc sign all executables and the .app bundle
+          find dist -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
+          if [ -d "dist/Vivarium.app" ]; then
+            codesign --force --deep --sign - dist/Vivarium.app
+          fi
+
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
