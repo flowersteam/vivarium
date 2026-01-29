@@ -19,6 +19,7 @@ from vivarium.utils.handle_server_interface import (
     check_server_running,
     get_server_interface_pids,
     terminate_process,
+    kill_vivarium_processes
 )
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
@@ -453,9 +454,8 @@ class WindowManager(Parameterized):
             self.controller = None
 
         # Stop the server (regardless of who started it)
-        _, server_pids = get_server_interface_pids()
+        server_pids = kill_vivarium_processes(server=True)
         if server_pids:
-            terminate_process(server_pids)
             lg.info("Server stopped")
 
         # Reset state

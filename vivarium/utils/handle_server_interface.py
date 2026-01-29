@@ -301,6 +301,20 @@ def kill_port_processes(port, servers_only=True):
     return killed_pids
 
 
+def kill_vivarium_processes(server=False, clients=False, interface=False, jupyter=False, grpc_port=50051, interface_port=5006, jupyter_port=8889):
+    killed = []
+    if not (server or clients or interface or jupyter):
+        lg.warning("No processes specified to kill.")
+        return []
+    if server:
+        killed.extend(kill_port_processes(grpc_port, servers_only=not clients))
+    if interface:
+        killed.extend(kill_port_processes(interface_port, servers_only=False))
+    if jupyter:
+        killed.extend(kill_port_processes(jupyter_port, servers_only=False))
+    return killed
+    
+
 def kill_all_vivarium_processes(grpc_port=50051, interface_port=5006, include_clients=True):
     """Forcefully kill all Vivarium-related processes.
 
