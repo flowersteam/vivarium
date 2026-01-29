@@ -78,9 +78,9 @@ jobs:
           cd dist
           # For macOS, include the .app bundle if it exists
           if [ -d "Vivarium.app" ]; then
-            tar -czvf ../${{ matrix.artifact_name }}.tar.gz Vivarium.app vivarium vivarium-server vivarium-interface
+            tar -czvf ../${{ matrix.artifact_name }}.tar.gz Vivarium.app vivarium-server vivarium-interface
           else
-            tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium vivarium-server vivarium-interface
+            tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface
           fi
 
       - name: Create archive (Windows)
@@ -88,7 +88,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path vivarium, vivarium-server, vivarium-interface -DestinationPath ../${{ matrix.artifact_name }}.zip
+          Compress-Archive -Path vivarium-server, vivarium-interface -DestinationPath ../${{ matrix.artifact_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

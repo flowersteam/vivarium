@@ -1,10 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec file for Vivarium - Multi-executable approach
-Builds three separate executables:
-  - vivarium (main launcher)
+Builds two executables:
   - vivarium-server (gRPC server)
-  - vivarium-interface (Panel web interface)
+  - vivarium-interface (Panel web interface, internally calls vivarium-server)
 
 Usage:
     pyinstaller vivarium_multi.spec
@@ -158,65 +157,16 @@ interface_coll = COLLECT(
 )
 
 # ============================================================================
-# MAIN LAUNCHER EXECUTABLE
-# ============================================================================
-
-main_script = os.path.join(project_root, 'scripts', 'run_vivarium.py')
-
-main_analysis = Analysis(
-    [main_script],
-    pathex=[project_root],
-    binaries=[],
-    datas=[],  # Main doesn't need data files, just spawns subprocesses
-    hiddenimports=[
-        'vivarium.utils.handle_server_interface',
-        'psutil',
-    ],
-    hookspath=[],
-    runtime_hooks=[],
-    excludes=[
-        'matplotlib', 'matplotlib.pyplot', 'IPython',
-        'scipy', 'pandas', 'sklearn', 'tensorflow',
-    ],
-    noarchive=False,
-)
-
-main_pyz = PYZ(main_analysis.pure)
-
-main_exe = EXE(
-    main_pyz,
-    main_analysis.scripts,
-    [],
-    exclude_binaries=True,
-    name='vivarium',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-)
-
-main_coll = COLLECT(
-    main_exe,
-    main_analysis.binaries,
-    main_analysis.datas,
-    strip=False,
-    upx=True,
-    name='vivarium',
-)
-
-# ============================================================================
 # macOS APPLICATION BUNDLE
 # ============================================================================
-# Creates a proper .app bundle containing all executables
-# The server and interface executables are placed in Contents/Resources/
+# Creates a proper .app bundle containing both executables
+# The server executable is placed in Contents/Resources/
 
 import sys
 if sys.platform == 'darwin':
     app = BUNDLE(
-        main_coll,
-        server_coll,
         interface_coll,
+        server_coll,
         name='Vivarium.app',
         icon=None,  # Add path to .icns file if you have one
         bundle_identifier='com.vivarium.app',
