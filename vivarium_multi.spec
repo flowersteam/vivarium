@@ -175,6 +175,7 @@ jupyter_pkg_datas = (
     + collect_data_files('jupyter_events')
     + collect_data_files('jsonschema')
     + collect_data_files('rfc3987_syntax')  # Contains .lark grammar files
+    + collect_data_files('debugpy')  # Contains _vendored directory needed by ipykernel
     # Include package metadata for entry points (needed for kernel provisioner)
     + copy_metadata('jupyter_client')
     + copy_metadata('jupyter_server')
