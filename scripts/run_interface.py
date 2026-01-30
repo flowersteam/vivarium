@@ -59,7 +59,7 @@ parser.add_argument(
     "--no-cleanup", action="store_true", help="Don't kill server/jupyter when the interface exits (useful for development)."
 )
 parser.add_argument(
-    "--server-timeout", type=float, default=30.0, help="Timeout in seconds when starting the vivarium server from the interface (default: 30)."
+    "--server-timeout", type=float, default=60.0, help="Timeout in seconds when starting the vivarium server from the interface (default: 60)."
 )
 args = parser.parse_args()
 
