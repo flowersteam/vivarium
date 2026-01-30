@@ -45,12 +45,13 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, server_timeout=30.0, **kwargs):
         super().__init__(**kwargs)
 
         # Basic state
         self.apply_changes = apply_changes
         self.testing_mode = testing_mode
+        self.server_timeout = server_timeout
         self._streaming_active = False
         self._pending_state_update = threading.Event()
         self._state_lock = threading.Lock()
@@ -413,7 +414,7 @@ class WindowManager(Parameterized):
 
         try:
             # Start the server and get a controller (controller manages server lifecycle)
-            controller = VivariumController(start_server=True, scene_name=scene_name, timeout=30.0)
+            controller = VivariumController(start_server=True, scene_name=scene_name, timeout=self.server_timeout)
             self._started_server = True
 
             # Transition to full simulation UI
