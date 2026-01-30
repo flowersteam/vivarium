@@ -88,78 +88,6 @@ jobs:
           # Ad-hoc sign all executables
           find dist -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
 
-      - name: Smoke test - Server starts
-        run: |
-          # Test that vivarium-server starts and responds to health checks
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-server/vivarium-server.exe &
-          else
-            ./dist/vivarium-server/vivarium-server &
-          fi
-          SERVER_PID=$!
-          sleep 10
-          # Check if server is responding (using grpc health check)
-          python -c "
-          from vivarium.utils.handle_server_interface import check_server_running
-          import sys
-          if check_server_running():
-              print('✓ Server health check passed')
-              sys.exit(0)
-          else:
-              print('✗ Server health check failed')
-              sys.exit(1)
-          "
-          kill $SERVER_PID 2>/dev/null || true
-        shell: bash
-
-      - name: Smoke test - Jupyter starts
-        run: |
-          # Test that vivarium-jupyter starts and binds to port
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-jupyter/vivarium-jupyter.exe --port 8889 &
-          else
-            ./dist/vivarium-jupyter/vivarium-jupyter --port 8889 &
-          fi
-          JUPYTER_PID=$!
-          sleep 15
-          # Check if Jupyter is responding
-          python -c "
-          from vivarium.utils.handle_server_interface import check_jupyter_running
-          import sys
-          if check_jupyter_running(8889):
-              print('✓ Jupyter health check passed')
-              sys.exit(0)
-          else:
-              print('✗ Jupyter health check failed')
-              sys.exit(1)
-          "
-          kill $JUPYTER_PID 2>/dev/null || true
-        shell: bash
-
-      - name: Smoke test - Interface starts
-        run: |
-          # Test that vivarium-interface starts and serves HTTP
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-interface/vivarium-interface.exe &
-          else
-            ./dist/vivarium-interface/vivarium-interface &
-          fi
-          INTERFACE_PID=$!
-          sleep 15
-          # Check if interface is responding to HTTP
-          python -c "
-          from vivarium.utils.handle_server_interface import wait_for_http
-          import sys
-          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
-              print('✓ Interface health check passed')
-              sys.exit(0)
-          else:
-              print('✗ Interface health check failed')
-              sys.exit(1)
-          "
-          kill $INTERFACE_PID 2>/dev/null || true
-        shell: bash
-
       - name: Create launcher script (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -233,6 +161,78 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0  # Already compressed, avoid double compression
+
+      - name: Smoke test - Server starts
+        run: |
+          # Test that vivarium-server starts and responds to health checks
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./dist/vivarium-server/vivarium-server.exe &
+          else
+            ./dist/vivarium-server/vivarium-server &
+          fi
+          SERVER_PID=$!
+          sleep 10
+          # Check if server is responding (using grpc health check)
+          python -c "
+          from vivarium.utils.handle_server_interface import check_server_running
+          import sys
+          if check_server_running():
+              print('✓ Server health check passed')
+              sys.exit(0)
+          else:
+              print('✗ Server health check failed')
+              sys.exit(1)
+          "
+          kill $SERVER_PID 2>/dev/null || true
+        shell: bash
+
+      - name: Smoke test - Jupyter starts
+        run: |
+          # Test that vivarium-jupyter starts and binds to port
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./dist/vivarium-jupyter/vivarium-jupyter.exe --port 8889 &
+          else
+            ./dist/vivarium-jupyter/vivarium-jupyter --port 8889 &
+          fi
+          JUPYTER_PID=$!
+          sleep 15
+          # Check if Jupyter is responding
+          python -c "
+          from vivarium.utils.handle_server_interface import check_jupyter_running
+          import sys
+          if check_jupyter_running(8889):
+              print('✓ Jupyter health check passed')
+              sys.exit(0)
+          else:
+              print('✗ Jupyter health check failed')
+              sys.exit(1)
+          "
+          kill $JUPYTER_PID 2>/dev/null || true
+        shell: bash
+
+      - name: Smoke test - Interface starts
+        run: |
+          # Test that vivarium-interface starts and serves HTTP
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./dist/vivarium-interface/vivarium-interface.exe &
+          else
+            ./dist/vivarium-interface/vivarium-interface &
+          fi
+          INTERFACE_PID=$!
+          sleep 15
+          # Check if interface is responding to HTTP
+          python -c "
+          from vivarium.utils.handle_server_interface import wait_for_http
+          import sys
+          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
+              print('✓ Interface health check passed')
+              sys.exit(0)
+          else:
+              print('✗ Interface health check failed')
+              sys.exit(1)
+          "
+          kill $INTERFACE_PID 2>/dev/null || true
+        shell: bash
 
   release:
     name: Create Release
