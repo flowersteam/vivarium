@@ -185,8 +185,8 @@ jupyter_pkg_datas = (
 jupyter_analysis = Analysis(
     [jupyter_script],
     pathex=[project_root],
-    binaries=[],
-    datas=notebook_datas + jupyter_config + jupyter_pkg_datas,
+    binaries=binaries,  # Include JAX binaries for vivarium
+    datas=notebook_datas + jupyter_config + jupyter_pkg_datas + hydra_datas,
     hiddenimports=[
         'notebook', 'notebook.app', 'jupyter_server', 'jupyter_client', 'ipykernel',
         'traitlets', 'tornado', 'zmq',
@@ -198,13 +198,19 @@ jupyter_analysis = Analysis(
         'jupyter_client.provisioning',
         'jupyter_client.provisioning.factory',
         'jupyter_client.provisioning.local_provisioner',
+        # Vivarium package (so notebooks can import it)
+        'vivarium',
+        'vivarium.controllers',
+        'vivarium.simulator',
+        'vivarium.simulator.grpc_server',
     ] + collect_submodules('notebook')
       + collect_submodules('jupyter_server')
       + collect_submodules('ipykernel')
-      + collect_submodules('jupyter_client'),
+      + collect_submodules('jupyter_client')
+      + collect_submodules('vivarium'),
     hookspath=[],
     runtime_hooks=[],
-    excludes=['jax', 'jaxlib', 'jax_md'],  # Not needed for Jupyter
+    excludes=[],
     noarchive=False,
 )
 
