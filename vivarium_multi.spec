@@ -1,10 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec file for Vivarium - Multi-executable approach
-Builds three executables:
+PyInstaller spec file for Vivarium - Multi-executable approach with shared dependencies
+
+Builds three executables that share a common dependency folder:
   - vivarium-server (gRPC server)
   - vivarium-interface (Panel web interface, internally calls vivarium-server)
   - vivarium-jupyter (Jupyter notebook server for embedded notebooks)
+
+Uses PyInstaller's MERGE() function to deduplicate shared libraries (JAX, gRPC, etc.)
+across executables, significantly reducing total distribution size.
 
 Usage:
     pyinstaller vivarium_multi.spec
@@ -90,15 +94,6 @@ server_exe = EXE(
     console=True,
 )
 
-server_coll = COLLECT(
-    server_exe,
-    server_analysis.binaries,
-    server_analysis.datas,
-    strip=False,
-    upx=True,
-    name='vivarium-server',
-)
-
 # ============================================================================
 # INTERFACE EXECUTABLE
 # ============================================================================
@@ -146,15 +141,6 @@ interface_exe = EXE(
     strip=False,
     upx=True,
     console=True,
-)
-
-interface_coll = COLLECT(
-    interface_exe,
-    interface_analysis.binaries,
-    interface_analysis.datas,
-    strip=False,
-    upx=True,
-    name='vivarium-interface',
 )
 
 # ============================================================================
@@ -214,6 +200,23 @@ jupyter_analysis = Analysis(
     noarchive=False,
 )
 
+# ============================================================================
+# MERGE - Deduplicate shared dependencies across all executables
+# ============================================================================
+# This significantly reduces the total distribution size by sharing:
+# - JAX/JAXlib binaries (~500MB+)
+# - gRPC libraries
+# - Python standard library
+# - NumPy, SciPy, and other scientific packages
+#
+# After MERGE, each executable references shared files from a common location
+
+MERGE(
+    (server_analysis, 'vivarium-server', 'vivarium-server'),
+    (interface_analysis, 'vivarium-interface', 'vivarium-interface'),
+    (jupyter_analysis, 'vivarium-jupyter', 'vivarium-jupyter'),
+)
+
 jupyter_pyz = PYZ(jupyter_analysis.pure)
 
 jupyter_exe = EXE(
@@ -229,13 +232,36 @@ jupyter_exe = EXE(
     console=True,
 )
 
-jupyter_coll = COLLECT(
+# ============================================================================
+# COMBINED COLLECT - Single folder with all executables and shared dependencies
+# ============================================================================
+# After MERGE, we use a single COLLECT to place all executables together with
+# deduplicated binaries and data files. This creates the structure:
+#
+#   dist/vivarium/
+#     vivarium-server        (executable)
+#     vivarium-interface     (executable)
+#     vivarium-jupyter       (executable)
+#     _internal/             (shared Python runtime & libraries)
+#
+# Shared dependencies (JAX, gRPC, NumPy, etc.) appear only once in _internal.
+
+coll = COLLECT(
+    # All three executables
+    server_exe,
+    interface_exe,
     jupyter_exe,
+    # Binaries from all analyses (MERGE has deduplicated these)
+    server_analysis.binaries,
+    interface_analysis.binaries,
     jupyter_analysis.binaries,
+    # Data files from all analyses (MERGE has deduplicated these)
+    server_analysis.datas,
+    interface_analysis.datas,
     jupyter_analysis.datas,
     strip=False,
     upx=True,
-    name='vivarium-jupyter',
+    name='vivarium',
 )
 
 # ============================================================================
@@ -250,9 +276,7 @@ jupyter_coll = COLLECT(
 # import sys
 # if sys.platform == 'darwin':
 #     app = BUNDLE(
-#         interface_coll,
-#         server_coll,
-#         jupyter_coll,
+#         coll,
 #         name='Vivarium.app',
 #         icon=None,
 #         bundle_identifier='com.vivarium.app',

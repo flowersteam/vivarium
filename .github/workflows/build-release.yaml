@@ -81,13 +81,13 @@ jobs:
       - name: Sign macOS binaries (ad-hoc)
         if: runner.os == 'macOS'
         run: |
-          # Ad-hoc sign all executables
-          find dist -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
+          # Ad-hoc sign all executables in the vivarium folder
+          find dist/vivarium -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
 
       - name: Create launcher script (macOS)
         if: runner.os == 'macOS'
         run: |
-          cat > dist/Start-Vivarium.command << 'EOF'
+          cat > dist/vivarium/Start-Vivarium.command << 'EOF'
           #!/bin/bash
           # Vivarium Launcher - double-click to start
           # Close this terminal window to quit Vivarium
@@ -96,14 +96,14 @@ jobs:
           echo "Starting Vivarium..."
           echo "Close this terminal window to quit."
           echo ""
-          ./vivarium-interface/vivarium-interface
+          ./vivarium-interface
           EOF
-          chmod +x dist/Start-Vivarium.command
+          chmod +x dist/vivarium/Start-Vivarium.command
 
       - name: Create launcher script (Linux)
         if: runner.os == 'Linux'
         run: |
-          cat > dist/start-vivarium.sh << 'EOF'
+          cat > dist/vivarium/start-vivarium.sh << 'EOF'
           #!/bin/bash
           # Vivarium Launcher
           # Close this terminal window to quit Vivarium
@@ -112,17 +112,15 @@ jobs:
           echo "Starting Vivarium..."
           echo "Close this terminal window to quit."
           echo ""
-          ./vivarium-interface/vivarium-interface
+          ./vivarium-interface
           EOF
-          chmod +x dist/start-vivarium.sh
+          chmod +x dist/vivarium/start-vivarium.sh
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
           cd dist
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter Start-Vivarium.command start-vivarium.sh 2>/dev/null || \
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter Start-Vivarium.command 2>/dev/null || \
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter start-vivarium.sh
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium
 
       - name: Create launcher script (Windows)
         if: runner.os == 'Windows'
@@ -137,15 +135,15 @@ jobs:
           echo Starting Vivarium...
           echo Close this window to quit.
           echo.
-          vivarium-interface\vivarium-interface.exe
-          "@ | Out-File -FilePath dist\Start-Vivarium.bat -Encoding ASCII
+          vivarium-interface.exe
+          "@ | Out-File -FilePath dist\vivarium\Start-Vivarium.bat -Encoding ASCII
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path vivarium-server, vivarium-interface, vivarium-jupyter, Start-Vivarium.bat -DestinationPath ../${{ matrix.artifact_name }}.zip
+          Compress-Archive -Path vivarium -DestinationPath ../${{ matrix.artifact_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -162,9 +160,9 @@ jobs:
         run: |
           # Test that vivarium-server starts and responds to health checks
           if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-server/vivarium-server.exe &
+            ./dist/vivarium/vivarium-server.exe &
           else
-            ./dist/vivarium-server/vivarium-server &
+            ./dist/vivarium/vivarium-server &
           fi
           SERVER_PID=$!
           sleep 60
@@ -186,9 +184,9 @@ jobs:
         run: |
           # Test that vivarium-jupyter starts and binds to port
           if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-jupyter/vivarium-jupyter.exe --port 8889 &
+            ./dist/vivarium/vivarium-jupyter.exe --port 8889 &
           else
-            ./dist/vivarium-jupyter/vivarium-jupyter --port 8889 &
+            ./dist/vivarium/vivarium-jupyter --port 8889 &
           fi
           JUPYTER_PID=$!
           sleep 15
@@ -210,9 +208,9 @@ jobs:
         run: |
           # Test that vivarium-interface starts and serves HTTP
           if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium-interface/vivarium-interface.exe &
+            ./dist/vivarium/vivarium-interface.exe &
           else
-            ./dist/vivarium-interface/vivarium-interface &
+            ./dist/vivarium/vivarium-interface &
           fi
           INTERFACE_PID=$!
           sleep 15
