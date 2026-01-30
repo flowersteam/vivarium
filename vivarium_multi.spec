@@ -172,6 +172,9 @@ jupyter_pkg_datas = (
     + collect_data_files('nbformat')
     + collect_data_files('nbconvert')
     + collect_data_files('ipykernel')
+    + collect_data_files('jupyter_events')
+    + collect_data_files('jsonschema')
+    + collect_data_files('rfc3987_syntax')  # Contains .lark grammar files
 )
 
 jupyter_analysis = Analysis(
