@@ -163,16 +163,29 @@ interface_coll = COLLECT(
 
 jupyter_script = os.path.join(project_root, 'scripts', 'run_jupyter.py')
 
+# Collect Jupyter package data files (templates, static assets, etc.)
+jupyter_pkg_datas = (
+    collect_data_files('notebook')
+    + collect_data_files('jupyter_server')
+    + collect_data_files('jupyter_core')
+    + collect_data_files('jupyter_client')
+    + collect_data_files('nbformat')
+    + collect_data_files('nbconvert')
+    + collect_data_files('ipykernel')
+)
+
 jupyter_analysis = Analysis(
     [jupyter_script],
     pathex=[project_root],
     binaries=[],
-    datas=notebook_datas + jupyter_config,
+    datas=notebook_datas + jupyter_config + jupyter_pkg_datas,
     hiddenimports=[
-        'notebook', 'jupyter_server', 'jupyter_client', 'ipykernel',
+        'notebook', 'notebook.app', 'jupyter_server', 'jupyter_client', 'ipykernel',
         'traitlets', 'tornado', 'zmq',
         'ipykernel.datapub', 'ipykernel.comm',
         'jupyter_core', 'nbformat', 'nbconvert',
+        'argon2', 'argon2.low_level',  # Password hashing
+        'jupyter_server.serverapp',  # Required for notebook 7.x
     ] + collect_submodules('notebook')
       + collect_submodules('jupyter_server')
       + collect_submodules('ipykernel'),

@@ -2,15 +2,17 @@
 
 This script starts a Jupyter notebook server programmatically,
 allowing it to be bundled as a standalone executable.
+
+Uses notebook 7.x API (JupyterNotebookApp) which is built on jupyter_server.
 """
 import argparse
 import sys
 
-if not sys.warnoptions:
-    import warnings
-    warnings.simplefilter("ignore")
+from notebook.app import JupyterNotebookApp
 
-from notebook.notebookapp import NotebookApp
+# if not sys.warnoptions:
+#     import warnings
+#     warnings.simplefilter("ignore")
 
 
 def main():
@@ -20,30 +22,24 @@ def main():
     parser.add_argument('--config', type=str, default=None, help='Path to Jupyter config file')
     args = parser.parse_args()
 
-    app = NotebookApp.instance()
-    app.port = args.port
+    # Build argv for JupyterNotebookApp
+    argv = [
+        f'--port={args.port}',
+        '--no-browser',
+        # iframe-friendly settings
+        '--ServerApp.allow_origin=*',
+        '--ServerApp.disable_check_xsrf=True',
+        '--ServerApp.tornado_settings={"headers": {"Content-Security-Policy": "frame-ancestors \'self\' http://localhost:* http://127.0.0.1:*"}}',
+    ]
+
     if args.notebook_dir:
-        app.notebook_dir = args.notebook_dir
-    app.open_browser = False
-
-    # iframe-friendly settings (same as jupyter_config_iframe.py)
-    app.allow_origin = '*'
-    app.disable_check_xsrf = True
-    app.tornado_settings = {
-        'headers': {
-            'Content-Security-Policy': "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*"
-        }
-    }
-
-    # Set default kernel name
-    # Note: In PyInstaller builds, the bundled Python acts as the kernel
-    app.kernel_manager_class = 'notebook.services.kernels.kernelmanager.MappingKernelManager'
+        argv.append(f'--notebook-dir={args.notebook_dir}')
 
     if args.config:
-        app.load_config_file(args.config)
+        argv.append(f'--config={args.config}')
 
-    app.initialize()
-    app.start()
+    # Use notebook 7.x API
+    JupyterNotebookApp.launch_instance(argv=argv)
 
 
 if __name__ == '__main__':
