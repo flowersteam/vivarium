@@ -51,10 +51,6 @@ jobs:
             python: '3.12'
             artifact_name: vivarium-windows-x64
 
-          # Windows ARM64
-          - os: windows-11-arm
-            python: '3.12'
-            artifact_name: vivarium-windows-arm64
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
