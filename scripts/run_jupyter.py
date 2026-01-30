@@ -40,6 +40,8 @@ def run_server():
         '--ServerApp.allow_origin=*',
         '--ServerApp.disable_check_xsrf=True',
         '--ServerApp.tornado_settings={"headers": {"Content-Security-Policy": "frame-ancestors \'self\' http://localhost:* http://127.0.0.1:*"}}',
+        # Disable token authentication for embedded use (local only)
+        '--IdentityProvider.token=',
     ]
 
     if args.notebook_dir:
