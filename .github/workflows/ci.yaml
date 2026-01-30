@@ -49,6 +49,32 @@ jobs:
       - name: Run pytest
         run: pytest -v --timeout=120
 
+  test-ubuntu-arm64:
+    name: Tests (ubuntu-24.04-arm, Python 3.12)
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
   test-macos:
     name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'macos'
@@ -124,6 +150,8 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            python: '3.12'
+          - os: ubuntu-24.04-arm
             python: '3.12'
           - os: macos-latest
             python: '3.12'
