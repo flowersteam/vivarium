@@ -177,10 +177,10 @@ jobs:
           from vivarium.utils.handle_server_interface import check_server_running
           import sys
           if check_server_running():
-              print('✓ Server health check passed')
+              print('[OK] Server health check passed')
               sys.exit(0)
           else:
-              print('✗ Server health check failed')
+              print('[FAIL] Server health check failed')
               sys.exit(1)
           "
           kill $SERVER_PID 2>/dev/null || true
@@ -201,10 +201,10 @@ jobs:
           from vivarium.utils.handle_server_interface import check_jupyter_running
           import sys
           if check_jupyter_running(8889):
-              print('✓ Jupyter health check passed')
+              print('[OK] Jupyter health check passed')
               sys.exit(0)
           else:
-              print('✗ Jupyter health check failed')
+              print('[FAIL] Jupyter health check failed')
               sys.exit(1)
           "
           kill $JUPYTER_PID 2>/dev/null || true
@@ -225,10 +225,10 @@ jobs:
           from vivarium.utils.handle_server_interface import wait_for_http
           import sys
           if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
-              print('✓ Interface health check passed')
+              print('[OK] Interface health check passed')
               sys.exit(0)
           else:
-              print('✗ Interface health check failed')
+              print('[FAIL] Interface health check failed')
               sys.exit(1)
           "
           kill $INTERFACE_PID 2>/dev/null || true
