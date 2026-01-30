@@ -622,8 +622,9 @@ class WindowManager(Parameterized):
             # Update the configured port to match what was actually used
             self.jupyter_port = port
 
-            # Wait a moment for Jupyter to fully start and bind to the port
-            for _ in range(10):
+            # Wait for Jupyter to fully start and bind to the port
+            # PyInstaller builds may take longer to initialize
+            for _ in range(20):
                 time.sleep(0.5)
                 if check_jupyter_running(port):
                     lg.info(f"Jupyter server confirmed running on port {port}")

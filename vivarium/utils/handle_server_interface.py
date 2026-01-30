@@ -72,13 +72,17 @@ def check_jupyter_running(port=8889):
     :return: True if Jupyter is running, False otherwise
     """
     import socket
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1)
-            result = s.connect_ex(('localhost', port))
-            return result == 0
-    except Exception:
-        return False
+    # Try both 127.0.0.1 and localhost to handle IPv4/IPv6 differences
+    for host in ('127.0.0.1', 'localhost'):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                result = s.connect_ex((host, port))
+                if result == 0:
+                    return True
+        except Exception:
+            pass
+    return False
 
 
 def stop_jupyter_server(jupyter_process=None, port=8889):
