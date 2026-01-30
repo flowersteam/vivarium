@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 import psutil
 import subprocess
@@ -13,6 +12,45 @@ from vivarium.utils.runtime import get_bundle_root, get_jupyter_config_path, get
 
 
 lg = logging.getLogger(__name__)
+
+# Registry of Jupyter ports started by this interface instance
+_started_jupyter_ports: set[int] = set()
+
+
+def register_jupyter_port(port: int) -> None:
+    """Register a Jupyter port as started by this interface instance."""
+    _started_jupyter_ports.add(port)
+
+
+def unregister_jupyter_port(port: int) -> None:
+    """Unregister a Jupyter port (e.g., when manually stopped)."""
+    _started_jupyter_ports.discard(port)
+
+
+def get_started_jupyter_ports() -> set[int]:
+    """Get all Jupyter ports started by this interface instance."""
+    return _started_jupyter_ports.copy()
+
+
+def find_next_available_port(start_port: int = 8889, max_attempts: int = 100) -> int:
+    """Find the next available port starting from start_port.
+
+    Args:
+        start_port: Port number to start searching from
+        max_attempts: Maximum number of ports to try
+
+    Returns:
+        The first available port found
+
+    Raises:
+        RuntimeError: If no available port found within max_attempts
+    """
+    for offset in range(max_attempts):
+        port = start_port + offset
+        if not check_jupyter_running(port):
+            return port
+    raise RuntimeError(f"No available port found between {start_port} and {start_port + max_attempts}")
+
 
 SERVER_PROCESS_NAME = "scripts/run_server.py"
 INTERFACE_PROCESS_NAME = "scripts/run_interface.py"
@@ -305,7 +343,26 @@ def kill_port_processes(port, servers_only=True):
     return killed_pids
 
 
-def kill_vivarium_processes(server=False, clients=False, interface=False, jupyter=False, grpc_port=50051, interface_port=5006, jupyter_port=8889):
+def kill_vivarium_processes(server=False, clients=False, interface=False, jupyter=False,
+                            grpc_port=50051, interface_port=5006, jupyter_port=8889,
+                            only_tracked_jupyter=False):
+    """Kill Vivarium-related processes selectively.
+
+    Args:
+        server: Kill the gRPC server
+        clients: Kill gRPC clients (in addition to server)
+        interface: Kill the Panel interface
+        jupyter: Kill Jupyter server(s)
+        grpc_port: Port for gRPC server
+        interface_port: Port for Panel interface
+        jupyter_port: Port for Jupyter (used when only_tracked_jupyter=False)
+        only_tracked_jupyter: If True, only kill Jupyter servers from the tracked registry
+                             (started by the interface instance). If False, kill the
+                             specified jupyter_port.
+
+    Returns:
+        List of PIDs that were killed
+    """
     killed = []
     if not (server or clients or interface or jupyter):
         lg.warning("No processes specified to kill.")
@@ -315,7 +372,14 @@ def kill_vivarium_processes(server=False, clients=False, interface=False, jupyte
     if interface:
         killed.extend(kill_port_processes(interface_port, servers_only=False))
     if jupyter:
-        killed.extend(kill_port_processes(jupyter_port, servers_only=False))
+        if only_tracked_jupyter:
+            # Only kill Jupyter servers we started (from registry)
+            tracked_ports = get_started_jupyter_ports()
+            for port in tracked_ports:
+                killed.extend(kill_port_processes(port, servers_only=True))
+        else:
+            # Legacy behavior: kill specified jupyter_port
+            killed.extend(kill_port_processes(jupyter_port, servers_only=False))
     return killed
     
 

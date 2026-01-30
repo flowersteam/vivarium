@@ -1,4 +1,5 @@
 import os
+import time
 import hydra
 import logging
 import threading
@@ -19,11 +20,16 @@ from vivarium.utils.handle_server_interface import (
     check_server_running,
     get_server_interface_pids,
     terminate_process,
-    kill_vivarium_processes
+    kill_vivarium_processes,
+    check_jupyter_running,
+    register_jupyter_port,
+    unregister_jupyter_port,
+    find_next_available_port,
 )
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
+from vivarium.utils.handle_server_interface import start_jupyter_server
 
 
 lg = logging.getLogger(__name__)
@@ -354,6 +360,8 @@ class WindowManager(Parameterized):
 
         # Jupyter server management
         self.jupyter_process = None
+        # Track whether we started this Jupyter server (vs connecting to external)
+        self._jupyter_started_by_us = False
 
         # UI for Jupyter control and notebook display
         self.jupyter_status = pn.pane.Markdown("**Jupyter Status:** Checking...", sizing_mode="stretch_width")
@@ -364,6 +372,13 @@ class WindowManager(Parameterized):
             start=8888,
             end=9999,
             step=1,
+            width=120,
+        )
+
+        # Check Server button for manual status check
+        self.check_jupyter_btn = pn.widgets.Button(
+            name="Check Server",
+            button_type="default",
             width=120,
         )
 
@@ -399,6 +414,43 @@ class WindowManager(Parameterized):
             placeholder=f"http://localhost:{self.jupyter_port}/notebooks/path/to/notebook.ipynb",
             value="",
             width=400,
+            visible=False,
+        )
+
+        # Conflict resolution panel (hidden by default)
+        self._conflict_port = None  # Track which port has the conflict
+        self._conflict_message = pn.pane.Markdown("")
+        self._suggested_port_msg = pn.pane.Markdown("")
+
+        self._jupyter_use_existing_btn = pn.widgets.Button(
+            name="Use Existing", button_type="primary", width=120
+        )
+        self._jupyter_kill_only_btn = pn.widgets.Button(
+            name="Kill Server", button_type="danger", width=100
+        )
+        self._jupyter_kill_restart_btn = pn.widgets.Button(
+            name="Kill & Restart", button_type="warning", width=120
+        )
+        self._jupyter_use_different_port_btn = pn.widgets.Button(
+            name="Use Different Port", button_type="success", width=150
+        )
+        self._jupyter_cancel_conflict_btn = pn.widgets.Button(
+            name="Cancel", button_type="default", width=80
+        )
+
+        self.jupyter_conflict_panel = pn.Column(
+            pn.pane.Markdown("### Jupyter Server Already Running", styles={'color': 'orange'}),
+            self._conflict_message,
+            pn.Row(
+                self._jupyter_use_existing_btn,
+                self._jupyter_kill_only_btn,
+                self._jupyter_kill_restart_btn,
+                self._jupyter_use_different_port_btn,
+            ),
+            pn.Row(
+                self._jupyter_cancel_conflict_btn,
+            ),
+            self._suggested_port_msg,
             visible=False,
         )
 
@@ -601,13 +653,19 @@ class WindowManager(Parameterized):
 
     def start_jupyter_cb(self, event):
         """Callback for starting Jupyter server"""
-        from vivarium.utils.handle_server_interface import start_jupyter_server, check_jupyter_running
-        import time
+        port = self.jupyter_port_input.value
+
+        # Check if port is already in use - show conflict panel if so
+        if check_jupyter_running(port):
+            self._show_jupyter_conflict_panel(port)
+            return
+
+        self._do_start_jupyter(port)
+
+    def _do_start_jupyter(self, port):
+        """Actually start the Jupyter server on the given port."""
 
         project_root = get_bundle_root()
-
-        # Use the port from the input field
-        port = self.jupyter_port_input.value
 
         try:
             lg.info(f"Starting Jupyter server on port {port}...")
@@ -622,6 +680,11 @@ class WindowManager(Parameterized):
 
             # Update the configured port to match what was actually used
             self.jupyter_port = port
+            self.jupyter_port_input.value = port
+
+            # Register this port as started by us (for cleanup tracking)
+            register_jupyter_port(port)
+            self._jupyter_started_by_us = True
 
             # Wait for Jupyter to fully start and bind to the port
             # PyInstaller builds may take longer to initialize
@@ -634,23 +697,129 @@ class WindowManager(Parameterized):
             # Update UI to reflect running state
             self._check_jupyter_status()
         except RuntimeError as e:
-            # Port already in use
-            error_msg = str(e)
-            lg.error(error_msg)
-            self.jupyter_status.object = f"**Jupyter Status:** ❌ {error_msg}"
+            # Port became busy between check and start - show conflict panel
+            if "already in use" in str(e).lower():
+                self._show_jupyter_conflict_panel(port)
+            else:
+                error_msg = str(e)
+                lg.error(error_msg)
+                self.jupyter_status.object = f"**Jupyter Status:** ❌ {error_msg}"
+
+    def _show_jupyter_conflict_panel(self, port):
+        """Display the conflict resolution panel for the given port."""
+        self._conflict_port = port
+        self._conflict_message.object = f"A Jupyter server is already running on port **{port}**. What would you like to do?"
+
+        # Find next available port for suggestion
+        try:
+            suggested = find_next_available_port(port + 1)
+            self._suggested_port_msg.object = f"*Suggested available port: **{suggested}***"
+        except RuntimeError:
+            self._suggested_port_msg.object = "*No available ports found nearby*"
+
+        self.jupyter_conflict_panel.visible = True
+
+    def _jupyter_use_existing_cb(self, event):
+        """Connect to the existing external Jupyter server without tracking it."""
+        port = self._conflict_port
+        self.jupyter_conflict_panel.visible = False
+
+        # Update port and status - we're using an external server
+        self.jupyter_port = port
+        self.jupyter_port_input.value = port
+        self._jupyter_started_by_us = False  # Don't track - it's external
+        self.jupyter_process = None
+
+        lg.info(f"Using existing Jupyter server on port {port}")
+        self._check_jupyter_status()
+
+    def _jupyter_kill_only_cb(self, event):
+        """Kill the existing Jupyter server without starting a new one."""
+        from vivarium.utils.handle_server_interface import kill_port_processes
+
+        port = self._conflict_port
+        self.jupyter_conflict_panel.visible = False
+
+        lg.info(f"Killing Jupyter server on port {port}...")
+        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping server on port {port}..."
+
+        killed = kill_port_processes(port, servers_only=True)
+        if killed:
+            lg.info(f"Killed Jupyter processes: {killed}")
+
+        # Unregister if it was tracked
+        unregister_jupyter_port(port)
+
+        # Small delay to let port free up
+        time.sleep(0.5)
+
+        # Update UI to reflect stopped state
+        self._check_jupyter_status()
+
+    def _jupyter_kill_restart_cb(self, event):
+        """Kill existing server and start a new one (tracked)."""
+        from vivarium.utils.handle_server_interface import kill_port_processes
+
+        port = self._conflict_port
+        self.jupyter_conflict_panel.visible = False
+
+        lg.info(f"Killing existing Jupyter on port {port} and restarting...")
+        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Restarting on port {port}..."
+
+        # Kill existing
+        killed = kill_port_processes(port, servers_only=True)
+        if killed:
+            lg.info(f"Killed existing Jupyter processes: {killed}")
+
+        # Unregister old if tracked
+        unregister_jupyter_port(port)
+
+        # Small delay to let port free up
+        time.sleep(0.5)
+
+        # Start new
+        self._do_start_jupyter(port)
+
+    def _jupyter_use_different_port_cb(self, event):
+        """Use the next available port."""
+        self.jupyter_conflict_panel.visible = False
+
+        try:
+            port = self._conflict_port
+            suggested = find_next_available_port(port + 1)
+            lg.info(f"Using alternative port {suggested}")
+            self._do_start_jupyter(suggested)
+        except RuntimeError as e:
+            lg.error(f"Could not find available port: {e}")
+            self.jupyter_status.object = f"**Jupyter Status:** ❌ {e}"
+
+    def _jupyter_cancel_conflict_cb(self, event):
+        """Cancel and do nothing."""
+        self.jupyter_conflict_panel.visible = False
+        self._check_jupyter_status()
+
+    def check_jupyter_cb(self, event):
+        """Manual check button handler - update Jupyter status display."""
+        port = self.jupyter_port_input.value
+        self.jupyter_port = port
+        self._check_jupyter_status()
 
     def stop_jupyter_cb(self, event):
         """Callback for stopping Jupyter server"""
         from vivarium.utils.handle_server_interface import stop_jupyter_server
 
-        if self.jupyter_process:
-            lg.info("Stopping Jupyter server...")
-            
-            self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping..."
-            stop_jupyter_server(self.jupyter_process, port=self.jupyter_port)
-            self.jupyter_process = None
-            # Update UI to reflect stopped state
-            self._check_jupyter_status()
+        lg.info("Stopping Jupyter server...")
+        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping..."
+
+        stop_jupyter_server(self.jupyter_process, port=self.jupyter_port)
+
+        # Unregister from tracking and reset state
+        unregister_jupyter_port(self.jupyter_port)
+        self.jupyter_process = None
+        self._jupyter_started_by_us = False
+
+        # Update UI to reflect stopped state
+        self._check_jupyter_status()
 
     def open_configured_notebook_cb(self, event):
         """Callback for opening the configured notebook"""
@@ -787,9 +956,11 @@ class WindowManager(Parameterized):
                 self.jupyter_status,
                 pn.Row(
                     self.jupyter_port_input,
+                    self.check_jupyter_btn,
                     self.start_jupyter_btn,
                     self.stop_jupyter_btn,
                 ),
+                self.jupyter_conflict_panel,
                 pn.Row(
                     self.open_configured_notebook_btn,
                     self.open_new_notebook_btn,
@@ -836,11 +1007,18 @@ class WindowManager(Parameterized):
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
         self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
         # Notebook callbacks
+        self.check_jupyter_btn.on_click(self.check_jupyter_cb)
         self.start_jupyter_btn.on_click(self.start_jupyter_cb)
         self.stop_jupyter_btn.on_click(self.stop_jupyter_cb)
         self.open_configured_notebook_btn.on_click(self.open_configured_notebook_cb)
         self.open_new_notebook_btn.on_click(self.open_new_notebook_cb)
         self.notebook_url.param.watch(self.notebook_url_cb, "value")
+        # Conflict resolution callbacks
+        self._jupyter_use_existing_btn.on_click(self._jupyter_use_existing_cb)
+        self._jupyter_kill_only_btn.on_click(self._jupyter_kill_only_cb)
+        self._jupyter_kill_restart_btn.on_click(self._jupyter_kill_restart_cb)
+        self._jupyter_use_different_port_btn.on_click(self._jupyter_use_different_port_cb)
+        self._jupyter_cancel_conflict_btn.on_click(self._jupyter_cancel_conflict_cb)
 
 
 if __name__ == "__main__":

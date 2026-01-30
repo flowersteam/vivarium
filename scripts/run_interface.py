@@ -6,7 +6,7 @@ import logging
 
 import panel as pn
 from vivarium.interface.panel_app import WindowManager
-from vivarium.utils.handle_server_interface import kill_vivarium_processes
+from vivarium.utils.handle_server_interface import kill_vivarium_processes, get_started_jupyter_ports, kill_port_processes
 
 lg = logging.getLogger(__name__)
 
@@ -23,9 +23,17 @@ def cleanup():
 
     lg.info("Cleaning up Vivarium processes...")
     try:
-        # Kill the gRPC server, its clients, and Jupyter if running
+        # Kill the gRPC server and its clients
         # Don't kill interface (that's us, already exiting)
-        killed = kill_vivarium_processes(server=True, clients=True, jupyter=True, interface=False)
+        killed = kill_vivarium_processes(server=True, clients=True, interface=False)
+
+        # Kill only Jupyter servers WE started (from registry), not external ones
+        tracked_ports = get_started_jupyter_ports()
+        if tracked_ports:
+            lg.info(f"Cleaning up Jupyter servers on tracked ports: {tracked_ports}")
+            for port in tracked_ports:
+                killed.extend(kill_port_processes(port, servers_only=True))
+
         if killed:
             lg.info(f"Stopped {len(killed)} process(es)")
     except Exception as e:
