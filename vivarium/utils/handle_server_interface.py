@@ -9,7 +9,7 @@ import re
 import grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
-from vivarium.utils.runtime import get_bundle_root, get_jupyter_config_path, get_server_command, get_interface_command
+from vivarium.utils.runtime import get_bundle_root, get_jupyter_config_path, get_server_command, get_interface_command, get_jupyter_command
 
 
 lg = logging.getLogger(__name__)
@@ -21,7 +21,10 @@ INTERFACE_PROCESS_NAME_WIN = "run_interface.py"
 
 
 def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_process_object=True):
-    """Start a Jupyter notebook server with iframe-friendly configuration
+    """Start a Jupyter notebook server with iframe-friendly configuration.
+
+    In development mode: uses 'jupyter notebook' CLI command
+    In frozen mode: spawns vivarium-jupyter executable
 
     :param port: Port to run Jupyter on, defaults to 8889
     :param notebook_dir: Directory to start Jupyter in, defaults to project root
@@ -40,19 +43,16 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
     if notebook_dir is None:
         notebook_dir = get_bundle_root()
 
-    jupyter_command = [
-        "jupyter",
-        "notebook",
-        f"--config={config_path}",
-        f"--port={port}",
-        f"--notebook-dir={notebook_dir}",
-        "--no-browser",
-    ]
+    jupyter_command = get_jupyter_command(
+        port=port,
+        notebook_dir=notebook_dir,
+        config_path=config_path
+    )
 
     lg.info(f"Starting Jupyter notebook server on port {port}...")
     lg.info(f"Notebook directory: {notebook_dir}")
+    lg.info(f"Command: {' '.join(jupyter_command)}")
 
-    # Always use subprocess.Popen for PyInstaller compatibility
     jupyter_process = subprocess.Popen(
         jupyter_command,
         stdout=None if show_output else subprocess.DEVNULL,

@@ -108,3 +108,39 @@ def get_interface_command(allow_external_origins: bool = False) -> list:
         if allow_external_origins:
             command.append("--allow-external-origins")
         return command
+
+
+def get_jupyter_command(port: int = 8889, notebook_dir: str = None, config_path: str = None) -> list:
+    """
+    Get the command to start the Jupyter server.
+
+    In frozen mode: returns path to vivarium-jupyter executable
+    In dev mode: returns 'jupyter notebook' CLI command
+
+    Args:
+        port: Port to run Jupyter on
+        notebook_dir: Directory to start Jupyter in
+        config_path: Path to Jupyter config file
+
+    Returns:
+        Full command list ready for subprocess
+    """
+    if is_frozen():
+        cmd = [_get_frozen_executable_path('vivarium-jupyter')]
+        cmd.extend(['--port', str(port)])
+        if notebook_dir:
+            cmd.extend(['--notebook-dir', str(notebook_dir)])
+        if config_path:
+            cmd.extend(['--config', str(config_path)])
+    else:
+        cmd = [
+            'jupyter', 'notebook',
+            f'--port={port}',
+            '--no-browser',
+        ]
+        if notebook_dir:
+            cmd.append(f'--notebook-dir={notebook_dir}')
+        if config_path:
+            cmd.append(f'--config={config_path}')
+
+    return cmd

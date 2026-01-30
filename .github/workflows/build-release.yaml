@@ -114,9 +114,9 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           cd dist
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface Start-Vivarium.command start-vivarium.sh 2>/dev/null || \
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface Start-Vivarium.command 2>/dev/null || \
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface start-vivarium.sh
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter Start-Vivarium.command start-vivarium.sh 2>/dev/null || \
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter Start-Vivarium.command 2>/dev/null || \
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium-server vivarium-interface vivarium-jupyter start-vivarium.sh
 
       - name: Create launcher script (Windows)
         if: runner.os == 'Windows'
@@ -139,7 +139,7 @@ jobs:
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path vivarium-server, vivarium-interface, Start-Vivarium.bat -DestinationPath ../${{ matrix.artifact_name }}.zip
+          Compress-Archive -Path vivarium-server, vivarium-interface, vivarium-jupyter, Start-Vivarium.bat -DestinationPath ../${{ matrix.artifact_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

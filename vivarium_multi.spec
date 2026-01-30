@@ -1,9 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec file for Vivarium - Multi-executable approach
-Builds two executables:
+Builds three executables:
   - vivarium-server (gRPC server)
   - vivarium-interface (Panel web interface, internally calls vivarium-server)
+  - vivarium-jupyter (Jupyter notebook server for embedded notebooks)
 
 Usage:
     pyinstaller vivarium_multi.spec
@@ -157,6 +158,55 @@ interface_coll = COLLECT(
 )
 
 # ============================================================================
+# JUPYTER EXECUTABLE
+# ============================================================================
+
+jupyter_script = os.path.join(project_root, 'scripts', 'run_jupyter.py')
+
+jupyter_analysis = Analysis(
+    [jupyter_script],
+    pathex=[project_root],
+    binaries=[],
+    datas=notebook_datas + jupyter_config,
+    hiddenimports=[
+        'notebook', 'jupyter_server', 'jupyter_client', 'ipykernel',
+        'traitlets', 'tornado', 'zmq',
+        'ipykernel.datapub', 'ipykernel.comm',
+        'jupyter_core', 'nbformat', 'nbconvert',
+    ] + collect_submodules('notebook')
+      + collect_submodules('jupyter_server')
+      + collect_submodules('ipykernel'),
+    hookspath=[],
+    runtime_hooks=[],
+    excludes=['jax', 'jaxlib', 'jax_md'],  # Not needed for Jupyter
+    noarchive=False,
+)
+
+jupyter_pyz = PYZ(jupyter_analysis.pure)
+
+jupyter_exe = EXE(
+    jupyter_pyz,
+    jupyter_analysis.scripts,
+    [],
+    exclude_binaries=True,
+    name='vivarium-jupyter',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+)
+
+jupyter_coll = COLLECT(
+    jupyter_exe,
+    jupyter_analysis.binaries,
+    jupyter_analysis.datas,
+    strip=False,
+    upx=True,
+    name='vivarium-jupyter',
+)
+
+# ============================================================================
 # NOTE: macOS .app bundle removed for alpha version
 # ============================================================================
 # For alpha, we distribute raw executables with a launcher script.
@@ -170,6 +220,7 @@ interface_coll = COLLECT(
 #     app = BUNDLE(
 #         interface_coll,
 #         server_coll,
+#         jupyter_coll,
 #         name='Vivarium.app',
 #         icon=None,
 #         bundle_identifier='com.vivarium.app',
