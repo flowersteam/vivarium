@@ -167,7 +167,7 @@ jobs:
             ./dist/vivarium-server/vivarium-server &
           fi
           SERVER_PID=$!
-          sleep 10
+          sleep 60
           # Check if server is responding (using grpc health check)
           python -c "
           from vivarium.utils.handle_server_interface import check_server_running
