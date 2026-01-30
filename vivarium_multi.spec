@@ -12,7 +12,7 @@ Usage:
 
 import sys
 import os
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs, copy_metadata
 
 # Get the project root directory
 project_root = os.path.abspath(SPECPATH)
@@ -175,6 +175,10 @@ jupyter_pkg_datas = (
     + collect_data_files('jupyter_events')
     + collect_data_files('jsonschema')
     + collect_data_files('rfc3987_syntax')  # Contains .lark grammar files
+    # Include package metadata for entry points (needed for kernel provisioner)
+    + copy_metadata('jupyter_client')
+    + copy_metadata('jupyter_server')
+    + copy_metadata('ipykernel')
 )
 
 jupyter_analysis = Analysis(
@@ -189,9 +193,14 @@ jupyter_analysis = Analysis(
         'jupyter_core', 'nbformat', 'nbconvert',
         'argon2', 'argon2.low_level',  # Password hashing
         'jupyter_server.serverapp',  # Required for notebook 7.x
+        # Kernel provisioner (loaded via entry points)
+        'jupyter_client.provisioning',
+        'jupyter_client.provisioning.factory',
+        'jupyter_client.provisioning.local_provisioner',
     ] + collect_submodules('notebook')
       + collect_submodules('jupyter_server')
-      + collect_submodules('ipykernel'),
+      + collect_submodules('ipykernel')
+      + collect_submodules('jupyter_client'),
     hookspath=[],
     runtime_hooks=[],
     excludes=['jax', 'jaxlib', 'jax_md'],  # Not needed for Jupyter
