@@ -222,6 +222,7 @@ jobs:
             ${{ matrix.artifact_name }}.zip
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0  # Already compressed, avoid double compression
 
   release:
     name: Create Release
