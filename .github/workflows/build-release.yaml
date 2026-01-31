@@ -84,66 +84,109 @@ jobs:
           # Ad-hoc sign all executables in the vivarium folder
           find dist/vivarium -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
 
+      - name: Create inner archive and package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          # Create inner archive with executables and _internal
+          cd dist/vivarium
+          tar -czvf ../vivarium-build.tar.gz *
+          cd ..
+
+          # Create outer package folder
+          mkdir -p vivarium-package
+          mv vivarium-build.tar.gz vivarium-package/
+
       - name: Create launcher script (macOS)
         if: runner.os == 'macOS'
         run: |
-          cat > dist/vivarium/Start-Vivarium.command << 'EOF'
+          cat > dist/vivarium-package/Start-Vivarium.command << 'EOF'
           #!/bin/bash
-          # Vivarium Launcher - double-click to start
-          # Close this terminal window to quit Vivarium
-
           cd "$(dirname "$0")"
+
+          if [ -f "vivarium-build.tar.gz" ]; then
+              echo "First launch - setting up Vivarium..."
+              xattr -cr vivarium-build.tar.gz 2>/dev/null || true
+              tar -xzf vivarium-build.tar.gz
+              rm vivarium-build.tar.gz
+              echo "Setup complete!"
+              echo ""
+          fi
+
           echo "Starting Vivarium..."
           echo "Close this terminal window to quit."
           echo ""
           ./vivarium-interface
           EOF
-          chmod +x dist/vivarium/Start-Vivarium.command
+          chmod +x dist/vivarium-package/Start-Vivarium.command
 
       - name: Create launcher script (Linux)
         if: runner.os == 'Linux'
         run: |
-          cat > dist/vivarium/start-vivarium.sh << 'EOF'
+          cat > dist/vivarium-package/start-vivarium.sh << 'EOF'
           #!/bin/bash
-          # Vivarium Launcher
-          # Close this terminal window to quit Vivarium
-
           cd "$(dirname "$0")"
+
+          if [ -f "vivarium-build.tar.gz" ]; then
+              echo "First launch - setting up Vivarium..."
+              tar -xzf vivarium-build.tar.gz
+              rm vivarium-build.tar.gz
+              echo "Setup complete!"
+              echo ""
+          fi
+
           echo "Starting Vivarium..."
           echo "Close this terminal window to quit."
           echo ""
           ./vivarium-interface
           EOF
-          chmod +x dist/vivarium/start-vivarium.sh
+          chmod +x dist/vivarium-package/start-vivarium.sh
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
         run: |
           cd dist
-          tar -czvf ../${{ matrix.artifact_name }}.tar.gz vivarium
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz -C vivarium-package .
+
+      - name: Create inner archive and package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist\vivarium
+          Compress-Archive -Path * -DestinationPath ..\vivarium-build.zip
+          cd ..
+          New-Item -ItemType Directory -Path vivarium-package
+          Move-Item vivarium-build.zip vivarium-package\
 
       - name: Create launcher script (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          @"
+          $script = @"
           @echo off
-          REM Vivarium Launcher - double-click to start
-          REM Close this window to quit Vivarium
-
           cd /d "%~dp0"
+
+          if exist "vivarium-build.zip" (
+              echo First launch - setting up Vivarium...
+              powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath ."
+              del vivarium-build.zip
+              echo Setup complete!
+              echo.
+          )
+
           echo Starting Vivarium...
           echo Close this window to quit.
           echo.
           vivarium-interface.exe
-          "@ | Out-File -FilePath dist\vivarium\Start-Vivarium.bat -Encoding ASCII
+          "@
+          # Remove leading whitespace from each line
+          $script -split "`n" | ForEach-Object { $_.TrimStart() } | Set-Content -Path dist\vivarium-package\Start-Vivarium.bat -Encoding ASCII
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           cd dist
-          Compress-Archive -Path vivarium -DestinationPath ../${{ matrix.artifact_name }}.zip
+          Compress-Archive -Path vivarium-package\* -DestinationPath ../${{ matrix.artifact_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -156,13 +199,56 @@ jobs:
           retention-days: 7
           compression-level: 0  # Already compressed, avoid double compression
 
+      - name: Extract outer archive for smoke tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p smoke-test
+          tar -xzf ${{ matrix.artifact_name }}.tar.gz -C smoke-test
+          ls -la smoke-test
+
+      - name: Extract outer archive for smoke tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path smoke-test
+          Expand-Archive -Path ${{ matrix.artifact_name }}.zip -DestinationPath smoke-test
+          Get-ChildItem smoke-test
+
+      - name: Smoke test - Launcher extracts and Interface starts
+        run: |
+          # Run the launcher script which extracts the inner archive and starts interface
+          cd smoke-test
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            bash Start-Vivarium.command &
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            bash start-vivarium.sh &
+          else
+            cmd.exe /c Start-Vivarium.bat &
+          fi
+          INTERFACE_PID=$!
+          sleep 20
+          # Check if interface is responding to HTTP
+          python -c "
+          from vivarium.utils.handle_server_interface import wait_for_http
+          import sys
+          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
+              print('[OK] Interface health check passed')
+              sys.exit(0)
+          else:
+              print('[FAIL] Interface health check failed')
+              sys.exit(1)
+          "
+          kill $INTERFACE_PID 2>/dev/null || true
+        shell: bash
+
       - name: Smoke test - Server starts
         run: |
-          # Test that vivarium-server starts and responds to health checks
+          # Inner archive already extracted by launcher, test server directly
+          cd smoke-test
           if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium/vivarium-server.exe &
+            ./vivarium-server.exe &
           else
-            ./dist/vivarium/vivarium-server &
+            ./vivarium-server &
           fi
           SERVER_PID=$!
           sleep 60
@@ -182,11 +268,12 @@ jobs:
 
       - name: Smoke test - Jupyter starts
         run: |
-          # Test that vivarium-jupyter starts and binds to port
+          # Inner archive already extracted by launcher, test jupyter directly
+          cd smoke-test
           if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium/vivarium-jupyter.exe --port 8889 &
+            ./vivarium-jupyter.exe --port 8889 &
           else
-            ./dist/vivarium/vivarium-jupyter --port 8889 &
+            ./vivarium-jupyter --port 8889 &
           fi
           JUPYTER_PID=$!
           sleep 15
@@ -202,30 +289,6 @@ jobs:
               sys.exit(1)
           "
           kill $JUPYTER_PID 2>/dev/null || true
-        shell: bash
-
-      - name: Smoke test - Interface starts
-        run: |
-          # Test that vivarium-interface starts and serves HTTP
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/vivarium/vivarium-interface.exe &
-          else
-            ./dist/vivarium/vivarium-interface &
-          fi
-          INTERFACE_PID=$!
-          sleep 15
-          # Check if interface is responding to HTTP
-          python -c "
-          from vivarium.utils.handle_server_interface import wait_for_http
-          import sys
-          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
-              print('[OK] Interface health check passed')
-              sys.exit(0)
-          else:
-              print('[FAIL] Interface health check failed')
-              sys.exit(1)
-          "
-          kill $INTERFACE_PID 2>/dev/null || true
         shell: bash
 
   release:
