@@ -231,7 +231,7 @@ jobs:
           python -c "
           from vivarium.utils.handle_server_interface import wait_for_http
           import sys
-          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=10):
+          if wait_for_http('http://localhost:5006/run_interface', retries=6, delay=5, timeout=30):
               print('[OK] Interface health check passed')
               sys.exit(0)
           else:
