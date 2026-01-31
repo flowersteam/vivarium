@@ -91,10 +91,15 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
     lg.info(f"Notebook directory: {notebook_dir}")
     lg.info(f"Command: {' '.join(jupyter_command)}")
 
+    # Set environment variable so notebooks can detect they were launched from Panel
+    env = os.environ.copy()
+    env['VIVARIUM_JUPYTER_FROM_PANEL'] = '1'
+
     jupyter_process = subprocess.Popen(
         jupyter_command,
         stdout=None if show_output else subprocess.DEVNULL,
-        stderr=None if show_output else subprocess.DEVNULL
+        stderr=None if show_output else subprocess.DEVNULL,
+        env=env
     )
     lg.info(f"Jupyter server started (PID: {jupyter_process.pid})")
 

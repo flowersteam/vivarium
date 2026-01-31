@@ -1,3 +1,4 @@
+import os
 import math
 import hydra
 import logging
@@ -5,7 +6,6 @@ import threading
 from time import sleep
 
 from vivarium.utils.handle_server_interface import (
-    create_ngrok_tunnel,
     start_simulation_server,
     stop_simulation_server,
     check_server_running,
@@ -77,6 +77,56 @@ class VivariumController:
         elif connect_to_server:
             # Try to connect to existing server
             self.connect(timeout=timeout)
+
+    @classmethod
+    def start_session(cls, scene_name,
+                      client=None,
+                      start_interface=True,
+                      start_controller_loop=True,
+                      step_from_controller=True,
+                      run_simulation=True,
+                      server_timeout=30.0):
+        """Start a Vivarium session with server, simulation, and optionally interface.
+
+        Args:
+            scene_name: Name of the scene configuration to load
+            client: Existing SimulatorGRPCClient or Simulator, or None to start a new server
+            start_interface: Whether to start the Panel web interface
+            start_controller_loop: Whether to start the controller loop immediately
+            step_from_controller: Whether this controller drives simulation steps
+            run_simulation: Whether to start the simulation running immediately
+            server_timeout: Maximum seconds to wait for gRPC server to be ready
+
+        Returns:
+            VivariumController instance with interface_url attribute set
+        """
+        # Create controller - either with provided client or in disconnected state
+        if client is not None:
+            controller = cls(client=client)
+        else:
+            controller = cls()  # disconnected state
+            controller.start_server_process(scene_name, timeout=server_timeout)
+            if start_interface:
+                controller.start_interface()
+
+        if step_from_controller:
+            controller.simulator.run_from = controller.client.name
+        if start_controller_loop:
+            controller.start_controller_loop()
+        if run_simulation:
+            controller.simulator.simulation_running = True
+        lg.info(f"VivariumController session '{scene_name}' is started")
+
+        # Print the URL the user should use
+        if controller.interface_url:
+            print(f"\n🌐 Open the interface at: {controller.interface_url}\n")
+
+        return controller
+
+    def __getattr__(self, name):
+        if name in self.controllers:
+            return self.controllers[name]
+        raise AttributeError(f"'VivariumController' object has no attribute '{name}'")
 
     def _initialize_from_client(self, client, scene_config=None, start_controller_loop=True):
         """Initialize controllers from an existing client.
@@ -258,104 +308,6 @@ class VivariumController:
             # Also disconnect since the server we were connected to no longer exists
             self.disconnect()
 
-    def start_interface(self, allow_external_origins=False, show_output=True, timeout=10):
-        """Start the Panel web interface.
-
-        Args:
-            allow_external_origins: Whether to allow websocket connections from
-                                   external origins (e.g., ngrok).
-            show_output: Whether to show interface output in console.
-            timeout: Timeout in seconds for interface startup.
-
-        Returns:
-            Interface URL if started successfully, None otherwise.
-        """
-
-        if self._interface_process is not None:
-            lg.warning("Interface is already running")
-            return self.interface_url
-
-        self._interface_process, self.interface_url = start_panel_interface(
-            allow_external_origins=allow_external_origins,
-            show_output=show_output,
-            timeout=timeout
-        )
-
-        if self.interface_url:
-            lg.info(f"Interface started at: {self.interface_url}")
-        return self.interface_url
-
-    def stop_interface(self):
-        """Stop the Panel interface if we started it."""
-        if self._interface_process is not None:
-            stop_panel_interface(self._interface_process)
-            self._interface_process = None
-            self.interface_url = None
-            lg.info("Interface stopped")
-
-    @classmethod
-    def start_session(cls, scene_name,
-                      client=None,
-                      start_interface=True,
-                      start_controller_loop=True,
-                      step_from_controller=True,
-                      run_simulation=True,
-                      server_timeout=30.0,
-                      ngrok=False,
-                      ngrok_token=None):
-        """Start a Vivarium session with server, simulation, and optionally interface.
-
-        Args:
-            scene_name: Name of the scene configuration to load
-            client: Existing SimulatorGRPCClient or Simulator, or None to start a new server
-            start_interface: Whether to start the Panel web interface
-            start_controller_loop: Whether to start the controller loop immediately
-            step_from_controller: Whether this controller drives simulation steps
-            run_simulation: Whether to start the simulation running immediately
-            server_timeout: Maximum seconds to wait for gRPC server to be ready
-            ngrok: Whether to create an ngrok tunnel for public access
-            ngrok_token: ngrok auth token (reads from NGROK_TOKEN env var if None)
-
-        Returns:
-            VivariumController instance with interface_url attribute set
-        """
-        # Create controller - either with provided client or in disconnected state
-        if client is not None:
-            controller = cls(client=client)
-        else:
-            controller = cls()  # disconnected state
-            controller.start_server_process(scene_name, timeout=server_timeout)
-            if start_interface:
-                controller.start_interface(allow_external_origins=ngrok)
-
-        # Create ngrok tunnel if requested
-        if ngrok:
-            try:
-                ngrok_url = create_ngrok_tunnel(port=5006, token=ngrok_token)
-                controller.interface_url = ngrok_url
-                controller._ngrok_active = True
-            except Exception as e:
-                lg.warning(f"Failed to create ngrok tunnel: {e}")
-
-        if step_from_controller:
-            controller.simulator.run_from = controller.client.name
-        if start_controller_loop:
-            controller.start_controller_loop()
-        if run_simulation:
-            controller.simulator.simulation_running = True
-        lg.info(f"VivariumController session '{scene_name}' is started")
-
-        # Print the URL the user should use
-        if controller.interface_url:
-            print(f"\n🌐 Open the interface at: {controller.interface_url}\n")
-
-        return controller
-
-    def __getattr__(self, name):
-        if name in self.controllers:
-            return self.controllers[name]
-        raise AttributeError(f"'VivariumController' object has no attribute '{name}'")
-
     def start_controller_loop(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
         """
         Execute the controller loop to maintain synchronization with the simulator server.
@@ -462,6 +414,63 @@ class VivariumController:
         self.client.set_changes(changes, update_from_server=update_from_server)
         if self.simulator.close:
             self.close()
+            
+    def start_interface(self, show_output=True, timeout=10, use_ngrok=False, ngrok_token=None):
+        """Start the Panel web interface.
+
+        Args:
+            show_output: Whether to show interface output in console.
+            timeout: Timeout in seconds for interface startup.
+            use_ngrok: Whether to create an ngrok tunnel for public access.
+            ngrok_token: ngrok auth token (reads from NGROK_TOKEN env var if None).
+
+        Returns:
+            Interface URL if started successfully, None otherwise.
+        """
+
+        if self._interface_process is not None:
+            lg.warning("Interface is already running")
+            return self.interface_url
+        
+        if os.environ.get('VIVARIUM_JUPYTER_FROM_PANEL') == '1':
+            lg.info("Jupyter was started from Panel interface; skipping interface start. "
+                    "If you want to start another interface, set the environment variable VIVARIUM_JUPYTER_FROM_PANEL to 0.")
+            return self.interface_url
+
+        self._interface_process, self.interface_url = start_panel_interface(
+            allow_external_origins=use_ngrok,
+            show_output=show_output,
+            timeout=timeout
+        )
+        
+        # Create ngrok tunnel if requested
+        if use_ngrok:
+            try:
+                from vivarium.utils.handle_server_interface import create_ngrok_tunnel
+                ngrok_url = create_ngrok_tunnel(port=5006, token=ngrok_token)
+                self.interface_url = ngrok_url
+                self._ngrok_active = True
+            except Exception as e:
+                lg.warning(f"Failed to create ngrok tunnel: {e}")        
+
+        if self.interface_url:
+            lg.info(f"Interface started at: {self.interface_url}")
+        return self.interface_url
+
+    def stop_interface(self):
+        """Stop the Panel interface if we started it."""
+        if self._interface_process is not None:
+            stop_panel_interface(self._interface_process)
+            self._interface_process = None
+            self.interface_url = None
+            
+            # Close ngrok tunnel if one was created
+            if getattr(self, '_ngrok_active', False):
+                from vivarium.utils.handle_server_interface import close_ngrok_tunnel
+                close_ngrok_tunnel()
+                self._ngrok_active = False            
+            
+            lg.info("Interface stopped")
 
     def close(self):
         if self._is_started:
@@ -473,12 +482,6 @@ class VivariumController:
             self.client.close()
             self.client = None
             self.controllers = {}
-
-        # Close ngrok tunnel if one was created
-        if getattr(self, '_ngrok_active', False):
-            from vivarium.utils.handle_server_interface import close_ngrok_tunnel
-            close_ngrok_tunnel()
-            self._ngrok_active = False
 
         # Stop interface if we started it
         if self._interface_process is not None:
