@@ -53,16 +53,13 @@ def get_jupyter_config_path() -> str:
 
 
 def _get_frozen_executable_path(name: str) -> str:
-    """Get the path to a companion executable in frozen mode."""
-    exe_dir = os.path.dirname(sys.executable)
+    """Get the path to a companion executable in frozen mode.
 
-    if is_macos_app_bundle():
-        # In .app bundle: all executables are in Contents/MacOS/ together
-        exe_path = os.path.join(exe_dir, name)
-    else:
-        # Folder structure: executables are in sibling directories
-        dist_dir = os.path.dirname(exe_dir)
-        exe_path = os.path.join(dist_dir, name, name)
+    All executables (vivarium-server, vivarium-interface, vivarium-jupyter)
+    are in the same directory, sharing a common _internal folder.
+    """
+    exe_dir = os.path.dirname(sys.executable)
+    exe_path = os.path.join(exe_dir, name)
 
     # On Windows, add .exe extension
     if sys.platform == 'win32':
