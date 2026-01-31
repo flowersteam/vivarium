@@ -2,26 +2,27 @@ This directory contains educational sessions that enable you controlling a simul
 
 You will need a set of software tools installed on your computer, which are listed below. **If you are unsure about how to install or use them, first ask a professor or another student, we will help you.**
 
+If you prefer not to bother with installation, you can try the first session in a Google Colab: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/flowersteam/vivarium/blob/main/notebooks/sessions/session_1.ipynb)
 - ## 1 - Installation of the required software tools
 
     - A Python distribution
         - On Linux it is usually pre-installed
         - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
-        - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
+        - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provides a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
     - A virtual environment
         - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
     - [pip](https://pypi.org/project/pip/)
     - [git](https://git-scm.com/)
 
 
-    - First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
+    - First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the installation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
     - Just follow the installation steps below.
 
 - ## 2 - Installation of the Vivarium project
 
-    - ### 2.1 - Automatic installation (not available for Windows)
+    - ### 2.1 - Automatic installation (not available for Windows, unless using WSL)
 
-    - If you work from an UPF computer with Ubuntu (Linux), or from a machine with any Unix distribution (Linux or Mac OS), you can do an automatic installation of the project. To do so open a terminal, navigate to the vivarium directory that you created and execute the following commands:
+    - If you work from an UPF computer with Ubuntu (Linux), or from a machine with any Unix distribution (Linux or MacOS), you can do an automatic installation of the project. To do so open a terminal, navigate to the vivarium directory that you created and execute the following commands:
 
         ```bash
         # update the package list (you might need to enter your password)
