@@ -17,7 +17,7 @@ NUM_STEPS = 10
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_load_viviarium_controller(client_fixture, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller = VivariumController(client=client, start_controller_loop=False)
+    controller = VivariumController(client=client, start_controller_thread=False)
     controllers = controller.controllers
 
     controller.simulator_step()
@@ -94,8 +94,8 @@ def test_load_viviarium_controller(client_fixture, request):
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_controller_parameter_sync(client_fixture, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller_1 = VivariumController(client=client, start_controller_loop=False)
-    controller_2 = VivariumController(client=client, start_controller_loop=False)
+    controller_1 = VivariumController(client=client, start_controller_thread=False)
+    controller_2 = VivariumController(client=client, start_controller_thread=False)
 
     agents_1 = controller_1.controllers['agents']
     agents_2 = controller_2.controllers['agents']
@@ -128,14 +128,14 @@ def test_disconnected_controller_methods_raise():
     """Test that methods requiring connection raise when disconnected."""
     controller = VivariumController()
     with pytest.raises(RuntimeError, match="Not connected"):
-        controller.start_controller_loop()
+        controller.start_controller_thread()
 
 
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_constructor_with_client(client_fixture, request):
     """Test that passing client to constructor initializes properly."""
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller = VivariumController(client=client, start_controller_loop=False)
+    controller = VivariumController(client=client, start_controller_thread=False)
 
     assert controller.is_connected(verify=False)
     assert controller.client is client
@@ -151,14 +151,14 @@ def test_is_connected(client_fixture, request):
     controller = VivariumController()
     assert controller.is_connected() == False
 
-    controller = VivariumController(client=client, start_controller_loop=False)
+    controller = VivariumController(client=client, start_controller_thread=False)
     assert controller.is_connected() == True
 
 
 def test_constructor_start_server_missing_scene_name():
     """Test that start_server=True without scene_name raises."""
     with pytest.raises(ValueError, match="scene_name is required"):
-        VivariumController(start_server=True, start_controller_loop=False)
+        VivariumController(start_server=True, start_controller_thread=False)
 
 
 def test_connect_to_server_no_server(caplog, monkeypatch):
@@ -167,7 +167,7 @@ def test_connect_to_server_no_server(caplog, monkeypatch):
     # Mock check_server_running to always return False
     monkeypatch.setattr(vivarium_controller, 'check_server_running', lambda *args, **kwargs: False)
 
-    controller = VivariumController(connect_to_server=True, start_controller_loop=False)
+    controller = VivariumController(connect_to_server=True, start_controller_thread=False)
     assert not controller.is_connected()
     assert "No server running" in caplog.text
 
@@ -176,7 +176,7 @@ def test_connect_to_server_no_server(caplog, monkeypatch):
 def test_is_connected_verify_false(client_fixture, request):
     """Test is_connected(verify=False) only checks local state."""
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller = VivariumController(client=client, start_controller_loop=False)
+    controller = VivariumController(client=client, start_controller_thread=False)
 
     # Without verify, just checks if client is set
     assert controller.is_connected(verify=False) == True
@@ -205,7 +205,7 @@ def test_is_connected_verify_false(client_fixture, request):
 def test_is_connected_verify_true_with_running_server(client_fixture, request):
     """Test is_connected(verify=True) returns True when server is running."""
     client = request.getfixturevalue(client_fixture)('braitenberg')
-    controller = VivariumController(client=client, start_controller_loop=False)
+    controller = VivariumController(client=client, start_controller_thread=False)
 
     # With verify=True and server running, should return True
     # Note: The grpc_client fixture uses a random port, but the controller's
@@ -229,7 +229,7 @@ def test_reconnect_after_external_server_restart(server_fixture):
     assert check_server_running()
 
     # Step 2: Connect controller to server
-    controller = VivariumController(connect_to_server=True, start_controller_loop=False)
+    controller = VivariumController(connect_to_server=True, start_controller_thread=False)
     assert controller.is_connected()
     original_client = controller.client
 
@@ -249,7 +249,7 @@ def test_reconnect_after_external_server_restart(server_fixture):
     assert check_server_running()
 
     # Step 5: Connect to the new server
-    result = controller.connect(start_controller_loop=False)
+    result = controller.connect(start_controller_thread=False)
 
     assert result == True
     assert controller.is_connected()
@@ -269,14 +269,14 @@ def test_two_controllers_server_handoff(clean_server_state):
     6. vc1 connects to this new server
     """
     # Step 1: vc1 starts a server and connects
-    vc1 = VivariumController(start_server=True, scene_name='braitenberg', start_controller_loop=False)
+    vc1 = VivariumController(start_server=True, scene_name='braitenberg', start_controller_thread=False)
     assert vc1.is_connected()
     assert vc1._server_process is not None
     assert check_server_running()
 
     try:
         # Step 2: vc2 tries to start a server - should connect to existing
-        vc2 = VivariumController(start_server=True, scene_name='braitenberg', start_controller_loop=False)
+        vc2 = VivariumController(start_server=True, scene_name='braitenberg', start_controller_thread=False)
         assert vc2.is_connected()
         assert vc2._server_process is None  # vc2 didn't start the server
         assert 'simulator' in vc2.controllers
@@ -304,13 +304,13 @@ def test_two_controllers_server_handoff(clean_server_state):
         assert vc2.client is None  # State cleaned up
 
         # Step 5: vc2 starts a new server and connects
-        vc2.start_server_process('braitenberg', timeout=30.0, start_controller_loop=False)
+        vc2.start_server_process('braitenberg', timeout=30.0, start_controller_thread=False)
         assert vc2.is_connected()
         assert vc2._server_process is not None
         assert check_server_running()
 
         # Step 6: vc1 connects to this new server
-        result = vc1.connect(start_controller_loop=False)
+        result = vc1.connect(start_controller_thread=False)
         assert result == True
         assert vc1.is_connected()
         assert 'simulator' in vc1.controllers
@@ -337,14 +337,14 @@ def test_start_server_scene_mismatch(caplog):
         assert not check_server_running(), "Failed to stop existing server"
 
     # Start a server with 'braitenberg' scene
-    vc1 = VivariumController(start_server=True, scene_name='braitenberg', timeout=30.0, start_controller_loop=False)
+    vc1 = VivariumController(start_server=True, scene_name='braitenberg', timeout=30.0, start_controller_thread=False)
     assert vc1.is_connected()
     assert check_server_running()
 
     try:
         # Try to start a server with a different scene
         vc2 = VivariumController()
-        vc2.start_server_process('quickstart', timeout=30.0, start_controller_loop=False)
+        vc2.start_server_process('quickstart', timeout=30.0, start_controller_thread=False)
 
         # vc2 should NOT be connected (scene mismatch)
         assert not vc2.is_connected()

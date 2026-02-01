@@ -31,7 +31,7 @@ class VivariumController:
                  start_server=False,
                  scene_name=None,
                  timeout=30.0,
-                 start_controller_loop=True):
+                 start_controller_thread=True):
         """Initialize a VivariumController.
 
         Args:
@@ -43,7 +43,7 @@ class VivariumController:
                          Requires scene_name to be set.
             scene_name: Name of the scene configuration (required if start_server=True).
             timeout: Timeout in seconds for server connection/startup.
-            start_controller_loop: Whether to start the controller loop immediately
+            start_controller_thread: Whether to start the controller thread immediately
                                    after initialization (default: True).
 
         Behavior matrix:
@@ -56,7 +56,8 @@ class VivariumController:
             | None | True | True | If server running: connect. If not: start, then connect |
         """
         self.time = 0
-        self._is_started = False
+        self._controller_thread = None
+        self._controller_thread_stop_event = threading.Event()
         self._server_process = None
         self._interface_process = None
         self._ngrok_active = False
@@ -68,21 +69,21 @@ class VivariumController:
 
         if client is not None:
             # Use provided client directly
-            self._initialize_from_client(client, start_controller_loop=start_controller_loop)
+            self._initialize_from_client(client, start_controller_thread=start_controller_thread)
         elif start_server:
             # Start server and connect
             if scene_name is None:
                 raise ValueError("scene_name is required when start_server=True")
-            self.start_server_process(scene_name, timeout=timeout, start_controller_loop=start_controller_loop)
+            self.start_server_process(scene_name, timeout=timeout, start_controller_thread=start_controller_thread)
         elif connect_to_server:
             # Try to connect to existing server
-            self.connect(timeout=timeout)
+            self.connect(start_controller_thread=start_controller_thread)
 
     @classmethod
     def start_session(cls, scene_name,
                       client=None,
                       start_interface=True,
-                      start_controller_loop=True,
+                      start_controller_thread=True,
                       step_from_controller=True,
                       run_simulation=True,
                       server_timeout=30.0):
@@ -92,7 +93,7 @@ class VivariumController:
             scene_name: Name of the scene configuration to load
             client: Existing SimulatorGRPCClient or Simulator, or None to start a new server
             start_interface: Whether to start the Panel web interface
-            start_controller_loop: Whether to start the controller loop immediately
+            start_controller_thread: Whether to start the controller thread immediately
             step_from_controller: Whether this controller drives simulation steps
             run_simulation: Whether to start the simulation running immediately
             server_timeout: Maximum seconds to wait for gRPC server to be ready
@@ -111,8 +112,8 @@ class VivariumController:
 
         if step_from_controller:
             controller.simulator.run_from = controller.client.name
-        if start_controller_loop:
-            controller.start_controller_loop()
+        if start_controller_thread:
+            controller.start_controller_thread()
         if run_simulation:
             controller.simulator.simulation_running = True
         lg.info(f"VivariumController session '{scene_name}' is started")
@@ -128,7 +129,7 @@ class VivariumController:
             return self.controllers[name]
         raise AttributeError(f"'VivariumController' object has no attribute '{name}'")
 
-    def _initialize_from_client(self, client, scene_config=None, start_controller_loop=True):
+    def _initialize_from_client(self, client, scene_config=None, start_controller_thread=True):
         """Initialize controllers from an existing client.
 
         Args:
@@ -149,8 +150,8 @@ class VivariumController:
 
         self.controllers = controllers
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
-        if start_controller_loop:
-            self.start_controller_loop()
+        if start_controller_thread:
+            self.start_controller_thread()
 
     def is_connected(self, verify=True):
         """Check if connected to a server.
@@ -190,7 +191,7 @@ class VivariumController:
                 "or pass a client/start_server=True to the constructor."
             )
 
-    def connect(self, timeout=30.0, reconnect=False, start_controller_loop=True):
+    def connect(self, reconnect=False, start_controller_thread=True):
         """Connect to an existing gRPC server.
 
         Args:
@@ -198,6 +199,8 @@ class VivariumController:
             reconnect: If True, clean up any existing (potentially stale) connection
                       and establish a fresh one. Useful when the server was restarted
                       by another client.
+            start_controller_thread: Whether to start the controller thread immediately
+                                   after connection (default: True).
 
         Returns:
             True if connected successfully, False otherwise.
@@ -207,7 +210,7 @@ class VivariumController:
             if check_server_running():
                 lg.info("Reconnecting to server...")
                 try:
-                    self.stop_controller_loop()
+                    self.stop_controller_thread()
                     self.client.close()
                 except Exception:
                     pass  # Ignore errors from stale connection
@@ -226,7 +229,7 @@ class VivariumController:
 
         try:
             client = SimulatorGRPCClient()
-            self._initialize_from_client(client, start_controller_loop=start_controller_loop)
+            self._initialize_from_client(client, start_controller_thread=start_controller_thread)
             lg.info("Connected to gRPC server")
             return True
         except Exception as e:
@@ -239,8 +242,9 @@ class VivariumController:
             lg.info("Already disconnected")
             return
 
-        self.stop_controller_loop()
-        sleep(1)  # wait for the simulation loop to stop
+        if self.is_controller_thread_running():
+            self.stop_controller_thread()
+            self._controller_thread.join(timeout=2.0)
         # Close the client connection
         try:
             self.client.close()
@@ -250,7 +254,7 @@ class VivariumController:
         self.controllers = {}
         lg.info("Disconnected from server")
 
-    def start_server_process(self, scene_name, timeout=30.0, start_controller_loop=True):
+    def start_server_process(self, scene_name, timeout=30.0, start_controller_thread=True):
         """Start a server process and connect to it.
 
         Args:
@@ -281,7 +285,7 @@ class VivariumController:
             # Same scene - connect if not already connected
             if self.client is None:
                 lg.info(f"Server already running with scene '{scene_name}'. Connecting.")
-                self._initialize_from_client(client, start_controller_loop=start_controller_loop)
+                self._initialize_from_client(client, start_controller_thread=start_controller_thread)
             else:
                 lg.info(f"Already connected to server with scene '{scene_name}'.")
             return
@@ -292,7 +296,7 @@ class VivariumController:
 
         # Connect to it
         client = SimulatorGRPCClient()
-        self._initialize_from_client(client, start_controller_loop=start_controller_loop)
+        self._initialize_from_client(client, start_controller_thread=start_controller_thread)
 
     def stop_server_process(self):
         """Stop the server process if we started it.
@@ -308,40 +312,40 @@ class VivariumController:
             # Also disconnect since the server we were connected to no longer exists
             self.disconnect()
 
-    def start_controller_loop(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
+    def start_controller_thread(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
         """
-        Execute the controller loop to maintain synchronization with the simulator server.
+        Start the controller thread to maintain synchronization with the simulator server.
         The simulator step will be called from this controller if `self.simulator.run_from == self.client.name` (synchronous mode).
-        :param threaded: Whether to run the loop in a thread or not, defaults to True
+        :param threaded: Whether to run in a separate thread or not, defaults to True
         :param use_streaming: Use bidirectional streaming (True) or unary RPC (False), defaults to True
         :raises RuntimeError: if the simulator is already started
         """
         
         self.ensure_connected()
 
-        if self.is_started():
-            lg.info("Simulator is already started")
+        if self.is_controller_thread_running():
+            lg.info("Controller thread is already running")
             return
 
         # automatically catch errors only if not in debug mode
         catch_errors = not debug_mode
 
-        self._is_started = True
+        self._controller_thread_stop_event.clear()
         if threaded:
-            run_thread = threading.Thread(
-                target=self._start_controller_loop, args=(num_steps, catch_errors, use_streaming)
+            self._controller_thread = threading.Thread(
+                target=self._run_controller_thread, args=(num_steps, catch_errors, use_streaming)
             )
-            run_thread.daemon = True
-            run_thread.start()
+            self._controller_thread.daemon = True
+            self._controller_thread.start()
         else:
-            self._start_controller_loop(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
-        lg.info("Simulator started on client")
+            self._run_controller_thread(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
+        lg.info("Controller thread started on client")
 
-    def _start_controller_loop(self, num_steps=math.inf, catch_errors=True, use_streaming=False):
+    def _run_controller_thread(self, num_steps=math.inf, catch_errors=True, use_streaming=False):
         """Run the simulation for a given number of steps.
 
         :param num_steps: num_steps, defaults to math.inf
-        :param catch_errors: wether to catch errors or not, defaults to False
+        :param catch_errors: whether to catch errors or not, defaults to False
         :param use_streaming: Use bidirectional streaming (True) or unary RPC (False)
         """
 
@@ -349,7 +353,7 @@ class VivariumController:
             # Use synchronized bidirectional streaming
             def compute_changes():
                 """Compute motor commands and return changes for the next step."""
-                if not self._is_started:
+                if self._controller_thread_stop_event.is_set():
                     return None  # Signal to stop
 
                 with sleep_timer(freq=self.controllers['simulator'].freq):
@@ -359,31 +363,31 @@ class VivariumController:
                 return self.fetch_changes()
 
             for state_and_cp in self.client.bidirectional_step_sync(num_steps, compute_changes):
-                if not self._is_started:
+                if self._controller_thread_stop_event.is_set():
                     break  # Stop if we've been told to stop
         else:
             # Use unary RPC (original approach)
             run_time = 0
-            while run_time < num_steps and self._is_started:
+            while run_time < num_steps and not self._controller_thread_stop_event.is_set():
                 with sleep_timer(freq=self.controllers['simulator'].freq):
                     self.step(catch_errors=catch_errors)
                     self.time += 1
                     run_time += 1
 
         # finally stop the simulation
-        if self.is_started():
-            self.stop_controller_loop()
+        if self.is_controller_thread_running():
+            self.stop_controller_thread()
 
 
-    def stop_controller_loop(self):
-        """Stop controller loop on this client."""
-        if not self.is_started():
-            lg.info("Controller loop is already stopped")
-        self._is_started = False
+    def stop_controller_thread(self):
+        """Stop controller thread on this client."""
+        if not self.is_controller_thread_running():
+            lg.info("Controller thread is already stopped")
+        self._controller_thread_stop_event.set()
 
-    def is_started(self):
-        """Check if the simulation loop is started on this client."""
-        return self._is_started
+    def is_controller_thread_running(self):
+        """Check if the controller thread is running on this client."""
+        return self._controller_thread is not None and self._controller_thread.is_alive()
 
     def simulator_step(self):
         changes = self.fetch_changes()
@@ -407,12 +411,12 @@ class VivariumController:
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
 
-    def apply_changes(self, changes=None, close_if_resquested=True): # TODO: should this be in SimulatorClient instead?
+    def apply_changes(self, changes=None, close_if_requested=True): # TODO: should this be in SimulatorClient instead?
         changes = changes or self.fetch_changes()
         # Use set_changes when streaming is active to avoid redundant state fetch
         update_from_server = not (hasattr(self.client, 'is_streaming') and self.client.is_streaming)
         self.client.set_changes(changes, update_from_server=update_from_server)
-        if self.simulator.close:
+        if self.simulator.close and close_if_requested:
             self.close()
             
     def start_interface(self, show_output=True, timeout=10, use_ngrok=False, ngrok_token=None):
@@ -473,9 +477,9 @@ class VivariumController:
             lg.info("Interface stopped")
 
     def close(self):
-        if self._is_started:
-            self.stop_controller_loop()
-            sleep(1)  # wait for the simulation loop to stop
+        if self.is_controller_thread_running():
+            self.stop_controller_thread()
+            self._controller_thread.join(timeout=2.0)
 
         # Close client if connected
         if self.is_connected():
@@ -493,13 +497,14 @@ class VivariumController:
 
     def close_all(self):
         """Send signal to close all clients and the simulator."""
-        self.stop_controller_loop()
-        sleep(1)  # wait for the simulation loop to stop
+        if self.is_controller_thread_running():
+            self.stop_controller_thread()
+            self._controller_thread.join(timeout=2.0)
         if 'simulator' in self.controllers:
             self.simulator.close = True
             lg.info("Waiting for all clients to close ...")
             while len(self.simulator.client_names) != 1:  # wait for other clients to close
-                self.apply_changes(close_if_resquested=False)
+                self.apply_changes(close_if_requested=False)
                 sleep(0.1)
         # close all processes
         stop_server_and_interface(safe_mode=False)

@@ -210,7 +210,7 @@ def simulator_from_config(scene_config):
 @pytest.fixture
 def vivarium_controller():
     def fn(client):
-        return VivariumController(client=client, start_controller_loop=False)
+        return VivariumController(client=client, start_controller_thread=False)
     return fn
 
 
@@ -218,7 +218,7 @@ def vivarium_controller():
 def vivarium_controller_from_config(simulator_from_config):
     def fn(scene_name, overrides=[]):
         client = simulator_from_config(scene_name, overrides=overrides)
-        return VivariumController(client=client, start_controller_loop=False)
+        return VivariumController(client=client, start_controller_thread=False)
     return fn
 
 
@@ -231,7 +231,7 @@ def vivarium_controller_start_session(grpc_client):
             scene_name=scene_name,
             client=client,
             start_interface=False,
-            start_controller_loop=False
+            start_controller_thread=False
         )
         controllers.append(controller)
         return controller
