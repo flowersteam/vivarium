@@ -33,7 +33,7 @@ setup(
         "cuda11": ["jax[cuda11]"],
         "cuda12": ["jax[cuda12]"],
         "cuda13": ["jax[cuda13]"],
-        "ngrok": ["pyngrok"],
+        "colab": ["pyngrok", "notebook>=6.0"],
     },
     
     author="Clément Moulin-Frier",
