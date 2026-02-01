@@ -8,7 +8,7 @@ import re
 import grpc
 from grpc_health.v1 import health_pb2, health_pb2_grpc
 
-from vivarium.utils.runtime import get_bundle_root, get_jupyter_config_path, get_server_command, get_interface_command, get_jupyter_command
+from vivarium.utils.runtime import get_app_root, get_jupyter_config_path, get_server_command, get_interface_command, get_jupyter_command
 
 
 lg = logging.getLogger(__name__)
@@ -79,7 +79,9 @@ def start_jupyter_server(port=8889, notebook_dir=None, show_output=True, return_
 
     config_path = get_jupyter_config_path()
     if notebook_dir is None:
-        notebook_dir = get_bundle_root()
+        # In frozen mode, notebooks are at distribution root (not in _internal)
+        # In dev mode, get_app_root() returns the same as get_bundle_root()
+        notebook_dir = get_app_root()
 
     jupyter_command = get_jupyter_command(
         port=port,

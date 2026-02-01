@@ -15,7 +15,12 @@ from bokeh.models import (
 
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_scene_config, get_available_scenes
-from vivarium.utils.runtime import get_bundle_root
+from vivarium.utils.runtime import (
+    get_app_root,
+    get_version,
+    check_for_updates,
+    is_frozen,
+)
 from vivarium.utils.handle_server_interface import (
     check_server_running,
     get_server_interface_pids,
@@ -92,8 +97,16 @@ class WindowManager(Parameterized):
         # Create scene selection UI components
         self._setup_scene_selection_ui()
 
+        # Create update notification UI (hidden by default)
+        self._setup_update_notification_ui()
+
         # Create main container that will hold either scene selection or simulation UI
         self.main_container = pn.Column(sizing_mode="stretch_both")
+
+        # Check for updates in background (frozen mode only)
+        self._update_info = None
+        if is_frozen():
+            self._start_update_check()
 
         # Determine initial state and initialize appropriately
         if controller is not None:
@@ -169,10 +182,19 @@ class WindowManager(Parameterized):
         self.scene_select_row = pn.Row(self.scene_select, align="center")
         self.start_server_row = pn.Row(self.start_server_btn, align="center")
 
-        # Scene selection panel layout
+        # Version display
+        version = get_version()
+        self.version_label = pn.pane.Markdown(
+            f"v{version}",
+            styles={'color': 'gray', 'font-size': '0.9em'},
+            align="center",
+        )
+
+        # Scene selection panel layout (update_notification_panel added in _setup_update_notification_ui)
         self.scene_selection_panel = pn.Column(
             pn.pane.Markdown("# Vivarium", align="center", styles={'font-size': '2em'}),
-            pn.layout.Spacer(height=20),
+            self.version_label,
+            pn.layout.Spacer(height=10),
             self.server_status,
             pn.layout.Spacer(height=20),
             self.existing_server_row,
@@ -184,6 +206,94 @@ class WindowManager(Parameterized):
             align="center",
             sizing_mode="stretch_both",
         )
+
+    def _setup_update_notification_ui(self):
+        """Setup UI components for update notifications."""
+        # Update notification banner (hidden by default)
+        self.update_banner = pn.pane.Markdown(
+            "",
+            styles={
+                'background-color': '#1a73e8',
+                'color': 'white',
+                'padding': '10px 20px',
+                'border-radius': '5px',
+                'text-align': 'center',
+            },
+            sizing_mode="stretch_width",
+        )
+
+        self.update_download_btn = pn.widgets.Button(
+            name="Download Update",
+            button_type="success",
+            width=150,
+        )
+        self.update_download_btn.on_click(self._open_download_url)
+
+        self.update_dismiss_btn = pn.widgets.Button(
+            name="Dismiss",
+            button_type="default",
+            width=100,
+        )
+        self.update_dismiss_btn.on_click(self._dismiss_update_notification)
+
+        self.update_notification_panel = pn.Column(
+            self.update_banner,
+            pn.Row(
+                self.update_download_btn,
+                self.update_dismiss_btn,
+                align="center",
+            ),
+            visible=False,
+            sizing_mode="stretch_width",
+        )
+
+    def _start_update_check(self):
+        """Start checking for updates in a background thread."""
+        def check_updates():
+            try:
+                update_info = check_for_updates(timeout=5.0)
+                if update_info:
+                    self._update_info = update_info
+                    # Schedule UI update on main thread
+                    if pn.state.curdoc:
+                        pn.state.curdoc.add_next_tick_callback(self._show_update_notification)
+                    else:
+                        self._show_update_notification()
+            except Exception as e:
+                lg.debug(f"Update check failed: {e}")
+
+        thread = threading.Thread(target=check_updates, daemon=True)
+        thread.start()
+
+    def _show_update_notification(self):
+        """Display the update notification banner."""
+        if not self._update_info:
+            return
+
+        current = self._update_info['current_version']
+        latest = self._update_info['latest_version']
+
+        self.update_banner.object = (
+            f"**Update Available:** A new version of Vivarium ({latest}) is available. "
+            f"You are running version {current}."
+        )
+        self.update_notification_panel.visible = True
+
+        # Insert at the top of scene selection panel if not already there
+        if self.update_notification_panel not in self.scene_selection_panel:
+            self.scene_selection_panel.insert(0, self.update_notification_panel)
+
+    def _open_download_url(self, _event):
+        """Open the download URL in a new browser tab."""
+        if self._update_info:
+            url = self._update_info.get('release_url') or self._update_info.get('download_url')
+            if url:
+                # Use JavaScript to open URL in new tab
+                pn.state.execute(f"window.open('{url}', '_blank')")
+
+    def _dismiss_update_notification(self, _event):
+        """Hide the update notification banner."""
+        self.update_notification_panel.visible = False
 
     def _show_scene_selection(self, error_message=None):
         """Show the scene selection screen."""
@@ -665,7 +775,8 @@ class WindowManager(Parameterized):
     def _do_start_jupyter(self, port):
         """Actually start the Jupyter server on the given port."""
 
-        project_root = get_bundle_root()
+        # Use distribution dir (where notebooks/ is located in frozen mode)
+        project_root = get_app_root()
 
         try:
             lg.info(f"Starting Jupyter server on port {port}...")
@@ -824,12 +935,14 @@ class WindowManager(Parameterized):
     def open_configured_notebook_cb(self, event):
         """Callback for opening the configured notebook"""
         if self.notebook_path:
-            project_root = get_bundle_root()
+            # Use app root (where notebooks/ is located in frozen mode)
+            project_root = get_app_root()
             if not os.path.isabs(self.notebook_path):
                 notebook_path = os.path.join(project_root, self.notebook_path)
             else:
                 notebook_path = self.notebook_path
 
+            lg.info(f"Opening notebook: {notebook_path}")
             notebook_rel_path = os.path.relpath(notebook_path, project_root)
             url = f"http://localhost:{self.jupyter_port}/notebooks/{notebook_rel_path}"
             self.notebook_url.value = url

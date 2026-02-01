@@ -7,8 +7,14 @@ import logging
 import panel as pn
 from vivarium.interface.panel_app import WindowManager
 from vivarium.utils.handle_server_interface import kill_vivarium_processes, get_started_jupyter_ports, kill_port_processes
+from vivarium.utils.runtime import initialize_user_data, is_frozen
 
 lg = logging.getLogger(__name__)
+
+# Initialize user data directories on first run (frozen mode only)
+if is_frozen() and initialize_user_data():
+    lg.info("First run initialization complete")
+
 
 # Track if cleanup has already run (avoid double cleanup)
 _cleanup_done = False

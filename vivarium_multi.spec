@@ -10,6 +10,22 @@ Builds three executables that share a common dependency folder:
 Uses PyInstaller's MERGE() function to deduplicate shared libraries (JAX, gRPC, etc.)
 across executables, significantly reducing total distribution size.
 
+Directory structure after build:
+  dist/vivarium/
+    vivarium-server        (executable)
+    vivarium-interface     (executable)
+    vivarium-jupyter       (executable)
+    VERSION                (version info, same file as source)
+    conf/                  (user-editable Hydra configs)
+    notebooks/             (user-editable notebooks)
+    _defaults/             (reference copies, updated with app)
+      conf/
+      notebooks/
+    _internal/             (shared Python runtime & libraries)
+
+On first run, if conf/ or notebooks/ don't exist, they are copied from _defaults/.
+This allows users to customize while preserving ability to check for upstream changes.
+
 Usage:
     pyinstaller vivarium_multi.spec
 """
@@ -21,16 +37,23 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules, coll
 # Get the project root directory
 project_root = os.path.abspath(SPECPATH)
 
+# Read version from VERSION file (single source of truth)
+with open(os.path.join(project_root, 'VERSION'), 'r') as f:
+    VERSION = f.read().strip()
+
 # ============================================================================
 # SHARED CONFIGURATION
 # ============================================================================
 
-# Collect shared data files
+# Collect shared data files (libraries)
 panel_datas = collect_data_files('panel')
 bokeh_datas = collect_data_files('bokeh')
-hydra_datas = [(os.path.join(project_root, 'conf'), 'conf')]
-notebook_datas = [(os.path.join(project_root, 'notebooks'), 'notebooks')]
-# Jupyter config for iframe embedding
+
+# NOTE: conf and notebooks are NO LONGER included in Analysis datas.
+# They are added at the COLLECT stage to place them at the distribution root
+# (next to executables) rather than inside _internal.
+
+# Jupyter config for iframe embedding (this stays in _internal, it's not user-editable)
 jupyter_config = [(os.path.join(project_root, 'vivarium/interface/jupyter_config_iframe.py'), 'vivarium/interface')]
 
 # Collect shared binaries
@@ -57,7 +80,7 @@ server_analysis = Analysis(
     [server_script],
     pathex=[project_root],
     binaries=binaries,
-    datas=hydra_datas,
+    datas=[],  # conf is added at COLLECT stage for user-editability
     # CRITICAL: Hydra loads classes dynamically via _target_ in YAML configs
     # PyInstaller can't detect these, so we must explicitly collect submodules:
     # - vivarium.environment.components: Server-side JAX components (entities, physics, etc.)
@@ -104,7 +127,7 @@ interface_analysis = Analysis(
     [interface_script],
     pathex=[project_root],
     binaries=binaries,  # Include JAX binaries
-    datas=panel_datas + bokeh_datas + hydra_datas + notebook_datas + jupyter_config,
+    datas=panel_datas + bokeh_datas + jupyter_config,  # conf/notebooks added at COLLECT stage
     # CRITICAL: Hydra loads classes dynamically via _target_ and *_cls in YAML configs
     # PyInstaller can't detect these, so we must explicitly collect submodules:
     # - vivarium.controllers.components: Client-side controller APIs (re-exported from vivarium.environment.components)
@@ -172,7 +195,7 @@ jupyter_analysis = Analysis(
     [jupyter_script],
     pathex=[project_root],
     binaries=binaries,  # Include JAX binaries for vivarium
-    datas=notebook_datas + jupyter_config + jupyter_pkg_datas + hydra_datas,
+    datas=jupyter_config + jupyter_pkg_datas,  # conf/notebooks added at COLLECT stage
     hiddenimports=[
         'notebook', 'notebook.app', 'jupyter_server', 'jupyter_client', 'ipykernel',
         'traitlets', 'tornado', 'zmq',
@@ -242,9 +265,30 @@ jupyter_exe = EXE(
 #     vivarium-server        (executable)
 #     vivarium-interface     (executable)
 #     vivarium-jupyter       (executable)
+#     VERSION                (version file, same as source)
+#     conf/                  (user-editable, copied from _defaults on first run)
+#     notebooks/             (user-editable, copied from _defaults on first run)
+#     _defaults/             (reference copies, updated with each release)
+#       conf/
+#       notebooks/
 #     _internal/             (shared Python runtime & libraries)
 #
 # Shared dependencies (JAX, gRPC, NumPy, etc.) appear only once in _internal.
+
+# VERSION file path (single source of truth, included directly in distribution)
+version_file_path = os.path.join(project_root, 'VERSION')
+
+# User-editable directories (placed at distribution root)
+# These are copied from _defaults/ on first run if they don't exist
+user_conf = Tree(os.path.join(project_root, 'conf'), prefix='conf')
+user_notebooks = Tree(os.path.join(project_root, 'notebooks'), prefix='notebooks')
+
+# Default/reference copies (for comparison and reset capability)
+defaults_conf = Tree(os.path.join(project_root, 'conf'), prefix='_defaults/conf')
+defaults_notebooks = Tree(os.path.join(project_root, 'notebooks'), prefix='_defaults/notebooks')
+
+# VERSION file - COLLECT expects 3-tuples: (dest_name, src_path, typecode)
+version_data = [('VERSION', version_file_path, 'DATA')]
 
 coll = COLLECT(
     # All three executables
@@ -259,10 +303,48 @@ coll = COLLECT(
     server_analysis.datas,
     interface_analysis.datas,
     jupyter_analysis.datas,
+    # User-editable directories (placed in _internal, moved to root in post-processing)
+    user_conf,
+    user_notebooks,
+    # Reference copies in _defaults/
+    defaults_conf,
+    defaults_notebooks,
+    # Version file
+    version_data,
     strip=False,
     upx=True,
     name='vivarium',
 )
+
+# ============================================================================
+# POST-PROCESSING: Move user-editable directories to distribution root
+# ============================================================================
+# PyInstaller 6+ places all data inside _internal/ by default.
+# For user-editable files (conf, notebooks), we want them at the
+# distribution root (next to executables) so users can easily access them.
+# This section moves these directories after COLLECT completes.
+
+import shutil
+
+dist_dir = os.path.join(project_root, 'dist', 'vivarium')
+internal_dir = os.path.join(dist_dir, '_internal')
+
+# Directories/files to move from _internal/ to distribution root
+items_to_move = ['conf', 'notebooks', '_defaults', 'VERSION']
+
+for item in items_to_move:
+    src = os.path.join(internal_dir, item)
+    dst = os.path.join(dist_dir, item)
+    if os.path.exists(src):
+        # Remove destination if it exists (from previous build)
+        if os.path.exists(dst):
+            if os.path.isdir(dst):
+                shutil.rmtree(dst)
+            else:
+                os.remove(dst)
+        # Move from _internal to root
+        shutil.move(src, dst)
+        print(f"Moved {item} to distribution root")
 
 # ============================================================================
 # NOTE: macOS .app bundle removed for alpha version

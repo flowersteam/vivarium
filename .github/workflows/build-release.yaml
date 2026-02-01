@@ -291,6 +291,76 @@ jobs:
           kill $JUPYTER_PID 2>/dev/null || true
         shell: bash
 
+      - name: Smoke test - Version consistency
+        run: |
+          cd smoke-test
+
+          # Verify VERSION file exists in distribution
+          if [ ! -f "VERSION" ]; then
+            echo "[FAIL] VERSION file not found in distribution"
+            exit 1
+          fi
+          echo "[OK] VERSION file exists"
+
+          # Read version from file
+          FILE_VERSION=$(cat VERSION)
+          echo "Version from file: $FILE_VERSION"
+
+          # Verify version format (semver-like)
+          if ! echo "$FILE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$'; then
+            echo "[FAIL] Invalid version format: $FILE_VERSION"
+            exit 1
+          fi
+          echo "[OK] Version format valid"
+
+          # Verify _defaults directory exists
+          if [ ! -d "_defaults" ]; then
+            echo "[FAIL] _defaults directory not found"
+            exit 1
+          fi
+          echo "[OK] _defaults directory exists"
+
+          # Verify _defaults contains conf and notebooks
+          if [ ! -d "_defaults/conf" ] || [ ! -d "_defaults/notebooks" ]; then
+            echo "[FAIL] _defaults missing conf/ or notebooks/"
+            exit 1
+          fi
+          echo "[OK] _defaults structure correct"
+        shell: bash
+
+      - name: Smoke test - First run initialization
+        run: |
+          cd smoke-test
+
+          # Remove conf and notebooks to simulate first run
+          rm -rf conf notebooks
+
+          # Run interface briefly (it should copy from _defaults)
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            ./vivarium-interface --dont-open-browser &
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            ./vivarium-interface --dont-open-browser &
+          else
+            ./vivarium-interface.exe --dont-open-browser &
+          fi
+          INTERFACE_PID=$!
+          sleep 10
+          kill $INTERFACE_PID 2>/dev/null || true
+
+          # Verify conf and notebooks were created
+          if [ ! -d "conf" ]; then
+            echo "[FAIL] conf/ not created on first run"
+            exit 1
+          fi
+          echo "[OK] conf/ created from _defaults"
+
+          if [ ! -d "notebooks" ]; then
+            echo "[FAIL] notebooks/ not created on first run"
+            exit 1
+          fi
+          echo "[OK] notebooks/ created from _defaults"
+        shell: bash
+
   release:
     name: Create Release
     needs: build
