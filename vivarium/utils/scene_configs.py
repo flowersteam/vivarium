@@ -80,6 +80,45 @@ def generate_random_positions(n, position_range, seed=None):
     return [[rng.uniform(x_min, x_max), rng.uniform(y_min, y_max)] for _ in range(n)]
 
 
+
+def generate_grid_positions(n, position_range):
+    """
+    Generate exactly n regularly spaced positions in a grid pattern within a given range.
+
+    :param n: number of positions to generate
+    :param position_range: range of positions (x_min, x_max, y_min, y_max)
+    :return: list of positions [[x, y], ...]
+    """
+    x_min, x_max, y_min, y_max = position_range
+    width = x_max - x_min
+    height = y_max - y_min
+
+    # Calculate grid dimensions that can fit at least n positions
+    # while respecting the aspect ratio of the position range
+    aspect_ratio = width / height if height > 0 else 1.0
+    ny = max(1, int((n / aspect_ratio) ** 0.5))
+    nx = max(1, int(n / ny))
+
+    # Ensure we have enough cells for n positions
+    while nx * ny < n:
+        if (nx + 1) * ny <= (ny + 1) * nx:
+            nx += 1
+        else:
+            ny += 1
+
+    # Generate grid positions, return exactly n
+    positions = []
+    for i in range(nx):
+        for j in range(ny):
+            if len(positions) >= n:
+                return positions
+            x = x_min + (i + 0.5) * width / nx
+            y = y_min + (j + 0.5) * height / ny
+            positions.append([x, y])
+
+    return positions
+
+
 def generate_random_orientations(n, seed=None):
     # Generate random orientations
     rng = random.Random(seed)
@@ -144,9 +183,14 @@ def extend_controller_kwargs(kwargs, by_indices, n):
 
 def compute_parameters(config):
     n = config.n_max
-    if '_range_' in config.position:
+    print(config.position)
+    if '_range_' in config.position and config.position['_range_'] is not None:
         # Generate random positions within a specified range
         config.position = generate_random_positions(n, config.position['_range_'])  # , self.seed)
+    elif '_regular_grid_' in config.position and config.position['_regular_grid_'] is not None:
+        # Generate regularly spaced positions in a grid pattern
+        print('Generating grid positions')
+        config.position = generate_grid_positions(n, config.position['_regular_grid_'])
     if config.orientation == '_random_':
         # Generate random orientations if not provided
         config.orientation = generate_random_orientations(n)  # , self.seed)
