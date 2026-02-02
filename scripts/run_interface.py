@@ -19,18 +19,31 @@ if is_frozen() and initialize_user_data():
 # Track if cleanup has already run (avoid double cleanup)
 _cleanup_done = False
 
+# Store the active WindowManager instance for cleanup
+_window_manager = None
+
 
 def cleanup():
     """Clean up all Vivarium processes when the interface exits."""
-    global _cleanup_done
+    global _cleanup_done, _window_manager
     if _cleanup_done:
         return
     _cleanup_done = True
 
     lg.info("Cleaning up Vivarium processes...")
+
+    # First, try to close the controller properly via WindowManager
+    if _window_manager is not None and _window_manager.controller is not None:
+        try:
+            lg.info("Closing controller...")
+            _window_manager.controller.close()
+            _window_manager.controller = None
+            lg.info("Controller closed successfully")
+        except Exception as e:
+            lg.warning(f"Error closing controller: {e}")
+
+    # Fallback: kill any remaining processes by port
     try:
-        # Kill the gRPC server and its clients
-        # Don't kill interface (that's us, already exiting)
         killed = kill_vivarium_processes(server=True, clients=True, interface=False)
 
         # Kill only Jupyter servers WE started (from registry), not external ones
@@ -41,7 +54,7 @@ def cleanup():
                 killed.extend(kill_port_processes(port, servers_only=True))
 
         if killed:
-            lg.info(f"Stopped {len(killed)} process(es)")
+            lg.info(f"Fallback cleanup stopped {len(killed)} process(es)")
     except Exception as e:
         lg.warning(f"Cleanup error: {e}")
 
@@ -83,8 +96,9 @@ if args.no_cleanup:
 
 
 def create_app():
-    wm = WindowManager(server_timeout=args.server_timeout)
-    return wm.app
+    global _window_manager
+    _window_manager = WindowManager(server_timeout=args.server_timeout)
+    return _window_manager.app
 
 
 serve_kwargs = {

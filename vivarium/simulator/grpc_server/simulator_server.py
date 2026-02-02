@@ -180,32 +180,44 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 def create_grpc_server(simulator, port=50051):
     """
     Create a gRPC server with the simulator servicer and health checking.
-    
+
     Args:
         simulator: The Simulator instance to serve
         port: Port to listen on (use 0 for random available port)
-        
+
     Returns:
         tuple: (server, actual_port) - the gRPC server and the port it's listening on
+
+    Raises:
+        RuntimeError: If port binding fails
     """
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     simulator_pb2_grpc.add_SimulatorServerServicer_to_server(
         SimulatorServerServicer(simulator), server
     )
-    
+
     # Add health checking service
     health_servicer = health.HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
-    
+
     actual_port = server.add_insecure_port(f"[::]:{port}")
+    if actual_port == 0:
+        raise RuntimeError(
+            f"Failed to bind to port {port}. "
+            "Another process may be using it. Try: lsof -i :50051"
+        )
+
     server.start()
-    
+    lg.info(f"gRPC server started on port {actual_port}")
+
     # Mark service as ready
     health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
-    
+    lg.info("gRPC health service marked as SERVING")
+
     return server, actual_port
 
 
 def serve(simulator):
-    server, _ = create_grpc_server(simulator, port=50051)
+    server, port = create_grpc_server(simulator, port=50051)
+    lg.info(f"Server listening on port {port}, waiting for termination...")
     server.wait_for_termination()

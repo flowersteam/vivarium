@@ -306,11 +306,12 @@ class VivariumController:
         Can also be called explicitly if you want to stop the server.
         """
         if self._server_process is not None:
+            # Disconnect first to stop threads cleanly before server goes down
+            self.disconnect()
+            # Now stop the server
             stop_simulation_server(self._server_process)
             self._server_process = None
             lg.info("Server stopped")
-            # Also disconnect since the server we were connected to no longer exists
-            self.disconnect()
 
     def start_controller_thread(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
         """
@@ -477,23 +478,20 @@ class VivariumController:
             lg.info("Interface stopped")
 
     def close(self):
-        if self.is_controller_thread_running():
-            self.stop_controller_thread()
-            self._controller_thread.join(timeout=2.0)
+        """Close the controller and clean up all resources.
 
-        # Close client if connected
-        if self.is_connected():
-            self.client.close()
-            self.client = None
-            self.controllers = {}
-
+        Stops any processes we started (interface, server) and disconnects from the server.
+        """
         # Stop interface if we started it
         if self._interface_process is not None:
             self.stop_interface()
 
-        # Stop server if we started it
+        # Stop server if we started it (this also calls disconnect())
         if self._server_process is not None:
             self.stop_server_process()
+        else:
+            # Just disconnect if we didn't start the server
+            self.disconnect()
 
     def close_all(self):
         """Send signal to close all clients and the simulator."""
@@ -506,8 +504,6 @@ class VivariumController:
             while len(self.simulator.client_names) != 1:  # wait for other clients to close
                 self.apply_changes(close_if_requested=False)
                 sleep(0.1)
-        # close all processes
-        stop_server_and_interface(safe_mode=False)
         # Close our client
         self.close()
 

@@ -608,18 +608,18 @@ class WindowManager(Parameterized):
         if self._streaming_active:
             self._stop_streaming()
 
-        # Disconnect the controller (don't close - we'll stop server separately)
+        # Close the controller (disconnects and stops server if we started it)
         if self.controller:
             try:
-                self.controller.disconnect()
+                self.controller.close()
             except Exception as e:
-                lg.warning(f"Error disconnecting controller: {e}")
+                lg.warning(f"Error closing controller: {e}")
             self.controller = None
 
-        # Stop the server (regardless of who started it)
+        # Fallback: kill any remaining server processes by port
         server_pids = kill_vivarium_processes(server=True)
         if server_pids:
-            lg.info("Server stopped")
+            lg.info(f"Fallback cleanup killed server process(es): {server_pids}")
 
         # Reset state
         self.scene_config = None
