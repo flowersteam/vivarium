@@ -14,7 +14,7 @@ from bokeh.models import (
 )
 
 from vivarium.controllers import VivariumController
-from vivarium.utils.scene_configs import load_scene_config, get_available_scenes
+from vivarium.utils.scene_configs import load_config, load_scene_config, get_available_scenes
 from vivarium.utils.runtime import (
     get_app_root,
     get_version,
@@ -75,16 +75,16 @@ class WindowManager(Parameterized):
 
         self.curdoc = curdoc()
 
-        # Check theme from URL query params (before server connection)
-        self.dark_theme = False
-        if pn.state.location is not None:
+        if pn.state.location is not None and 'theme' in pn.state.location.query_params:
             query_params = pn.state.location.query_params
-            if 'theme' in query_params:
-                self.dark_theme = (query_params['theme'] == 'dark')
-            if self.dark_theme:
-                pn.config.theme = 'dark'
-            else:
-                pn.config.theme = 'default'
+            self.dark_theme = (query_params['theme'] == 'dark')
+        else:
+            self.dark_theme =  load_config("scene/interface", "base_interface").dark_mode
+                    
+        if self.dark_theme:
+            pn.config.theme = 'dark'
+        else:
+            pn.config.theme = 'default'
 
         # Initialize controller and scene_config as None
         self.controller = None
@@ -189,6 +189,14 @@ class WindowManager(Parameterized):
             styles={'color': 'gray', 'font-size': '0.9em'},
             align="center",
         )
+        
+        self.dark_theme_switch = pn.widgets.Switch(
+            name="Light/Dark theme",
+            value=self.dark_theme,
+            align="center",
+        )
+        
+        self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
 
         # Scene selection panel layout (update_notification_panel added in _setup_update_notification_ui)
         self.scene_selection_panel = pn.Column(
@@ -202,6 +210,8 @@ class WindowManager(Parameterized):
             self.scene_select_row,
             pn.layout.Spacer(height=10),
             self.start_server_row,
+            pn.layout.Spacer(height=20),
+            self.dark_theme_switch,
             pn.layout.Spacer(height=20),
             align="center",
             sizing_mode="stretch_both",
@@ -353,12 +363,6 @@ class WindowManager(Parameterized):
         client = self.controller.client
         self.scene_config = load_scene_config(client.scene_name)
 
-        # Update dark theme from scene config if not set via URL
-        if pn.state.location is None or 'theme' not in pn.state.location.query_params:
-            self.dark_theme = self.scene_config.interface.dark_mode
-            if self.dark_theme:
-                pn.config.theme = 'dark'
-
         self.use_streaming = self.scene_config.interface.use_streaming
         self.controller_names = list(self.controller.controllers.keys())
 
@@ -419,12 +423,6 @@ class WindowManager(Parameterized):
         )
 
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
-
-        self.dark_theme_switch = pn.widgets.Switch(
-            name="Light/Dark theme",
-            value=self.dark_theme,
-            align="center",
-        )
 
         self.controller_toggle = pn.widgets.ToggleGroup(
             name="ControllerToggle",
@@ -749,9 +747,7 @@ class WindowManager(Parameterized):
 
         :param event: The event for the new value of the button (True if dark theme)
         """
-        self.pcb_plot.stop()
-        self.controller.close()
-        del self.controller
+        
         self.dark_theme = event.new
         if event.new:
             pn.state.location.param.update(search="?theme=dark")
@@ -1094,7 +1090,6 @@ class WindowManager(Parameterized):
                     self.plot_fps,
                     # self.streaming_toggle,
                     self.drag_n_drop,
-                    self.dark_theme_switch,
                     pn.layout.Spacer(width=20),
                     self.stop_server_btn,
                     self.stop_confirm_panel,
@@ -1118,7 +1113,6 @@ class WindowManager(Parameterized):
         self.plot_fps.param.watch(self.update_plot_fps, "value")
         # self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
-        self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
         # Notebook callbacks
         self.check_jupyter_btn.on_click(self.check_jupyter_cb)
         self.start_jupyter_btn.on_click(self.start_jupyter_cb)
