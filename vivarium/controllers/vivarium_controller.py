@@ -502,7 +502,10 @@ class VivariumController:
             self.simulator.close = True
             lg.info("Waiting for all clients to close ...")
             while len(self.simulator.client_names) != 1:  # wait for other clients to close
-                self.apply_changes(close_if_requested=False)
+                if self.is_connected(verify=True):
+                    self.apply_changes(close_if_requested=False)
+                else:
+                    break
                 sleep(0.1)
         # Close our client
         self.close()
