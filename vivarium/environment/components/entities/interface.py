@@ -28,6 +28,13 @@ class Selected(param.Parameterized):
     """Class to store the selected entities in the interface"""
 
     selection = param.ListSelector([0], objects=[0])
+    
+    subtype_selection = param.ListSelector([], objects=[])
+    
+    def __init__(self, n_entities, subtype_labels, **params):
+        super().__init__(**params)
+        self.param.selection.objects = list(range(n_entities))
+        self.param.subtype_selection.objects = subtype_labels
 
     def __len__(self):
         return len(self.selection)
@@ -60,7 +67,7 @@ class ParamEntity(ParameterizedData):
 
     @property
     def selected_entity_data(self):
-        return self.controller[self.selection[0]]
+        return self.controller[self.selection[0] if len(self.selection) > 0 else 0]
 
 
 class EntityRenderer(Renderer):
@@ -241,11 +248,13 @@ class EntityInterface(Interface):
         
         self.parameters = self.param_cls(controller, controller.subtype_labels)
         
-        self.selected = Selected()
         
         state = controller._remote.state.obj()
         
-        self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
+        self.selected = Selected(
+            n_entities=getattr(state, controller.entity_type).count(), 
+            subtype_labels=controller.subtype_labels
+            )
         
         renderer = self.renderer_cls(
                 entities = controller._entity_list,
@@ -269,6 +278,13 @@ class EntityInterface(Interface):
             precedence=1,
         )
         
+        self.selected.param.watch(
+            self.select_by_subtype,
+            ["subtype_selection"],
+            onlychanged=True,
+            precedence=1,
+        )
+        
         self.global_params.param.watch(
             self.set_hide_non_existing,
             ["hide_non_existing"],
@@ -279,7 +295,16 @@ class EntityInterface(Interface):
     def build_widget(self):
         super().build_widget()
         self.widget.insert(1, pn.panel(self.global_params))
-        self.widget.insert(2, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))        
+        self.widget.insert(
+            2, 
+            pn.panel(
+                self.selected, name=None, 
+                widgets={
+                    'selection': {'width': 100}, 
+                    'subtype_selection': pn.widgets.CheckBoxGroup
+                    }
+                )
+            )
     
     def set_hide_non_existing(self, event):
         self.renderer.hide_non_existing = event.new
@@ -288,4 +313,10 @@ class EntityInterface(Interface):
         """Pull the selected configurations"""
         self.parameters.selection = self.selected.selection
         self.parameters.update_from_server = True
+        
+    def select_by_subtype(self, *events):
+        """Select entities by subtype"""
+        selected_subtypes = self.selected.subtype_selection
+        new_selection = [i for i, e in enumerate(self.controller._entity_list) if e.subtype in selected_subtypes]
+        self.selected.selection = new_selection
         

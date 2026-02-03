@@ -22,7 +22,7 @@ class ParameterizedData(param.Parameterized):
     @param.depends('update_from_server', watch=True)
     def update_from(self):
         self.allow_update_to = False  # Prevents to call update_to callback for each updated parameter
-        data = self.controller if self.selection is None else self.controller[self.selection[0]]
+        data = self.controller if self.selection is None else self.controller[self.selection[0] if len(self.selection) else 0]
         for p in self.direct_mapping_parameters:
             if isinstance(getattr(self, p), ParameterizedData):
                 getattr(self, p).update_from()
