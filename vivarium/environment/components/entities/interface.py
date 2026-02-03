@@ -78,7 +78,6 @@ class EntityRenderer(Renderer):
         self.shape = getattr(Shape, shape.upper()) if isinstance(shape, str) else shape
         self.entities = entities
         
-        super().__init__(state, use_point_draw_tool=True)
         
         self.selected_param_entity = selected_param_entity
         self.selected = selected
@@ -89,8 +88,11 @@ class EntityRenderer(Renderer):
         self.line_width = line_width
         self.hide_non_existing = hide_non_existing
         
-        self.cds.on_change("data", self.drag_cb)
         self.cds_view = self.create_cds_view()
+        
+        super().__init__(state, use_point_draw_tool=True)
+        
+        self.cds.on_change("data", self.drag_cb)
         selected.param.watch(
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
@@ -98,8 +100,6 @@ class EntityRenderer(Renderer):
         self.selected_param_entity.param.watch(self.update_cds_view,
                                                self.panel_visibility_parameters,
                                                onlychanged=True)
-        
-        self.apply_visible_filter()
         
         self._lock = Lock()
 
@@ -142,6 +142,7 @@ class EntityRenderer(Renderer):
         """
         with self._lock:
             super().update_cds(state)
+            self.apply_visible_filter(state)
 
     def create_cds_view(self):
         """Creates a ColumnDataSource view for each visibility attribute
@@ -177,16 +178,15 @@ class EntityRenderer(Renderer):
         self.cds.selected.indices = event.new
 
 
-    def apply_visible_filter(self):
+    def apply_visible_filter(self, state):
         for attr in self.panel_visibility_parameters:
-            self.cds_view[attr].filter = BooleanFilter([(e.exists if self.hide_non_existing else e.visible) and getattr(e, attr) for e in self.entities])
+            self.cds_view[attr].filter = BooleanFilter([(bool(state_exists.item()) if self.hide_non_existing else e.visible) and getattr(e, attr) for e, state_exists in zip(self.entities, state.entity_state.exists)])
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""
         indices = self.cds.selected.indices
         if len(indices) > 0 and indices != self.selected.selection:
             self.selected.selection = indices
-        self.apply_visible_filter()
 
     def plot(self, fig: figure):
         """Plot the objects on the bokeh figure

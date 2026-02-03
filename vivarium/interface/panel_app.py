@@ -726,6 +726,7 @@ class WindowManager(Parameterized):
             renderer = interface.renderer
             if renderer is not None:
                 renderer.update_cds(state)
+        # self.curdoc.add_next_tick_callback(lambda: None)
             
     def drag_n_drop_cb(self, event):
         if event.new:
