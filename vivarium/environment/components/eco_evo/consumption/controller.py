@@ -55,7 +55,7 @@ class ConsumptionController(Controller):
                 # If there is a single consumption interaction, allow direct access to its attributes
                 return self._single_consumption_controllers[self._consumption_names[0]].__getattr__(attr)
             else:
-                raise AttributeError(f"Access specific consumption interaction among: {list(self._consumption_names)}")
+                raise AttributeError(f"Consumption \"{attr}\" not found. Access specific consumption interaction among: {list(self._consumption_names)}")
         else:            
             return super().__getattr__(attr)
     
@@ -67,7 +67,7 @@ class ConsumptionController(Controller):
                     value = np.array(self._subtype_labels.index(value), dtype=int)
                 self._remote.state.__getattr__(f'{self._name}_state').__getattr__(attr)[0] = value
             else:
-                raise AttributeError(f"Access specific consumption interaction among: {list(self._consumption_names)}")
+                raise AttributeError(f"Consumption \"{attr}\" not found. Access specific consumption interaction among: {list(self._consumption_names)}")
         else:
             super().__setattr__(attr, value)
             
