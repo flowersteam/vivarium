@@ -27,4 +27,6 @@ subtype_labels:
   - particle
 
 simulator:
-  freq: -1
+  client:
+    controller_kwargs:
+      freq: -1.
