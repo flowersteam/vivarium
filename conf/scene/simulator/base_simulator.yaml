@@ -3,7 +3,7 @@ client:
   controller_kwargs:
     scene_name: ${....scene_name}
     subtype_labels: ${....subtype_labels}
-    freq: 40.
+    freq: -1
     client_names: []
     run_from: server
     simulation_running: false
