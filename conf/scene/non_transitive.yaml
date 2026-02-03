@@ -12,7 +12,7 @@ scene_name: non_transitive
 
 environment:
   kwargs:
-    box_size: 300.0
+    box_size: 150.0
     neighbor_radius: 10.0
     dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
     num_scan_steps: 1
@@ -22,11 +22,12 @@ environment:
         dt: 0.2
       agents:
         n_max: 900
-        # n_behaviors: 2
-        n_behaviors: 3
+        n_behaviors: 2
         diameter:
           _all_values_: 2.0
         wheel_diameter:
+          _all_values_: 2.0
+        max_speed:
           _all_values_: 2.0
         proxs_cos_min:
           _all_values_: -1.0
@@ -100,13 +101,14 @@ environment:
         energy_init: 1.
         energy_max: 2.00001
         energy_decay: 0.0
-        energy_burst: 0.001
+        energy_burst: 1
+        distribute_extra_energy: true
       reproduction:
         entity_type: agents
         birth_energy_threshold: 2.0
         birth_energy: 1.
         birth_radius: 10.
-        birth_recovery_time: 100
+        birth_recovery_time: 0
 
 simulator:
   client:
