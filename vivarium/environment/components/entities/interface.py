@@ -186,8 +186,9 @@ class EntityRenderer(Renderer):
 
 
     def apply_visible_filter(self, state):
+        entity_type_exists = state.entity_state.exists[getattr(state, self.etype).entity_idx]
         for attr in self.panel_visibility_parameters:
-            self.cds_view[attr].filter = BooleanFilter([(bool(state_exists.item()) if self.hide_non_existing else e.visible) and getattr(e, attr) for e, state_exists in zip(self.entities, state.entity_state.exists)])
+            self.cds_view[attr].filter = BooleanFilter([(bool(state_exists.item()) if self.hide_non_existing else e.visible) and getattr(e, attr) for e, state_exists in zip(self.entities, entity_type_exists)])
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""
