@@ -3,23 +3,18 @@ Runtime environment utilities for development and PyInstaller compatibility.
 
 This module centralizes all logic that differs between development mode
 and frozen (PyInstaller) mode, including path resolution and command building.
-It also handles first-run initialization and update checking for frozen builds.
+It also handles first-run initialization for frozen builds.
+
+Update-related functionality is in vivarium.utils.updater.
 """
 
 import os
 import sys
 import shutil
-import json
 import logging
-import urllib.error
-import urllib.request
-from typing import Optional
 
 
 lg = logging.getLogger(__name__)
-
-# GitHub repository for update checks
-GITHUB_REPO = "flowersteam/vivarium"
 
 
 def is_frozen() -> bool:
@@ -149,147 +144,6 @@ def initialize_user_data() -> bool:
                 lg.error(f"Failed to initialize {folder}/: {e}")
 
     return initialized
-
-
-def check_for_updates(timeout: float = 5.0) -> Optional[dict]:
-    """
-    Check GitHub releases for a newer version.
-
-    Args:
-        timeout: Request timeout in seconds
-
-    Returns:
-        Dict with update info if available, None otherwise.
-        Dict contains: 'latest_version', 'current_version', 'download_url', 'release_url'
-    """
-    current = get_version()
-
-    try:
-        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-        request = urllib.request.Request(
-            url,
-            headers={'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Vivarium'}
-        )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            data = json.loads(response.read().decode('utf-8'))
-
-        latest = data.get("tag_name", "").lstrip("v")
-        if not latest:
-            return None
-
-        # Simple version comparison (works for semver-like versions)
-        if _version_is_newer(latest, current):
-            # Find the appropriate asset for the current platform
-            download_url = None
-            for asset in data.get("assets", []):
-                name = asset.get("name", "").lower()
-                if sys.platform == "darwin" and "macos" in name:
-                    download_url = asset.get("browser_download_url")
-                    break
-                elif sys.platform == "win32" and "windows" in name:
-                    download_url = asset.get("browser_download_url")
-                    break
-                elif sys.platform.startswith("linux") and "linux" in name:
-                    download_url = asset.get("browser_download_url")
-                    break
-
-            return {
-                'latest_version': latest,
-                'current_version': current,
-                'download_url': download_url,
-                'release_url': data.get("html_url"),
-                'release_notes': data.get("body", ""),
-            }
-
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError) as e:
-        lg.debug(f"Update check failed: {e}")
-
-    return None
-
-
-def _version_is_newer(latest: str, current: str) -> bool:
-    """
-    Compare two version strings.
-
-    Returns True if latest is newer than current.
-    Handles versions like "1.2.3", "1.2", "1.2.3-beta".
-    """
-    def parse_version(v: str) -> tuple:
-        # Remove pre-release suffix for comparison
-        v = v.split('-')[0].split('+')[0]
-        parts = []
-        for part in v.split('.'):
-            try:
-                parts.append(int(part))
-            except ValueError:
-                parts.append(0)
-        # Pad to at least 3 parts
-        while len(parts) < 3:
-            parts.append(0)
-        return tuple(parts)
-
-    try:
-        return parse_version(latest) > parse_version(current)
-    except Exception:
-        return False
-
-
-def get_defaults_update_info() -> Optional[dict]:
-    """
-    Check if defaults have been updated compared to user's copies.
-
-    Compares files in _defaults/conf and _defaults/notebooks with
-    the user's conf/ and notebooks/ directories.
-
-    Returns:
-        Dict with lists of 'new_files', 'modified_files' for each folder,
-        or None if not in frozen mode or no differences found.
-    """
-    if not is_frozen():
-        return None
-
-    dist_dir = get_app_root()
-    defaults_dir = get_defaults_dir()
-
-    result = {
-        'conf': {'new_files': [], 'modified_files': []},
-        'notebooks': {'new_files': [], 'modified_files': []},
-    }
-
-    for folder in ['conf', 'notebooks']:
-        user_folder = os.path.join(dist_dir, folder)
-        default_folder = os.path.join(defaults_dir, folder)
-
-        if not os.path.exists(default_folder):
-            continue
-
-        for root, _, files in os.walk(default_folder):
-            for filename in files:
-                default_file = os.path.join(root, filename)
-                rel_path = os.path.relpath(default_file, default_folder)
-                user_file = os.path.join(user_folder, rel_path)
-
-                if not os.path.exists(user_file):
-                    result[folder]['new_files'].append(rel_path)
-                else:
-                    # Compare file contents
-                    try:
-                        with open(default_file, 'rb') as f:
-                            default_content = f.read()
-                        with open(user_file, 'rb') as f:
-                            user_content = f.read()
-                        if default_content != user_content:
-                            result[folder]['modified_files'].append(rel_path)
-                    except Exception:
-                        pass
-
-    # Return None if no differences
-    has_changes = any(
-        result[folder]['new_files'] or result[folder]['modified_files']
-        for folder in ['conf', 'notebooks']
-    )
-
-    return result if has_changes else None
 
 
 def get_jupyter_config_path() -> str:

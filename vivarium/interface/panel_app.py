@@ -18,8 +18,17 @@ from vivarium.utils.scene_configs import load_config, load_scene_config, get_ava
 from vivarium.utils.runtime import (
     get_app_root,
     get_version,
-    check_for_updates,
     is_frozen,
+)
+from vivarium.utils.updater import (
+    check_for_updates,
+    download_update,
+    apply_downloaded_update,
+    get_defaults_update_info,
+    is_update_pending,
+    get_update_pending_info,
+    clear_update_pending,
+    UpdateDownloadError,
 )
 from vivarium.utils.handle_server_interface import (
     check_server_running,
@@ -105,6 +114,7 @@ class WindowManager(Parameterized):
 
         # Check for updates in background (frozen mode only)
         self._update_info = None
+        self._defaults_info = None
         if is_frozen():
             self._start_update_check()
 
@@ -219,6 +229,10 @@ class WindowManager(Parameterized):
 
     def _setup_update_notification_ui(self):
         """Setup UI components for update notifications."""
+        # Track download state
+        self._download_thread = None
+        self._download_cancelled = False
+
         # Update notification banner (hidden by default)
         self.update_banner = pn.pane.Markdown(
             "",
@@ -237,7 +251,7 @@ class WindowManager(Parameterized):
             button_type="success",
             width=150,
         )
-        self.update_download_btn.on_click(self._open_download_url)
+        self.update_download_btn.on_click(self._download_update)
 
         self.update_dismiss_btn = pn.widgets.Button(
             name="Dismiss",
@@ -246,22 +260,105 @@ class WindowManager(Parameterized):
         )
         self.update_dismiss_btn.on_click(self._dismiss_update_notification)
 
+        # Progress bar for download (hidden by default)
+        self.update_progress = pn.widgets.Progress(
+            name="Downloading...",
+            value=0,
+            max=100,
+            sizing_mode="stretch_width",
+            visible=False,
+        )
+
+        # Status text for download progress
+        self.update_status_text = pn.pane.Markdown(
+            "",
+            styles={'text-align': 'center'},
+            visible=False,
+        )
+
+        # Cancel button (visible during download)
+        self.update_cancel_btn = pn.widgets.Button(
+            name="Cancel",
+            button_type="warning",
+            width=100,
+            visible=False,
+        )
+        self.update_cancel_btn.on_click(self._cancel_download)
+
+        # Restart button (visible after successful download)
+        self.update_restart_btn = pn.widgets.Button(
+            name="Restart to Apply",
+            button_type="success",
+            width=150,
+            visible=False,
+        )
+        self.update_restart_btn.on_click(self._request_restart)
+
         self.update_notification_panel = pn.Column(
             self.update_banner,
             pn.Row(
                 self.update_download_btn,
+                self.update_cancel_btn,
+                self.update_restart_btn,
                 self.update_dismiss_btn,
                 align="center",
             ),
+            self.update_progress,
+            self.update_status_text,
+            visible=False,
+            sizing_mode="stretch_width",
+        )
+
+        # Defaults change notification (separate from update notification)
+        self.defaults_banner = pn.pane.Markdown(
+            "",
+            styles={
+                'background-color': '#2e7d32',
+                'color': 'white',
+                'padding': '10px 20px',
+                'border-radius': '5px',
+                'text-align': 'center',
+            },
+            sizing_mode="stretch_width",
+        )
+
+        self.defaults_dismiss_btn = pn.widgets.Button(
+            name="Got it",
+            button_type="default",
+            width=100,
+        )
+        self.defaults_dismiss_btn.on_click(self._dismiss_defaults_notification)
+
+        self.defaults_notification_panel = pn.Column(
+            self.defaults_banner,
+            pn.Row(self.defaults_dismiss_btn, align="center"),
             visible=False,
             sizing_mode="stretch_width",
         )
 
     def _start_update_check(self):
-        """Start checking for updates in a background thread."""
+        """Start checking for updates and defaults changes in a background thread."""
         def check_updates():
             try:
-                update_info = check_for_updates(timeout=5.0)
+                # First, check if an update was recently applied (show defaults notification)
+                if is_update_pending():
+                    pending_info = get_update_pending_info()
+                    if pending_info:
+                        lg.info(f"Update pending from {pending_info.get('previous_version')} to {pending_info.get('new_version')}")
+                    # Check for defaults changes
+                    defaults_info = get_defaults_update_info()
+                    if defaults_info:
+                        self._defaults_info = defaults_info
+                        if pn.state.curdoc:
+                            pn.state.curdoc.add_next_tick_callback(self._show_defaults_notification)
+                        else:
+                            self._show_defaults_notification()
+                    # Clear the pending marker
+                    clear_update_pending()
+
+                # Then check for new updates
+                # Set include_prereleases=True to test with pre-release versions
+                update_info = check_for_updates(timeout=5.0, include_prereleases=True)
                 if update_info:
                     self._update_info = update_info
                     # Schedule UI update on main thread
@@ -293,17 +390,173 @@ class WindowManager(Parameterized):
         if self.update_notification_panel not in self.scene_selection_panel:
             self.scene_selection_panel.insert(0, self.update_notification_panel)
 
-    def _open_download_url(self, _event):
-        """Open the download URL in a new browser tab."""
-        if self._update_info:
-            url = self._update_info.get('release_url') or self._update_info.get('download_url')
-            if url:
-                # Use JavaScript to open URL in new tab
-                pn.state.execute(f"window.open('{url}', '_blank')")
+    def _download_update(self, _event):
+        """Start downloading the update in a background thread."""
+        if not self._update_info or not self._update_info.get('download_url'):
+            lg.warning("No download URL available")
+            return
+
+        # Reset state
+        self._download_cancelled = False
+
+        # Update UI for download state
+        self.update_download_btn.disabled = True
+        self.update_download_btn.visible = False
+        self.update_cancel_btn.visible = True
+        self.update_dismiss_btn.visible = False
+        self.update_progress.visible = True
+        self.update_progress.value = 0
+        self.update_status_text.object = "Starting download..."
+        self.update_status_text.visible = True
+
+        def do_download():
+            try:
+                url = self._update_info['download_url']
+                new_version = self._update_info['latest_version']
+
+                def progress_callback(downloaded, total):
+                    if total > 0:
+                        percent = int(downloaded * 100 / total)
+                        mb_downloaded = downloaded / (1024 * 1024)
+                        mb_total = total / (1024 * 1024)
+
+                        def update_ui():
+                            self.update_progress.value = percent
+                            self.update_status_text.object = f"Downloading: {mb_downloaded:.1f} / {mb_total:.1f} MB ({percent}%)"
+
+                        if pn.state.curdoc:
+                            pn.state.curdoc.add_next_tick_callback(update_ui)
+                        else:
+                            update_ui()
+
+                def cancel_check():
+                    return self._download_cancelled
+
+                # Download the update
+                archive_path = download_update(
+                    url,
+                    progress_callback=progress_callback,
+                    cancel_flag=cancel_check,
+                )
+
+                # Apply the update (extract outer archive)
+                apply_downloaded_update(archive_path, new_version)
+
+                # Show restart prompt
+                if pn.state.curdoc:
+                    pn.state.curdoc.add_next_tick_callback(self._show_restart_prompt)
+                else:
+                    self._show_restart_prompt()
+
+            except UpdateDownloadError as e:
+                lg.error(f"Update download failed: {e}")
+                if pn.state.curdoc:
+                    pn.state.curdoc.add_next_tick_callback(lambda: self._show_download_error(str(e)))
+                else:
+                    self._show_download_error(str(e))
+            except Exception as e:
+                lg.exception(f"Unexpected error during update: {e}")
+                if pn.state.curdoc:
+                    pn.state.curdoc.add_next_tick_callback(lambda: self._show_download_error(f"Unexpected error: {e}"))
+                else:
+                    self._show_download_error(f"Unexpected error: {e}")
+
+        self._download_thread = threading.Thread(target=do_download, daemon=True)
+        self._download_thread.start()
+
+    def _show_restart_prompt(self):
+        """Show UI prompting user to restart to apply update."""
+        self.update_progress.visible = False
+        self.update_cancel_btn.visible = False
+        self.update_restart_btn.visible = True
+        self.update_dismiss_btn.visible = True
+        self.update_status_text.object = "**Update downloaded!** Restart Vivarium to complete the installation."
+        self.update_banner.object = (
+            f"**Update Ready:** Version {self._update_info['latest_version']} is ready to install."
+        )
+
+    def _show_download_error(self, error_msg: str):
+        """Show download error and offer retry."""
+        self.update_progress.visible = False
+        self.update_cancel_btn.visible = False
+        self.update_download_btn.disabled = False
+        self.update_download_btn.visible = True
+        self.update_download_btn.name = "Retry Download"
+        self.update_dismiss_btn.visible = True
+        self.update_status_text.object = f"**Error:** {error_msg}"
+        self._download_thread = None
+
+    def _cancel_download(self, _event):
+        """Cancel an in-progress download."""
+        self._download_cancelled = True
+        self.update_status_text.object = "Cancelling download..."
+
+    def _request_restart(self, _event):
+        """Request app restart to apply update."""
+        # Show message that user needs to manually restart
+        self.update_status_text.object = (
+            "**Please close this window and restart Vivarium using the launcher script.**"
+        )
+        self.update_restart_btn.visible = False
+
+    def _show_defaults_notification(self):
+        """Display notification about defaults changes after an update."""
+        if not hasattr(self, '_defaults_info') or not self._defaults_info:
+            return
+
+        # Build message about what changed
+        new_files_parts = []
+        conflicts_parts = []
+
+        for folder in ['conf', 'notebooks']:
+            info = self._defaults_info.get(folder, {})
+            new_files = info.get('new_files', [])
+            conflicts = info.get('conflicts', [])
+
+            if new_files:
+                new_files_parts.append(f"**{len(new_files)} new file(s)** in {folder}/")
+            if conflicts:
+                conflicts_parts.append(f"**{len(conflicts)} file(s)** in {folder}/")
+
+        if not new_files_parts and not conflicts_parts:
+            return
+
+        # Build appropriate message
+        messages = []
+        if conflicts_parts:
+            messages.append(
+                "**Attention:** Some files you modified have also changed in this update: "
+                + ", ".join(conflicts_parts) + ". "
+                "Compare your files with `_defaults/` to merge changes."
+            )
+        if new_files_parts:
+            messages.append(
+                "**New defaults available:** " + ", ".join(new_files_parts) + ". "
+                "Check `_defaults/` folder to see what's new."
+            )
+
+        self.defaults_banner.object = " ".join(messages)
+        self.defaults_notification_panel.visible = True
+
+        # Insert at the top of scene selection panel
+        if self.defaults_notification_panel not in self.scene_selection_panel:
+            self.scene_selection_panel.insert(0, self.defaults_notification_panel)
+
+    def _dismiss_defaults_notification(self, _event):
+        """Hide the defaults change notification."""
+        self.defaults_notification_panel.visible = False
 
     def _dismiss_update_notification(self, _event):
         """Hide the update notification banner."""
         self.update_notification_panel.visible = False
+        # Reset download UI state
+        self.update_download_btn.disabled = False
+        self.update_download_btn.visible = True
+        self.update_download_btn.name = "Download Update"
+        self.update_progress.visible = False
+        self.update_cancel_btn.visible = False
+        self.update_restart_btn.visible = False
+        self.update_status_text.visible = False
 
     def _show_scene_selection(self, error_message=None):
         """Show the scene selection screen."""

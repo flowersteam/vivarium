@@ -104,10 +104,32 @@ jobs:
           cd "$(dirname "$0")"
 
           if [ -f "vivarium-build.tar.gz" ]; then
-              echo "First launch - setting up Vivarium..."
+              echo "Installing/updating Vivarium..."
+
+              # Backup user data if it exists (update scenario)
+              BACKUP_DIR=""
+              if [ -d "conf" ] || [ -d "notebooks" ]; then
+                  BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
+                  mkdir -p "$BACKUP_DIR"
+                  [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
+                  [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
+                  echo "User data backed up to $BACKUP_DIR"
+              fi
+
+              # Clear quarantine (macOS only)
               xattr -cr vivarium-build.tar.gz 2>/dev/null || true
+
+              # Extract new version
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
+
+              # Restore user data if we backed it up (keep backup for safety)
+              if [ -n "$BACKUP_DIR" ]; then
+                  [ -d "$BACKUP_DIR/conf" ] && rm -rf conf && cp -r "$BACKUP_DIR/conf" conf
+                  [ -d "$BACKUP_DIR/notebooks" ] && rm -rf notebooks && cp -r "$BACKUP_DIR/notebooks" notebooks
+                  echo "User data restored (backup kept in $BACKUP_DIR)"
+              fi
+
               echo "Setup complete!"
               echo ""
           fi
@@ -127,9 +149,29 @@ jobs:
           cd "$(dirname "$0")"
 
           if [ -f "vivarium-build.tar.gz" ]; then
-              echo "First launch - setting up Vivarium..."
+              echo "Installing/updating Vivarium..."
+
+              # Backup user data if it exists (update scenario)
+              BACKUP_DIR=""
+              if [ -d "conf" ] || [ -d "notebooks" ]; then
+                  BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
+                  mkdir -p "$BACKUP_DIR"
+                  [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
+                  [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
+                  echo "User data backed up to $BACKUP_DIR"
+              fi
+
+              # Extract new version
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
+
+              # Restore user data if we backed it up (keep backup for safety)
+              if [ -n "$BACKUP_DIR" ]; then
+                  [ -d "$BACKUP_DIR/conf" ] && rm -rf conf && cp -r "$BACKUP_DIR/conf" conf
+                  [ -d "$BACKUP_DIR/notebooks" ] && rm -rf notebooks && cp -r "$BACKUP_DIR/notebooks" notebooks
+                  echo "User data restored (backup kept in $BACKUP_DIR)"
+              fi
+
               echo "Setup complete!"
               echo ""
           fi
@@ -163,12 +205,52 @@ jobs:
         run: |
           $script = @"
           @echo off
+          setlocal EnableDelayedExpansion
           cd /d "%~dp0"
 
           if exist "vivarium-build.zip" (
-              echo First launch - setting up Vivarium...
-              powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath ."
+              echo Installing/updating Vivarium...
+
+              :: Backup user data if exists
+              set "BACKUP_DIR="
+              if exist "conf" (
+                  for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
+                  for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
+                  set "BACKUP_DIR=.update_backup_!DATESTAMP!_!TIMESTAMP!"
+                  set "BACKUP_DIR=!BACKUP_DIR: =0!"
+                  mkdir "!BACKUP_DIR!" 2>nul
+                  xcopy /E /I /Q "conf" "!BACKUP_DIR!\conf" >nul
+                  echo User data backed up to !BACKUP_DIR!
+              )
+              if exist "notebooks" (
+                  if not defined BACKUP_DIR (
+                      for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
+                      for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
+                      set "BACKUP_DIR=.update_backup_!DATESTAMP!_!TIMESTAMP!"
+                      set "BACKUP_DIR=!BACKUP_DIR: =0!"
+                      mkdir "!BACKUP_DIR!" 2>nul
+                  )
+                  xcopy /E /I /Q "notebooks" "!BACKUP_DIR!\notebooks" >nul
+                  if not exist "conf" echo User data backed up to !BACKUP_DIR!
+              )
+
+              :: Extract new version
+              powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
               del vivarium-build.zip
+
+              :: Restore user data if we backed it up (keep backup for safety)
+              if defined BACKUP_DIR (
+                  if exist "!BACKUP_DIR!\conf" (
+                      rmdir /S /Q conf 2>nul
+                      xcopy /E /I /Q "!BACKUP_DIR!\conf" "conf" >nul
+                  )
+                  if exist "!BACKUP_DIR!\notebooks" (
+                      rmdir /S /Q notebooks 2>nul
+                      xcopy /E /I /Q "!BACKUP_DIR!\notebooks" "notebooks" >nul
+                  )
+                  echo User data restored (backup kept in !BACKUP_DIR!)
+              )
+
               echo Setup complete!
               echo.
           )
@@ -177,6 +259,7 @@ jobs:
           echo Close this window to quit.
           echo.
           vivarium-interface.exe
+          endlocal
           "@
           # Remove leading whitespace from each line
           $script -split "`n" | ForEach-Object { $_.TrimStart() } | Set-Content -Path dist\vivarium-package\Start-Vivarium.bat -Encoding ASCII

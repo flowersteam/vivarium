@@ -12,8 +12,8 @@ from vivarium.utils.runtime import (
     get_notebooks_dir,
     get_defaults_dir,
     initialize_user_data,
-    _version_is_newer,
 )
+from vivarium.utils.updater import _version_is_newer
 
 
 class TestPathResolution:
@@ -160,9 +160,14 @@ class TestVersionComparison:
         assert _version_is_newer(latest, current) == expected
 
     @pytest.mark.parametrize("latest,current,expected", [
-        ("1.0.0-beta", "1.0.0-alpha", False),  # Pre-release suffixes stripped
-        ("1.0.0", "1.0.0-beta", False),  # Both become 1.0.0
+        ("1.0.0-beta", "1.0.0-alpha", False),  # No numeric suffix, both equal
+        ("1.0.0", "1.0.0-beta", False),  # Both become (1.0.0, 0)
         ("1.0.1-beta", "1.0.0", True),  # 1.0.1 > 1.0.0
+        ("1.0.0-test2", "1.0.0-test1", True),  # Same base, test2 > test1
+        ("0.2.0-test2", "0.2.0-test1", True),  # Same base, test2 > test1
+        ("0.2.0-test1", "0.2.0-test2", False),  # test1 < test2
+        ("0.2.0-test10", "0.2.0-test9", True),  # test10 > test9
+        ("1.0.0-rc2", "1.0.0-rc1", True),  # rc2 > rc1
     ])
     def test_version_is_newer_with_prerelease(self, latest, current, expected):
         """Test version comparison with pre-release suffixes."""
