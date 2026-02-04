@@ -456,15 +456,15 @@ class WindowManager(Parameterized):
     def _setup_notebook_widgets(self):
         """Setup widgets for notebook/Jupyter control."""
         # Notebook configuration - load from config
-        notebook_config = getattr(self.scene_config.interface, 'notebook', None)
+        self.notebook_config = getattr(self.scene_config.interface, 'notebook', None)
         self.notebook_path = None
         self.jupyter_port = 8889
 
-        if notebook_config is not None:
-            if hasattr(notebook_config, 'path'):
-                self.notebook_path = notebook_config.path
-            if hasattr(notebook_config, 'jupyter_port'):
-                self.jupyter_port = notebook_config.jupyter_port
+        if self.notebook_config is not None:
+            if hasattr(self.notebook_config, 'path'):
+                self.notebook_path = self.notebook_config.path
+            if hasattr(self.notebook_config, 'jupyter_port'):
+                self.jupyter_port = self.notebook_config.jupyter_port
 
         # Jupyter server management
         self.jupyter_process = None
@@ -1038,7 +1038,7 @@ class WindowManager(Parameterized):
             *[
                 pn.Column(
                     pn.pane.Markdown("### Simulator", align="center"),
-                    pn.panel(self.param_simulator, name="Configuration",
+                    pn.panel(self.param_simulator, name="Controller",
                              widgets={param_name: {'width': 100, 'min_width': 80, 'max_width': 140} for param_name in self.param_simulator.param_names()}),
                     visible=True,
                     sizing_mode="stretch_height",
@@ -1057,8 +1057,8 @@ class WindowManager(Parameterized):
 
         # Build tabs for the right side
         tabs_list = [
-            ("Configurations", pn.Column(
-                pn.Row("### Show Configurations", self.controller_toggle),
+            ("Controllers", pn.Column(
+                pn.Row("### Show Controllers", self.controller_toggle),
                 pn.Row(*self.config_columns),
                 sizing_mode="stretch_both",
             )),
@@ -1082,6 +1082,8 @@ class WindowManager(Parameterized):
         ]
 
         right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
+        
+        right_side_tabs.active = 1 if hasattr(self.notebook_config, 'path') and self.notebook_config.path else 0
 
         # Build the simulation UI
         simulation_ui = pn.Row(
