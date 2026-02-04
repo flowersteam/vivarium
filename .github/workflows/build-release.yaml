@@ -389,8 +389,9 @@ jobs:
           FILE_VERSION=$(cat VERSION)
           echo "Version from file: $FILE_VERSION"
 
-          # Verify version format (semver-like)
-          if ! echo "$FILE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$'; then
+          # Verify version format (PEP 440 compatible)
+          # Allows: 1.2.3, 1.2.3rc1, 1.2.3a1, 1.2.3b1, 1.2.3.dev1
+          if ! echo "$FILE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+|\.dev[0-9]+)?$'; then
             echo "[FAIL] Invalid version format: $FILE_VERSION"
             exit 1
           fi
