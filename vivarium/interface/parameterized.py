@@ -18,6 +18,7 @@ class ParameterizedData(param.Parameterized):
         self.selection = None
         self.direct_mapping_parameters = self._direct_mapping_parameters()
         self.param.watch(self.update_to, self.direct_mapping_parameters, onlychanged=True)
+        self.allow_update_to = True
 
     @param.depends('update_from_server', watch=True)
     def update_from(self):
