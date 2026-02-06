@@ -342,11 +342,14 @@ class WindowManager(Parameterized):
             try:
                 print("[UPDATE DEBUG] Starting update check thread...")  # DEBUG
 
-                # DEBUG: Test basic network/SSL connectivity
+                # DEBUG: Test basic network/SSL connectivity with certifi
+                import ssl
                 import urllib.request
+                import certifi
                 try:
-                    urllib.request.urlopen("https://api.github.com", timeout=5)
-                    print("[UPDATE DEBUG] GitHub API is reachable (SSL OK)")
+                    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+                    urllib.request.urlopen("https://api.github.com", timeout=5, context=ssl_ctx)
+                    print("[UPDATE DEBUG] GitHub API is reachable (SSL with certifi OK)")
                 except Exception as net_err:
                     print(f"[UPDATE DEBUG] GitHub API unreachable: {net_err}")
                 # First, check if an update was recently applied (show defaults notification)

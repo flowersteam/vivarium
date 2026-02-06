@@ -33,6 +33,7 @@ setup(
         "pytest-timeout>=2.3.1",
         "python-dotenv==1.2.1",
         "notebook==7.0.8",
+        "certifi",  # SSL certificates for PyInstaller builds
     ],
     
     extras_require={

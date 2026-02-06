@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import shutil
+import ssl
 import sys
 import tarfile
 import urllib.error
@@ -20,7 +21,19 @@ import zipfile
 from datetime import datetime
 from typing import Callable, Optional
 
+import certifi
+
 from vivarium.utils.runtime import get_app_root, get_defaults_dir, get_version, is_frozen
+
+
+def _get_ssl_context() -> ssl.SSLContext:
+    """
+    Create an SSL context with proper CA certificates.
+
+    This is needed for PyInstaller builds where the system CA certificates
+    may not be accessible. Uses certifi's CA bundle.
+    """
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 lg = logging.getLogger(__name__)
@@ -313,7 +326,8 @@ def check_for_updates(timeout: float = 5.0, include_prereleases: bool = False) -
             url,
             headers={'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Vivarium'}
         )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        ssl_context = _get_ssl_context()
+        with urllib.request.urlopen(request, timeout=timeout, context=ssl_context) as response:
             response_data = json.loads(response.read().decode('utf-8'))
 
         # Handle list vs single object response
@@ -513,7 +527,8 @@ def download_update(
             headers={'User-Agent': 'Vivarium'}
         )
 
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        ssl_context = _get_ssl_context()
+        with urllib.request.urlopen(request, timeout=timeout, context=ssl_context) as response:
             total_size = int(response.headers.get('Content-Length', 0))
 
             # Check disk space if we know the size
