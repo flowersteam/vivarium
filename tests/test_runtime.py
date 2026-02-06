@@ -160,8 +160,8 @@ class TestVersionComparison:
         assert _version_is_newer(latest, current) == expected
 
     @pytest.mark.parametrize("latest,current,expected", [
-        ("1.0.0-beta", "1.0.0-alpha", False),  # No numeric suffix, both equal
-        ("1.0.0", "1.0.0-beta", False),  # Both become (1.0.0, 0)
+        ("1.0.0-beta", "1.0.0-alpha", True),  # beta > alpha
+        ("1.0.0", "1.0.0-beta", True),  # release > pre-release of same base
         ("1.0.1-beta", "1.0.0", True),  # 1.0.1 > 1.0.0
         ("1.0.0-test2", "1.0.0-test1", True),  # Same base, test2 > test1
         ("0.2.0-test2", "0.2.0-test1", True),  # Same base, test2 > test1
@@ -170,5 +170,21 @@ class TestVersionComparison:
         ("1.0.0-rc2", "1.0.0-rc1", True),  # rc2 > rc1
     ])
     def test_version_is_newer_with_prerelease(self, latest, current, expected):
-        """Test version comparison with pre-release suffixes."""
+        """Test version comparison with pre-release suffixes (dash style)."""
+        assert _version_is_newer(latest, current) == expected
+
+    @pytest.mark.parametrize("latest,current,expected", [
+        # PEP 440 style pre-releases (no dash): 0.2.2rc1, 0.2.2a1, 0.2.2b1
+        ("0.2.2rc1", "0.2.1", True),  # 0.2.2rc1 is newer than 0.2.1
+        ("0.2.1", "0.2.2rc1", False),  # 0.2.1 is NOT newer than 0.2.2rc1
+        ("0.2.2rc2", "0.2.2rc1", True),  # rc2 > rc1
+        ("0.2.2rc1", "0.2.2rc2", False),  # rc1 < rc2
+        ("0.2.2", "0.2.2rc1", True),  # release > pre-release of same base
+        ("0.2.2rc1", "0.2.2", False),  # pre-release < release of same base
+        ("1.0.0a1", "0.9.9", True),  # alpha of 1.0.0 > 0.9.9
+        ("1.0.0b1", "1.0.0a1", True),  # beta > alpha
+        ("1.0.0rc1", "1.0.0b1", True),  # rc > beta
+    ])
+    def test_version_is_newer_with_pep440_prerelease(self, latest, current, expected):
+        """Test version comparison with PEP 440 style pre-releases (no dash)."""
         assert _version_is_newer(latest, current) == expected

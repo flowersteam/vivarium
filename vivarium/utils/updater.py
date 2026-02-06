@@ -211,38 +211,70 @@ def _version_is_newer(latest: str, current: str) -> bool:
     Compare two version strings.
 
     Returns True if latest is newer than current.
-    Handles versions like "1.2.3", "1.2", "1.2.3-beta", "1.2.3-test1".
-    """
-    def parse_version(v: str) -> tuple:
-        # Split into base version and pre-release suffix
-        if '-' in v:
-            base, prerelease = v.split('-', 1)
-        else:
-            base, prerelease = v, ''
+    Handles versions like "1.2.3", "1.2", "1.2.3-beta", "1.2.3rc1", "1.2.3-test1".
 
-        # Remove build metadata
-        base = base.split('+')[0]
+    Pre-release ordering:
+    - 0.2.2 (release) > 0.2.2rc1 (pre-release of same base)
+    - 0.2.2rc2 > 0.2.2rc1 (later pre-release)
+    - 0.2.2rc1 > 0.2.1 (pre-release of 0.2.2 is newer than 0.2.1 release)
+    """
+    import re
+
+    def parse_version(v: str) -> tuple:
+        # Remove build metadata (everything after +)
+        v = v.split('+')[0]
+
+        # Handle both dash-style (1.2.3-rc1) and PEP 440-style (1.2.3rc1)
+        # Pattern: base version, optional pre-release identifier, optional number
+        match = re.match(r'^(\d+(?:\.\d+)*)(?:[-.]?(a|alpha|b|beta|rc|test|dev)(\d*))?$', v, re.IGNORECASE)
+
+        if match:
+            base = match.group(1)
+            prerelease_type = match.group(2)  # e.g., "rc", "beta", "test"
+            prerelease_num = match.group(3)   # e.g., "1", "2"
+        else:
+            # Fallback: try to extract base version from each part
+            base = v
+            prerelease_type = None
+            prerelease_num = None
 
         # Parse base version parts
         parts = []
         for part in base.split('.'):
-            try:
-                parts.append(int(part))
-            except ValueError:
+            # Extract leading digits from each part
+            num_match = re.match(r'^(\d+)', part)
+            if num_match:
+                parts.append(int(num_match.group(1)))
+            else:
                 parts.append(0)
+
         # Pad to at least 3 parts
         while len(parts) < 3:
             parts.append(0)
 
-        # Extract numeric suffix from prerelease (e.g., "test1" -> 1, "test2" -> 2)
-        prerelease_num = 0
-        if prerelease:
-            import re
-            match = re.search(r'(\d+)$', prerelease)
-            if match:
-                prerelease_num = int(match.group(1))
+        # Pre-release ordering: rc > beta > alpha > test > dev
+        # We use a tuple: (base_version, is_release, prerelease_order, prerelease_num)
+        # is_release: 1 for release, 0 for pre-release (so release sorts higher)
+        prerelease_order = {
+            'rc': 50,
+            'beta': 40, 'b': 40,
+            'alpha': 30, 'a': 30,
+            'test': 20,
+            'dev': 10,
+        }
 
-        return (tuple(parts), prerelease_num)
+        if prerelease_type is None:
+            # This is a release version
+            is_release = 1
+            pr_order = 0
+            pr_num = 0
+        else:
+            # This is a pre-release
+            is_release = 0
+            pr_order = prerelease_order.get(prerelease_type.lower(), 0)
+            pr_num = int(prerelease_num) if prerelease_num else 0
+
+        return (tuple(parts), is_release, pr_order, pr_num)
 
     try:
         latest_parsed = parse_version(latest)
