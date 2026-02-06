@@ -76,6 +76,7 @@ jobs:
         run: python scripts/patch_jax_md.py
 
       - name: Set version from tag
+        shell: bash
         run: |
           # Extract version from tag (removes 'v' prefix)
           VERSION=${GITHUB_REF_NAME#v}
