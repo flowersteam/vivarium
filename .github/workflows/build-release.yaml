@@ -75,6 +75,13 @@ jobs:
         if: matrix.os == 'macos-15-intel'
         run: python scripts/patch_jax_md.py
 
+      - name: Set version from tag
+        run: |
+          # Extract version from tag (removes 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Setting VERSION to: $VERSION"
+          echo "$VERSION" > VERSION
+
       - name: Build with PyInstaller
         run: pyinstaller vivarium_multi.spec --noconfirm
 
