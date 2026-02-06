@@ -297,6 +297,8 @@ def check_for_updates(timeout: float = 5.0, include_prereleases: bool = False) -
         Dict contains: 'latest_version', 'current_version', 'download_url', 'release_url'
     """
     current = get_version()
+    print(f"[UPDATE DEBUG] current version: {current}")  # DEBUG
+    print(f"[UPDATE DEBUG] include_prereleases: {include_prereleases}")  # DEBUG
 
     try:
         if include_prereleases:
@@ -306,6 +308,7 @@ def check_for_updates(timeout: float = 5.0, include_prereleases: bool = False) -
             # Only fetch the latest stable release
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
+        print(f"[UPDATE DEBUG] Fetching: {url}")  # DEBUG
         request = urllib.request.Request(
             url,
             headers={'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'Vivarium'}
@@ -316,17 +319,23 @@ def check_for_updates(timeout: float = 5.0, include_prereleases: bool = False) -
         # Handle list vs single object response
         if include_prereleases:
             if not response_data:
+                print("[UPDATE DEBUG] No releases found")  # DEBUG
                 return None
             data = response_data[0]  # First release is the newest
+            print(f"[UPDATE DEBUG] First release tag: {data.get('tag_name')}")  # DEBUG
         else:
             data = response_data
 
         latest = data.get("tag_name", "").lstrip("v")
+        print(f"[UPDATE DEBUG] latest version from API: {latest}")  # DEBUG
         if not latest:
+            print("[UPDATE DEBUG] No tag_name found")  # DEBUG
             return None
 
         # Simple version comparison (works for semver-like versions)
-        if _version_is_newer(latest, current):
+        is_newer = _version_is_newer(latest, current)
+        print(f"[UPDATE DEBUG] _version_is_newer({latest}, {current}) = {is_newer}")  # DEBUG
+        if is_newer:
             # Find the appropriate asset for the current platform
             download_url = None
             for asset in data.get("assets", []):
@@ -350,8 +359,10 @@ def check_for_updates(timeout: float = 5.0, include_prereleases: bool = False) -
             }
 
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError) as e:
+        print(f"[UPDATE DEBUG] Exception in check_for_updates: {e}")  # DEBUG
         lg.debug(f"Update check failed: {e}")
 
+    print("[UPDATE DEBUG] Returning None (no update or error)")  # DEBUG
     return None
 
 

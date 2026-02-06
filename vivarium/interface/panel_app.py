@@ -341,6 +341,14 @@ class WindowManager(Parameterized):
         def check_updates():
             try:
                 print("[UPDATE DEBUG] Starting update check thread...")  # DEBUG
+
+                # DEBUG: Test basic network/SSL connectivity
+                import urllib.request
+                try:
+                    urllib.request.urlopen("https://api.github.com", timeout=5)
+                    print("[UPDATE DEBUG] GitHub API is reachable (SSL OK)")
+                except Exception as net_err:
+                    print(f"[UPDATE DEBUG] GitHub API unreachable: {net_err}")
                 # First, check if an update was recently applied (show defaults notification)
                 if is_update_pending():
                     pending_info = get_update_pending_info()
