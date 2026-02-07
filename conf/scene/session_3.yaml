@@ -63,3 +63,8 @@ subtype_labels:
   - agent
   - resource
   - obstacle
+
+interface:
+  notebook:
+    path: notebooks/sessions/session_3.ipynb
+

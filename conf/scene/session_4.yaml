@@ -71,3 +71,8 @@ subtype_labels:
   - resource
   - small_obstacle
   - big_obstacle
+
+interface:
+  notebook:
+    path: notebooks/sessions/session_4.ipynb
+

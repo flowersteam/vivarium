@@ -7,3 +7,8 @@ scene_name: session_2
 subtype_labels:
   - agent
   - object
+
+interface:
+  notebook:
+    path: notebooks/sessions/session_2.ipynb
+
