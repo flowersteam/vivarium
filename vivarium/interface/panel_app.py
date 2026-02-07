@@ -516,7 +516,7 @@ class WindowManager(Parameterized):
         """Request app restart to apply update."""
         # Show message that user needs to manually restart
         self.update_status_text.object = (
-            "**Please close this window and restart Vivarium using the launcher script.**"
+            "**Please close Vivarium from the terminal (Ctrl-C) and restart it using the launcher script.**"
         )
         self.update_restart_btn.visible = False
 
@@ -879,6 +879,8 @@ class WindowManager(Parameterized):
         # Stop streaming if active
         if self._streaming_active:
             self._stop_streaming()
+            
+        self.stop_jupyter_cb(None)  # Stop Jupyter if running
 
         # Close the controller (disconnects and stops server if we started it)
         if self.controller:
