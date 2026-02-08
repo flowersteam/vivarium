@@ -15,12 +15,12 @@ def test_version_file_exists():
     assert os.path.exists(version_file), f"VERSION file not found at {version_file}"
 
 
-def test_version_file_valid_semver():
-    """Verify VERSION file contains a valid semver-like version string."""
+def test_version_file_valid_pep440():
+    """Verify VERSION file contains a valid PEP 440 version string."""
     version = get_version()
-    # Match patterns like: 0.2.0, 1.0.0, 1.2.3-beta, 1.2.3-rc1
-    semver_pattern = r'^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$'
-    assert re.match(semver_pattern, version), f"Invalid version format: {version}"
+    # Match PEP 440 patterns: 0.2.0, 1.0.0, 1.2.3rc1, 1.2.3a1, 1.2.3b1
+    pep440_pattern = r'^\d+\.\d+\.\d+((a|b|rc)\d+)?$'
+    assert re.match(pep440_pattern, version), f"Invalid version format: {version}. Expected PEP 440 format."
 
 
 def test_get_version_returns_string():
@@ -60,9 +60,9 @@ def test_get_version_raises_when_file_missing(tmp_path):
 def test_get_version_frozen_mode_uses_app_root(tmp_path):
     """Verify get_version() reads from app root in frozen mode."""
     version_file = tmp_path / 'VERSION'
-    version_file.write_text('1.2.3-test')
+    version_file.write_text('1.2.3rc1')
 
     with patch('vivarium.utils.runtime.is_frozen', return_value=True):
         with patch('vivarium.utils.runtime.get_app_root', return_value=str(tmp_path)):
             version = get_version()
-            assert version == '1.2.3-test'
+            assert version == '1.2.3rc1'
