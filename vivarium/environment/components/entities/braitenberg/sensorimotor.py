@@ -92,19 +92,24 @@ def motor_force(state, braitenberg_state, mask):
                              state.entity_state.diameter[agent_idx],
                              braitenberg_state.wheel_diameter)
 
+    target_vel = n * jnp.tile(fwd, (SPACE_NDIMS, 1)).T
+    
+    
     cur_vel = (
         state.entity_state.unified_momentum[agent_idx]
         / state.entity_state.unified_mass[agent_idx]
     )
+    
+    fwd_force = (target_vel - cur_vel) / state.dt
 
-    cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
-
-    fwd_delta = fwd - cur_fwd_vel
-
-    fwd_force = (
-        n
-        * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
-    )
+    # Previous way to compute the forward force. The new one above seems better
+    # (if a single wheel is activated, it rotates around the inactive wheel. With the above version it rotated around the center of mass)
+    # cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
+    # fwd_delta = fwd - cur_fwd_vel
+    # fwd_force = (
+    #     n
+    #     * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
+    # )
 
     center = (
         jnp.zeros_like(state.entity_state.unified_position).at[agent_idx].set(fwd_force)
@@ -124,7 +129,7 @@ def motor_force(state, braitenberg_state, mask):
         # rot is a rotation speed.
         # In this case of a non-rigid body, `orientation` below will be summed to the current orientation
         # in `sum_force_to_entities`
-        orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(rot * state.dt)
+        orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(0.5 *rot * state.dt)
 
     orientation = jnp.where(mask, orientation, 0.0)
     mask = jnp.stack([mask] * SPACE_NDIMS, axis=1)
