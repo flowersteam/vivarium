@@ -112,11 +112,11 @@ class WindowManager(Parameterized):
         # Create main container that will hold either scene selection or simulation UI
         self.main_container = pn.Column(sizing_mode="stretch_both")
 
-        # Check for updates in background
+        # Check for updates in background (only in frozen/PyInstaller builds)
         self._update_info = None
         self._defaults_info = None
-        # TODO: restore is_frozen() guard after testing
-        self._start_update_check()
+        if is_frozen():
+            self._start_update_check()
 
         # Determine initial state and initialize appropriately
         if controller is not None:
@@ -340,18 +340,6 @@ class WindowManager(Parameterized):
         """Start checking for updates and defaults changes in a background thread."""
         def check_updates():
             try:
-                print("[UPDATE DEBUG] Starting update check thread...")  # DEBUG
-
-                # DEBUG: Test basic network/SSL connectivity with certifi
-                import ssl
-                import urllib.request
-                import certifi
-                try:
-                    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-                    urllib.request.urlopen("https://api.github.com", timeout=5, context=ssl_ctx)
-                    print("[UPDATE DEBUG] GitHub API is reachable (SSL with certifi OK)")
-                except Exception as net_err:
-                    print(f"[UPDATE DEBUG] GitHub API unreachable: {net_err}")
                 # First, check if an update was recently applied (show defaults notification)
                 if is_update_pending():
                     pending_info = get_update_pending_info()
@@ -368,26 +356,16 @@ class WindowManager(Parameterized):
                     # Clear the pending marker
                     clear_update_pending()
 
-                # Then check for new updates
-                # Set include_prereleases=True to test with pre-release versions
-                print("[UPDATE DEBUG] Calling check_for_updates()...")  # DEBUG
+                # Then check for new updates (include pre-releases during alpha/beta phase)
                 update_info = check_for_updates(timeout=5.0, include_prereleases=True)
-                print(f"[UPDATE DEBUG] check_for_updates returned: {update_info}")  # DEBUG
                 if update_info:
                     self._update_info = update_info
                     # Schedule UI update on main thread
-                    print(f"[UPDATE DEBUG] pn.state.curdoc = {pn.state.curdoc}")  # DEBUG
                     if pn.state.curdoc:
                         pn.state.curdoc.add_next_tick_callback(self._show_update_notification)
                     else:
                         self._show_update_notification()
-                    print("[UPDATE DEBUG] Scheduled _show_update_notification")  # DEBUG
-                else:
-                    print("[UPDATE DEBUG] No update available (or check returned None)")  # DEBUG
             except Exception as e:
-                import traceback
-                print(f"[UPDATE DEBUG] Exception in update check: {e}")  # DEBUG
-                print(f"[UPDATE DEBUG] Traceback:\n{traceback.format_exc()}")  # DEBUG
                 lg.debug(f"Update check failed: {e}")
 
         thread = threading.Thread(target=check_updates, daemon=True)
