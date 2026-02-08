@@ -453,6 +453,147 @@ def get_defaults_update_info() -> Optional[dict]:
     return result if has_changes else None
 
 
+def find_latest_backup_dir() -> Optional[str]:
+    """
+    Find the most recent .update_backup_* directory.
+
+    Returns:
+        Full path to the latest backup directory, or None if not found.
+    """
+    if not is_frozen():
+        return None
+
+    app_root = get_app_root()
+    try:
+        backup_dirs = sorted(
+            [d for d in os.listdir(app_root) if d.startswith('.update_backup_')],
+            reverse=True  # Most recent first (timestamp-based naming)
+        )
+        if backup_dirs:
+            return os.path.join(app_root, backup_dirs[0])
+    except OSError as e:
+        lg.warning(f"Could not list backup directories: {e}")
+
+    return None
+
+
+def perform_post_update_merge() -> Optional[dict]:
+    """
+    Perform smart merge after an update.
+
+    This function should be called on app startup when UPDATE_PENDING is detected.
+    It compares files in the backup directory against the old defaults manifest
+    to determine what the user modified, then selectively restores user modifications
+    for files that weren't changed by the update.
+
+    Logic for each file in backup:
+    - If backup hash == old defaults hash: user didn't modify, keep new version
+    - If backup hash != old defaults hash (user modified):
+        - If old defaults hash == new defaults hash: update didn't change it, restore from backup
+        - If old defaults hash != new defaults hash: conflict, keep new version, notify user
+
+    Returns:
+        Dict with 'backup_dir', 'restored', and 'conflicts' for each folder,
+        or None if no backup found or not in frozen mode.
+
+        'restored': Files where user's modifications were preserved
+        'conflicts': Files where both user and update made changes (new version kept)
+    """
+    if not is_frozen():
+        return None
+
+    backup_dir = find_latest_backup_dir()
+    if not backup_dir:
+        lg.debug("No backup directory found for post-update merge")
+        return None
+
+    old_manifest = load_defaults_manifest()
+    if old_manifest is None:
+        # No manifest = first install or legacy, nothing to merge
+        lg.debug("No defaults manifest found, skipping post-update merge")
+        return None
+
+    lg.info(f"Performing post-update merge from backup: {backup_dir}")
+
+    result = {
+        'backup_dir': backup_dir,
+        'conf': {'restored': [], 'conflicts': []},
+        'notebooks': {'restored': [], 'conflicts': []},
+    }
+
+    defaults_dir = get_defaults_dir()
+    app_root = get_app_root()
+
+    for folder in ['conf', 'notebooks']:
+        backup_folder = os.path.join(backup_dir, folder)
+        if not os.path.exists(backup_folder):
+            continue
+
+        for root, _, files in os.walk(backup_folder):
+            for filename in files:
+                backup_file = os.path.join(root, filename)
+                rel_path = os.path.relpath(backup_file, backup_folder)
+
+                # Paths for comparison
+                user_file = os.path.join(app_root, folder, rel_path)
+                default_file = os.path.join(defaults_dir, folder, rel_path)
+                manifest_key = os.path.join(folder, rel_path)
+
+                # Normalize path separators for manifest lookup (use forward slashes)
+                manifest_key = manifest_key.replace(os.sep, '/')
+
+                # Compute hashes
+                backup_hash = _compute_file_hash(backup_file)
+                old_default_hash = old_manifest.get(manifest_key, "")
+
+                # Check if user modified this file
+                user_modified = (backup_hash != old_default_hash)
+
+                if not user_modified:
+                    # User didn't modify this file - keep new version (do nothing)
+                    continue
+
+                # User modified the file - check if update also modified it
+                if os.path.exists(default_file):
+                    new_default_hash = _compute_file_hash(default_file)
+                    update_modified = (old_default_hash != new_default_hash)
+                else:
+                    # File no longer exists in new defaults - update removed it
+                    # Keep new state (file removed), this is a conflict
+                    update_modified = True
+
+                if update_modified:
+                    # Both user and update modified - conflict
+                    # Keep new version, add to conflicts for notification
+                    result[folder]['conflicts'].append(rel_path)
+                    lg.debug(f"Conflict: {folder}/{rel_path} (user's version in backup)")
+                else:
+                    # Only user modified - restore from backup
+                    try:
+                        os.makedirs(os.path.dirname(user_file), exist_ok=True)
+                        shutil.copy2(backup_file, user_file)
+                        result[folder]['restored'].append(rel_path)
+                        lg.debug(f"Restored: {folder}/{rel_path}")
+                    except OSError as e:
+                        lg.warning(f"Failed to restore {folder}/{rel_path}: {e}")
+                        # Treat as conflict if we couldn't restore
+                        result[folder]['conflicts'].append(rel_path)
+
+    # Clear the manifest after merge
+    clear_defaults_manifest()
+
+    # Log summary
+    total_restored = len(result['conf']['restored']) + len(result['notebooks']['restored'])
+    total_conflicts = len(result['conf']['conflicts']) + len(result['notebooks']['conflicts'])
+    lg.info(f"Post-update merge complete: {total_restored} restored, {total_conflicts} conflicts")
+
+    # Return None if nothing happened
+    if total_restored == 0 and total_conflicts == 0:
+        return None
+
+    return result
+
+
 def check_disk_space(required_bytes: int) -> bool:
     """
     Check if there's enough disk space for the update.

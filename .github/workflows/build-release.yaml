@@ -115,7 +115,8 @@ jobs:
               echo "Installing/updating Vivarium..."
 
               # Backup user data if it exists (update scenario)
-              BACKUP_DIR=""
+              # Python will perform smart merge on startup, restoring user modifications
+              # only for files that weren't updated
               if [ -d "conf" ] || [ -d "notebooks" ]; then
                   BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
                   mkdir -p "$BACKUP_DIR"
@@ -127,16 +128,13 @@ jobs:
               # Clear quarantine (macOS only)
               xattr -cr vivarium-build.tar.gz 2>/dev/null || true
 
-              # Extract new version
+              # Extract new version (overwrites conf/ and notebooks/ with new defaults)
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
 
-              # Restore user data if we backed it up (keep backup for safety)
-              if [ -n "$BACKUP_DIR" ]; then
-                  [ -d "$BACKUP_DIR/conf" ] && rm -rf conf && cp -r "$BACKUP_DIR/conf" conf
-                  [ -d "$BACKUP_DIR/notebooks" ] && rm -rf notebooks && cp -r "$BACKUP_DIR/notebooks" notebooks
-                  echo "User data restored (backup kept in $BACKUP_DIR)"
-              fi
+              # Note: User modifications are restored selectively by the app on startup
+              # Files modified by user but NOT by the update are restored from backup
+              # Files modified by BOTH user and update use new version (user notified)
 
               echo "Setup complete!"
               echo ""
@@ -160,7 +158,8 @@ jobs:
               echo "Installing/updating Vivarium..."
 
               # Backup user data if it exists (update scenario)
-              BACKUP_DIR=""
+              # Python will perform smart merge on startup, restoring user modifications
+              # only for files that weren't updated
               if [ -d "conf" ] || [ -d "notebooks" ]; then
                   BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
                   mkdir -p "$BACKUP_DIR"
@@ -169,16 +168,13 @@ jobs:
                   echo "User data backed up to $BACKUP_DIR"
               fi
 
-              # Extract new version
+              # Extract new version (overwrites conf/ and notebooks/ with new defaults)
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
 
-              # Restore user data if we backed it up (keep backup for safety)
-              if [ -n "$BACKUP_DIR" ]; then
-                  [ -d "$BACKUP_DIR/conf" ] && rm -rf conf && cp -r "$BACKUP_DIR/conf" conf
-                  [ -d "$BACKUP_DIR/notebooks" ] && rm -rf notebooks && cp -r "$BACKUP_DIR/notebooks" notebooks
-                  echo "User data restored (backup kept in $BACKUP_DIR)"
-              fi
+              # Note: User modifications are restored selectively by the app on startup
+              # Files modified by user but NOT by the update are restored from backup
+              # Files modified by BOTH user and update use new version (user notified)
 
               echo "Setup complete!"
               echo ""
@@ -220,6 +216,8 @@ jobs:
               echo Installing/updating Vivarium...
 
               :: Backup user data if exists
+              :: Python will perform smart merge on startup, restoring user modifications
+              :: only for files that weren't updated
               set "BACKUP_DIR="
               if exist "conf" (
                   for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
@@ -242,22 +240,13 @@ jobs:
                   if not exist "conf" echo User data backed up to !BACKUP_DIR!
               )
 
-              :: Extract new version
+              :: Extract new version (overwrites conf/ and notebooks/ with new defaults)
               powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
               del vivarium-build.zip
 
-              :: Restore user data if we backed it up (keep backup for safety)
-              if defined BACKUP_DIR (
-                  if exist "!BACKUP_DIR!\conf" (
-                      rmdir /S /Q conf 2>nul
-                      xcopy /E /I /Q "!BACKUP_DIR!\conf" "conf" >nul
-                  )
-                  if exist "!BACKUP_DIR!\notebooks" (
-                      rmdir /S /Q notebooks 2>nul
-                      xcopy /E /I /Q "!BACKUP_DIR!\notebooks" "notebooks" >nul
-                  )
-                  echo User data restored (backup kept in !BACKUP_DIR!)
-              )
+              :: Note: User modifications are restored selectively by the app on startup
+              :: Files modified by user but NOT by the update are restored from backup
+              :: Files modified by BOTH user and update use new version (user notified)
 
               echo Setup complete!
               echo.

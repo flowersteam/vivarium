@@ -28,6 +28,7 @@ from vivarium.utils.updater import (
     is_update_pending,
     get_update_pending_info,
     clear_update_pending,
+    perform_post_update_merge,
     UpdateDownloadError,
 )
 from vivarium.utils.handle_server_interface import (
@@ -340,19 +341,22 @@ class WindowManager(Parameterized):
         """Start checking for updates and defaults changes in a background thread."""
         def check_updates():
             try:
-                # First, check if an update was recently applied (show defaults notification)
+                # First, check if an update was recently applied
                 if is_update_pending():
                     pending_info = get_update_pending_info()
                     if pending_info:
                         lg.info(f"Update pending from {pending_info.get('previous_version')} to {pending_info.get('new_version')}")
-                    # Check for defaults changes
-                    defaults_info = get_defaults_update_info()
-                    if defaults_info:
-                        self._defaults_info = defaults_info
+
+                    # Perform smart merge: restore user modifications for files not changed by update
+                    # Files changed by both user and update will use new version (conflicts)
+                    merge_info = perform_post_update_merge()
+                    if merge_info:
+                        self._merge_info = merge_info
                         if pn.state.curdoc:
                             pn.state.curdoc.add_next_tick_callback(self._show_defaults_notification)
                         else:
                             self._show_defaults_notification()
+
                     # Clear the pending marker
                     clear_update_pending()
 
@@ -499,42 +503,43 @@ class WindowManager(Parameterized):
         self.update_restart_btn.visible = False
 
     def _show_defaults_notification(self):
-        """Display notification about defaults changes after an update."""
-        if not hasattr(self, '_defaults_info') or not self._defaults_info:
+        """Display notification about merge results after an update."""
+        if not hasattr(self, '_merge_info') or not self._merge_info:
             return
 
-        # Build message about what changed
-        new_files_parts = []
+        backup_dir = self._merge_info.get('backup_dir', '')
+        backup_name = os.path.basename(backup_dir) if backup_dir else 'backup folder'
+
+        # Collect conflicts and restored files
         conflicts_parts = []
+        restored_count = 0
 
         for folder in ['conf', 'notebooks']:
-            info = self._defaults_info.get(folder, {})
-            new_files = info.get('new_files', [])
+            info = self._merge_info.get(folder, {})
             conflicts = info.get('conflicts', [])
+            restored = info.get('restored', [])
 
-            if new_files:
-                new_files_parts.append(f"**{len(new_files)} new file(s)** in {folder}/")
             if conflicts:
                 conflicts_parts.append(f"**{len(conflicts)} file(s)** in {folder}/")
+            restored_count += len(restored)
 
-        if not new_files_parts and not conflicts_parts:
+        # Only show notification if there are conflicts
+        # (restored files are silently handled - user's modifications preserved)
+        if not conflicts_parts:
+            # Just log if we restored files
+            if restored_count > 0:
+                lg.info(f"Update complete: {restored_count} user modification(s) preserved")
             return
 
-        # Build appropriate message
-        messages = []
-        if conflicts_parts:
-            messages.append(
-                "**Attention:** Some files you modified have also changed in this update: "
-                + ", ".join(conflicts_parts) + ". "
-                "Compare your files with `_defaults/` to merge changes."
-            )
-        if new_files_parts:
-            messages.append(
-                "**New defaults available:** " + ", ".join(new_files_parts) + ". "
-                "Check `_defaults/` folder to see what's new."
-            )
+        # Build message for conflicts
+        message = (
+            "**Update applied:** Some files you customized were also updated. "
+            "The new versions are now in use. "
+            + ", ".join(conflicts_parts) + " affected. "
+            f"Your previous versions are saved in `{backup_name}/`."
+        )
 
-        self.defaults_banner.object = " ".join(messages)
+        self.defaults_banner.object = message
         self.defaults_notification_panel.visible = True
 
         # Insert at the top of scene selection panel

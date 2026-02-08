@@ -1,11 +1,18 @@
 """Tests for update checking functionality."""
 
+import hashlib
 import json
 import urllib.error
 import pytest
 from unittest.mock import patch, MagicMock
 
-from vivarium.utils.updater import check_for_updates, get_defaults_update_info
+from vivarium.utils.updater import (
+    check_for_updates,
+    get_defaults_update_info,
+    find_latest_backup_dir,
+    perform_post_update_merge,
+    DEFAULTS_MANIFEST_FILE,
+)
 
 
 class TestCheckForUpdates:
@@ -208,3 +215,332 @@ class TestGetDefaultsUpdateInfo:
                             result = get_defaults_update_info()
 
         assert result is None
+
+
+class TestFindLatestBackupDir:
+    """Tests for find_latest_backup_dir()."""
+
+    def test_returns_none_when_not_frozen(self):
+        """In dev mode (not frozen), should return None."""
+        with patch('vivarium.utils.updater.is_frozen', return_value=False):
+            result = find_latest_backup_dir()
+            assert result is None
+
+    def test_returns_none_when_no_backups(self, tmp_path):
+        """When no backup directories exist, should return None."""
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                result = find_latest_backup_dir()
+                assert result is None
+
+    def test_finds_single_backup(self, tmp_path):
+        """When one backup exists, should return it."""
+        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                result = find_latest_backup_dir()
+                assert result == str(backup_dir)
+
+    def test_finds_latest_backup(self, tmp_path):
+        """When multiple backups exist, should return the most recent."""
+        (tmp_path / '.update_backup_20250101_120000').mkdir()
+        (tmp_path / '.update_backup_20250102_120000').mkdir()
+        latest = tmp_path / '.update_backup_20250103_120000'
+        latest.mkdir()
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                result = find_latest_backup_dir()
+                assert result == str(latest)
+
+    def test_ignores_non_backup_directories(self, tmp_path):
+        """Should only consider directories starting with .update_backup_."""
+        (tmp_path / 'conf').mkdir()
+        (tmp_path / 'notebooks').mkdir()
+        (tmp_path / '.other_backup').mkdir()
+        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                result = find_latest_backup_dir()
+                assert result == str(backup_dir)
+
+
+def _compute_hash_from_content(content: str) -> str:
+    """Helper to compute MD5 hash from string content."""
+    return hashlib.md5(content.encode('utf-8')).hexdigest()
+
+
+class TestPerformPostUpdateMerge:
+    """Tests for perform_post_update_merge() - smart merge after updates."""
+
+    def test_returns_none_when_not_frozen(self):
+        """In dev mode (not frozen), should return None."""
+        with patch('vivarium.utils.updater.is_frozen', return_value=False):
+            result = perform_post_update_merge()
+            assert result is None
+
+    def test_returns_none_when_no_backup(self, tmp_path):
+        """When no backup directory exists, should return None."""
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                result = perform_post_update_merge()
+                assert result is None
+
+    def test_returns_none_when_no_manifest(self, tmp_path):
+        """When no manifest exists, should return None."""
+        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+        (backup_dir / 'conf').mkdir()
+        (backup_dir / 'conf' / 'test.yaml').write_text('user content')
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(tmp_path / '_defaults')):
+                    result = perform_post_update_merge()
+                    assert result is None
+
+    def test_restores_user_modified_file_when_update_unchanged(self, tmp_path):
+        """
+        When user modified a file but update didn't change it,
+        should restore from backup.
+        """
+        # Setup directory structure
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        defaults_dir.mkdir()
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+
+        # Create backup with user's modified content
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+        (backup_dir / 'conf').mkdir()
+        (backup_dir / 'conf' / 'test.yaml').write_text('user modified content')
+
+        # Create manifest (representing old defaults)
+        old_content = 'original default content'
+        manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
+        (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
+
+        # New defaults are same as old (update didn't change this file)
+        (defaults_dir / 'conf' / 'test.yaml').write_text(old_content)
+
+        # Current user file (from extraction) has new default content
+        (app_root / 'conf' / 'test.yaml').write_text(old_content)
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    result = perform_post_update_merge()
+
+        # Should restore user's file
+        assert result is not None
+        assert 'test.yaml' in result['conf']['restored']
+        assert len(result['conf']['conflicts']) == 0
+
+        # Verify file was actually restored
+        restored_content = (app_root / 'conf' / 'test.yaml').read_text()
+        assert restored_content == 'user modified content'
+
+    def test_conflict_when_both_user_and_update_modified(self, tmp_path):
+        """
+        When user modified a file AND update changed it,
+        should keep new version and report conflict.
+        """
+        # Setup directory structure
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        defaults_dir.mkdir()
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+
+        # Create backup with user's modified content
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+        (backup_dir / 'conf').mkdir()
+        (backup_dir / 'conf' / 'test.yaml').write_text('user modified content')
+
+        # Create manifest (representing old defaults)
+        old_content = 'original default content'
+        manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
+        (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
+
+        # New defaults are DIFFERENT (update changed this file)
+        new_content = 'new updated default content'
+        (defaults_dir / 'conf' / 'test.yaml').write_text(new_content)
+
+        # Current user file (from extraction) has new default content
+        (app_root / 'conf' / 'test.yaml').write_text(new_content)
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    result = perform_post_update_merge()
+
+        # Should report conflict, not restore
+        assert result is not None
+        assert 'test.yaml' in result['conf']['conflicts']
+        assert len(result['conf']['restored']) == 0
+
+        # Verify file still has new content (not restored)
+        current_content = (app_root / 'conf' / 'test.yaml').read_text()
+        assert current_content == new_content
+
+    def test_no_action_when_user_didnt_modify(self, tmp_path):
+        """
+        When user didn't modify a file (backup matches old defaults),
+        should keep new version without any action.
+        """
+        # Setup directory structure
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        defaults_dir.mkdir()
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+
+        # Create backup with unmodified content (same as old defaults)
+        old_content = 'original default content'
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir.mkdir()
+        (backup_dir / 'conf').mkdir()
+        (backup_dir / 'conf' / 'test.yaml').write_text(old_content)
+
+        # Create manifest
+        manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
+        (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
+
+        # New defaults are different (update changed this file)
+        new_content = 'new updated default content'
+        (defaults_dir / 'conf' / 'test.yaml').write_text(new_content)
+        (app_root / 'conf' / 'test.yaml').write_text(new_content)
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    result = perform_post_update_merge()
+
+        # Should return None (no action needed)
+        assert result is None
+
+        # Verify file still has new content
+        current_content = (app_root / 'conf' / 'test.yaml').read_text()
+        assert current_content == new_content
+
+    def test_handles_multiple_files_mixed_scenarios(self, tmp_path):
+        """Test with multiple files having different scenarios."""
+        # Setup directory structure
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (defaults_dir / 'notebooks').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+        (app_root / 'notebooks').mkdir()
+
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        (backup_dir / 'conf').mkdir(parents=True)
+        (backup_dir / 'notebooks').mkdir(parents=True)
+
+        # File 1: User modified, update unchanged -> should restore
+        old1 = 'old content 1'
+        (backup_dir / 'conf' / 'restore_me.yaml').write_text('user version 1')
+        (defaults_dir / 'conf' / 'restore_me.yaml').write_text(old1)
+        (app_root / 'conf' / 'restore_me.yaml').write_text(old1)
+
+        # File 2: User modified, update also modified -> conflict
+        old2 = 'old content 2'
+        (backup_dir / 'conf' / 'conflict.yaml').write_text('user version 2')
+        (defaults_dir / 'conf' / 'conflict.yaml').write_text('new default 2')
+        (app_root / 'conf' / 'conflict.yaml').write_text('new default 2')
+
+        # File 3: User didn't modify -> no action
+        old3 = 'old content 3'
+        (backup_dir / 'notebooks' / 'unchanged.ipynb').write_text(old3)
+        (defaults_dir / 'notebooks' / 'unchanged.ipynb').write_text('new content 3')
+        (app_root / 'notebooks' / 'unchanged.ipynb').write_text('new content 3')
+
+        # Create manifest
+        manifest = {
+            'conf/restore_me.yaml': _compute_hash_from_content(old1),
+            'conf/conflict.yaml': _compute_hash_from_content(old2),
+            'notebooks/unchanged.ipynb': _compute_hash_from_content(old3),
+        }
+        (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    result = perform_post_update_merge()
+
+        assert result is not None
+        assert 'restore_me.yaml' in result['conf']['restored']
+        assert 'conflict.yaml' in result['conf']['conflicts']
+        # unchanged.ipynb should not appear in either list
+        assert len(result['notebooks']['restored']) == 0
+        assert len(result['notebooks']['conflicts']) == 0
+
+        # Verify files
+        assert (app_root / 'conf' / 'restore_me.yaml').read_text() == 'user version 1'
+        assert (app_root / 'conf' / 'conflict.yaml').read_text() == 'new default 2'
+
+    def test_clears_manifest_after_merge(self, tmp_path):
+        """Manifest should be cleared after successful merge."""
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        (backup_dir / 'conf').mkdir(parents=True)
+
+        old_content = 'old content'
+        (backup_dir / 'conf' / 'test.yaml').write_text('user modified')
+        (defaults_dir / 'conf' / 'test.yaml').write_text(old_content)
+        (app_root / 'conf' / 'test.yaml').write_text(old_content)
+
+        manifest_path = app_root / DEFAULTS_MANIFEST_FILE
+        manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
+        manifest_path.write_text(json.dumps(manifest))
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    perform_post_update_merge()
+
+        # Manifest should be cleared
+        assert not manifest_path.exists()
+
+    def test_includes_backup_dir_in_result(self, tmp_path):
+        """Result should include the backup directory path."""
+        app_root = tmp_path / 'app'
+        app_root.mkdir()
+        defaults_dir = app_root / '_defaults'
+        (defaults_dir / 'conf').mkdir(parents=True)
+        (app_root / 'conf').mkdir()
+
+        backup_dir = app_root / '.update_backup_20250101_120000'
+        (backup_dir / 'conf').mkdir(parents=True)
+
+        old_content = 'old content'
+        (backup_dir / 'conf' / 'test.yaml').write_text('user modified')
+        (defaults_dir / 'conf' / 'test.yaml').write_text(old_content)
+        (app_root / 'conf' / 'test.yaml').write_text(old_content)
+
+        manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
+        (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
+
+        with patch('vivarium.utils.updater.is_frozen', return_value=True):
+            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+                    result = perform_post_update_merge()
+
+        assert result is not None
+        assert result['backup_dir'] == str(backup_dir)
