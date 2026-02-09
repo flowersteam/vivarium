@@ -4,6 +4,12 @@ defaults:
 
 scene_name: session_2
 
+environment:
+  components:
+    component_list:
+      objects:
+        n_exists: 1
+
 subtype_labels:
   - agent
   - object
