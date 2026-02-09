@@ -118,7 +118,7 @@ jobs:
               # Python will perform smart merge on startup, restoring user modifications
               # only for files that weren't updated
               if [ -d "conf" ] || [ -d "notebooks" ]; then
-                  BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
+                  BACKUP_DIR="update_backup_$(date +%Y%m%d_%H%M%S)"
                   mkdir -p "$BACKUP_DIR"
                   [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
                   [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
@@ -161,7 +161,7 @@ jobs:
               # Python will perform smart merge on startup, restoring user modifications
               # only for files that weren't updated
               if [ -d "conf" ] || [ -d "notebooks" ]; then
-                  BACKUP_DIR=".update_backup_$(date +%Y%m%d_%H%M%S)"
+                  BACKUP_DIR="update_backup_$(date +%Y%m%d_%H%M%S)"
                   mkdir -p "$BACKUP_DIR"
                   [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
                   [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
@@ -222,7 +222,7 @@ jobs:
               if exist "conf" (
                   for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
                   for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
-                  set "BACKUP_DIR=.update_backup_!DATESTAMP!_!TIMESTAMP!"
+                  set "BACKUP_DIR=update_backup_!DATESTAMP!_!TIMESTAMP!"
                   set "BACKUP_DIR=!BACKUP_DIR: =0!"
                   mkdir "!BACKUP_DIR!" 2>nul
                   xcopy /E /I /Q "conf" "!BACKUP_DIR!\conf" >nul
@@ -232,7 +232,7 @@ jobs:
                   if not defined BACKUP_DIR (
                       for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
                       for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
-                      set "BACKUP_DIR=.update_backup_!DATESTAMP!_!TIMESTAMP!"
+                      set "BACKUP_DIR=update_backup_!DATESTAMP!_!TIMESTAMP!"
                       set "BACKUP_DIR=!BACKUP_DIR: =0!"
                       mkdir "!BACKUP_DIR!" 2>nul
                   )

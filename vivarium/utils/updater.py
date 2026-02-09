@@ -455,7 +455,7 @@ def get_defaults_update_info() -> Optional[dict]:
 
 def find_latest_backup_dir() -> Optional[str]:
     """
-    Find the most recent .update_backup_* directory.
+    Find the most recent update_backup_* directory.
 
     Returns:
         Full path to the latest backup directory, or None if not found.
@@ -466,7 +466,7 @@ def find_latest_backup_dir() -> Optional[str]:
     app_root = get_app_root()
     try:
         backup_dirs = sorted(
-            [d for d in os.listdir(app_root) if d.startswith('.update_backup_')],
+            [d for d in os.listdir(app_root) if d.startswith('update_backup_')],
             reverse=True  # Most recent first (timestamp-based naming)
         )
         if backup_dirs:

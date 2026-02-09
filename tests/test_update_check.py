@@ -235,7 +235,7 @@ class TestFindLatestBackupDir:
 
     def test_finds_single_backup(self, tmp_path):
         """When one backup exists, should return it."""
-        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir = tmp_path / 'update_backup_20250101_120000'
         backup_dir.mkdir()
 
         with patch('vivarium.utils.updater.is_frozen', return_value=True):
@@ -245,9 +245,9 @@ class TestFindLatestBackupDir:
 
     def test_finds_latest_backup(self, tmp_path):
         """When multiple backups exist, should return the most recent."""
-        (tmp_path / '.update_backup_20250101_120000').mkdir()
-        (tmp_path / '.update_backup_20250102_120000').mkdir()
-        latest = tmp_path / '.update_backup_20250103_120000'
+        (tmp_path / 'update_backup_20250101_120000').mkdir()
+        (tmp_path / 'update_backup_20250102_120000').mkdir()
+        latest = tmp_path / 'update_backup_20250103_120000'
         latest.mkdir()
 
         with patch('vivarium.utils.updater.is_frozen', return_value=True):
@@ -256,11 +256,11 @@ class TestFindLatestBackupDir:
                 assert result == str(latest)
 
     def test_ignores_non_backup_directories(self, tmp_path):
-        """Should only consider directories starting with .update_backup_."""
+        """Should only consider directories starting with update_backup_."""
         (tmp_path / 'conf').mkdir()
         (tmp_path / 'notebooks').mkdir()
         (tmp_path / '.other_backup').mkdir()
-        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir = tmp_path / 'update_backup_20250101_120000'
         backup_dir.mkdir()
 
         with patch('vivarium.utils.updater.is_frozen', return_value=True):
@@ -292,7 +292,7 @@ class TestPerformPostUpdateMerge:
 
     def test_returns_none_when_no_manifest(self, tmp_path):
         """When no manifest exists, should return None."""
-        backup_dir = tmp_path / '.update_backup_20250101_120000'
+        backup_dir = tmp_path / 'update_backup_20250101_120000'
         backup_dir.mkdir()
         (backup_dir / 'conf').mkdir()
         (backup_dir / 'conf' / 'test.yaml').write_text('user content')
@@ -317,7 +317,7 @@ class TestPerformPostUpdateMerge:
         (app_root / 'conf').mkdir()
 
         # Create backup with user's modified content
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         backup_dir.mkdir()
         (backup_dir / 'conf').mkdir()
         (backup_dir / 'conf' / 'test.yaml').write_text('user modified content')
@@ -361,7 +361,7 @@ class TestPerformPostUpdateMerge:
         (app_root / 'conf').mkdir()
 
         # Create backup with user's modified content
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         backup_dir.mkdir()
         (backup_dir / 'conf').mkdir()
         (backup_dir / 'conf' / 'test.yaml').write_text('user modified content')
@@ -407,7 +407,7 @@ class TestPerformPostUpdateMerge:
 
         # Create backup with unmodified content (same as old defaults)
         old_content = 'original default content'
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         backup_dir.mkdir()
         (backup_dir / 'conf').mkdir()
         (backup_dir / 'conf' / 'test.yaml').write_text(old_content)
@@ -444,7 +444,7 @@ class TestPerformPostUpdateMerge:
         (app_root / 'conf').mkdir()
         (app_root / 'notebooks').mkdir()
 
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         (backup_dir / 'conf').mkdir(parents=True)
         (backup_dir / 'notebooks').mkdir(parents=True)
 
@@ -498,7 +498,7 @@ class TestPerformPostUpdateMerge:
         (defaults_dir / 'conf').mkdir(parents=True)
         (app_root / 'conf').mkdir()
 
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         (backup_dir / 'conf').mkdir(parents=True)
 
         old_content = 'old content'
@@ -526,7 +526,7 @@ class TestPerformPostUpdateMerge:
         (defaults_dir / 'conf').mkdir(parents=True)
         (app_root / 'conf').mkdir()
 
-        backup_dir = app_root / '.update_backup_20250101_120000'
+        backup_dir = app_root / 'update_backup_20250101_120000'
         (backup_dir / 'conf').mkdir(parents=True)
 
         old_content = 'old content'
