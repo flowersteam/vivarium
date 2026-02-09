@@ -511,7 +511,7 @@ class WindowManager(Parameterized):
         backup_name = os.path.basename(backup_dir) if backup_dir else 'backup folder'
 
         # Collect conflicts and restored files
-        conflicts_parts = []
+        all_conflicts = []
         restored_count = 0
 
         for folder in ['conf', 'notebooks']:
@@ -519,24 +519,26 @@ class WindowManager(Parameterized):
             conflicts = info.get('conflicts', [])
             restored = info.get('restored', [])
 
-            if conflicts:
-                conflicts_parts.append(f"**{len(conflicts)} file(s)** in {folder}/")
+            # Add folder prefix to each conflict file
+            for filename in conflicts:
+                all_conflicts.append(f"{folder}/{filename}")
             restored_count += len(restored)
 
         # Only show notification if there are conflicts
         # (restored files are silently handled - user's modifications preserved)
-        if not conflicts_parts:
+        if not all_conflicts:
             # Just log if we restored files
             if restored_count > 0:
                 lg.info(f"Update complete: {restored_count} user modification(s) preserved")
             return
 
-        # Build message for conflicts
+        # Build message for conflicts with file list
+        file_list = ", ".join(f"`{f}`" for f in all_conflicts)
         message = (
-            "**Update applied:** Some files you customized were also updated. "
-            "The new versions are now in use. "
-            + ", ".join(conflicts_parts) + " affected. "
-            f"Your previous versions are saved in `{backup_name}/`."
+            f"**Update applied:** The following files you modified were also updated: {file_list}. "
+            f"The new versions are now in use. "
+            f"Your previous versions are saved in the **{backup_name}** folder "
+            f"(located next to the `Start-Vivarium` script)."
         )
 
         self.defaults_banner.object = message
