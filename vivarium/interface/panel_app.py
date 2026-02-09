@@ -360,8 +360,10 @@ class WindowManager(Parameterized):
                     # Clear the pending marker
                     clear_update_pending()
 
-                # Then check for new updates (include pre-releases during alpha/beta phase)
-                update_info = check_for_updates(timeout=5.0, include_prereleases=True)
+                # Check for new updates
+                interface_cfg = load_config("scene/interface", "base_interface")
+                include_prereleases = getattr(interface_cfg, 'include_prereleases', False)
+                update_info = check_for_updates(timeout=5.0, include_prereleases=include_prereleases)
                 if update_info:
                     self._update_info = update_info
                     # Schedule UI update on main thread

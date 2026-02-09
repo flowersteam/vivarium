@@ -1,5 +1,6 @@
 use_streaming: true
 dark_mode: false
+include_prereleases: false  # Set to true to receive pre-release updates (alpha, beta, rc)
 notebook:
   path: null  # Path to notebook file (e.g., "notebooks/sessions/session_1.ipynb")
   jupyter_port: 8889
