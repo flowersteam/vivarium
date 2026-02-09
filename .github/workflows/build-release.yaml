@@ -207,59 +207,40 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Note: No empty lines or :: comments inside if-blocks (causes batch syntax errors)
           $script = @"
           @echo off
           setlocal EnableDelayedExpansion
           cd /d "%~dp0"
-
           if exist "vivarium-build.zip" (
-              echo Installing/updating Vivarium...
-
-              :: Backup user data if exists
-              :: Python will perform smart merge on startup, restoring user modifications
-              :: only for files that weren't updated
-              set "BACKUP_DIR="
-              if exist "conf" (
-                  for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
-                  for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
-                  set "BACKUP_DIR=update_backup_!DATESTAMP!_!TIMESTAMP!"
-                  set "BACKUP_DIR=!BACKUP_DIR: =0!"
-                  mkdir "!BACKUP_DIR!" 2>nul
-                  xcopy /E /I /Q "conf" "!BACKUP_DIR!\conf" >nul
-                  echo User data backed up to !BACKUP_DIR!
-              )
-              if exist "notebooks" (
-                  if not defined BACKUP_DIR (
-                      for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set "DATESTAMP=%%c%%a%%b"
-                      for /f "tokens=1-2 delims=: " %%a in ('time /t') do set "TIMESTAMP=%%a%%b"
-                      set "BACKUP_DIR=update_backup_!DATESTAMP!_!TIMESTAMP!"
-                      set "BACKUP_DIR=!BACKUP_DIR: =0!"
-                      mkdir "!BACKUP_DIR!" 2>nul
-                  )
-                  xcopy /E /I /Q "notebooks" "!BACKUP_DIR!\notebooks" >nul
-                  if not exist "conf" echo User data backed up to !BACKUP_DIR!
-              )
-
-              :: Extract new version (overwrites conf/ and notebooks/ with new defaults)
-              powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
-              del vivarium-build.zip
-
-              :: Note: User modifications are restored selectively by the app on startup
-              :: Files modified by user but NOT by the update are restored from backup
-              :: Files modified by BOTH user and update use new version (user notified)
-
-              echo Setup complete!
-              echo.
+          echo Installing/updating Vivarium...
+          set "BACKUP_DIR="
+          if exist "conf" (
+          for /f %%a in ('powershell -Command "Get-Date -Format \"yyyyMMdd_HHmmss\""') do set "BACKUP_DIR=update_backup_%%a"
+          mkdir "!BACKUP_DIR!" 2>nul
+          xcopy /E /I /Q "conf" "!BACKUP_DIR!\conf" >nul
+          echo User data backed up to !BACKUP_DIR!
           )
-
+          if exist "notebooks" (
+          if not defined BACKUP_DIR (
+          for /f %%a in ('powershell -Command "Get-Date -Format \"yyyyMMdd_HHmmss\""') do set "BACKUP_DIR=update_backup_%%a"
+          mkdir "!BACKUP_DIR!" 2>nul
+          )
+          xcopy /E /I /Q "notebooks" "!BACKUP_DIR!\notebooks" >nul
+          if not exist "conf" echo User data backed up to !BACKUP_DIR!
+          )
+          powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
+          del vivarium-build.zip
+          echo Setup complete!
+          echo.
+          )
           echo Starting Vivarium...
           echo Close this window to quit.
           echo.
           vivarium-interface.exe
           endlocal
           "@
-          # Remove leading whitespace from each line
-          $script -split "`n" | ForEach-Object { $_.TrimStart() } | Set-Content -Path dist\vivarium-package\Start-Vivarium.bat -Encoding ASCII
+          $script | Set-Content -Path dist\vivarium-package\Start-Vivarium.bat -Encoding ASCII
 
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
