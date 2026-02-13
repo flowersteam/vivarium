@@ -17,7 +17,7 @@ class ConsumptionState:
     consumption_matrix: jnp.ndarray = None
 
 
-def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype, source_subtype, target_subtype, start, range):     
+def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype, diameter, source_subtype, target_subtype, start, range):     
 
     mask = neighbors_entity_mask(
         neighbors_idx=neighbors_idx,
@@ -25,7 +25,8 @@ def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype
         target_mask=jnp.logical_and(exists == 1, entity_subtype == target_subtype),
         neighbor_mask=neighbor_mask
     )
-    mask &= jnp.logical_and(d_r < range, start)
+    source_target_radius_sum = (jnp.tile(diameter[:, jnp.newaxis], (1, neighbors_idx.shape[1])) + diameter[neighbors_idx]) / 2
+    mask &= jnp.logical_and(d_r - source_target_radius_sum < range, start)
     
     # Normalize mask by row sums, handling zero-sum rows
     row_sums = mask.sum(axis=1, keepdims=True)
@@ -34,7 +35,7 @@ def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype
     return mask_normalized
 
 
-single_consumption = vmap(single_consumption, in_axes=(None, None, None, None, None, 0, 0, 0, 0))
+single_consumption = vmap(single_consumption, in_axes=(None, None, None, None, None, None, 0, 0, 0, 0))
 
 
 class ConsumptionComponent(Component):
@@ -105,6 +106,7 @@ class ConsumptionComponent(Component):
                 partition.neighbor_list_mask(neighbors, mask_self=True),
                 state.entity_state.exists,
                 state.entity_state.entity_subtype,
+                state.entity_state.diameter,
                 consumption_state.source_subtype,
                 consumption_state.target_subtype,
                 consumption_state.start,
