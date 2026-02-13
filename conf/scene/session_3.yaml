@@ -21,7 +21,7 @@ environment:
         by_indices:
           - resource:
               indices: "${range: 0, 15}"
-              n_exists: 3
+              n_exists: 8
               subtype: resource
               diameter: 3.0
               client:
@@ -40,7 +40,7 @@ environment:
         agent_to_resource:
           source_subtype: 0
           target_subtype: 1
-          range: 12.5
+          range: 1
           start: false
         client:
           controller_kwargs:
