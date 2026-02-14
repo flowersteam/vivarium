@@ -150,6 +150,7 @@ class VivariumController:
 
         self.controllers = controllers
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
+        self.subtypes = self.controllers['simulator'].subtype_labels
         if start_controller_thread:
             self.start_controller_thread()
 
