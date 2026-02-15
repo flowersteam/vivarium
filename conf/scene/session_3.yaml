@@ -16,8 +16,11 @@ environment:
       agents:
         n_max: 2
         n_exists: 1
+        proxs_dist_max: 15.0
       objects:
         n_max: 25
+        friction: 
+          _all_values_: 0.3
         by_indices:
           - resource:
               indices: "${range: 0, 15}"
