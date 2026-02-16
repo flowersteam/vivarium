@@ -1349,7 +1349,11 @@ class WindowManager(Parameterized):
 
         right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
         
-        right_side_tabs.active = 1 if hasattr(self.notebook_config, 'path') and self.notebook_config.path else 0
+        if hasattr(self.notebook_config, 'path') and self.notebook_config.path:
+            right_side_tabs.active = 1
+            self.start_toggle.visible = False
+        else:
+            right_side_tabs.active = 0
 
         # Build the simulation UI
         simulation_ui = pn.Row(
