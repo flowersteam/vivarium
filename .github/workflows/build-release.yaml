@@ -129,6 +129,7 @@ jobs:
               xattr -cr vivarium-build.tar.gz 2>/dev/null || true
 
               # Extract new version (overwrites conf/ and notebooks/ with new defaults)
+              echo "Extracting archive, please wait..."
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
 
@@ -169,6 +170,7 @@ jobs:
               fi
 
               # Extract new version (overwrites conf/ and notebooks/ with new defaults)
+              echo "Extracting archive, please wait..."
               tar -xzf vivarium-build.tar.gz
               rm vivarium-build.tar.gz
 
@@ -229,6 +231,7 @@ jobs:
           xcopy /E /I /Q "notebooks" "!BACKUP_DIR!\notebooks" >nul
           if not exist "conf" echo User data backed up to !BACKUP_DIR!
           )
+          echo Extracting archive, please wait...
           powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
           del vivarium-build.zip
           echo Setup complete!

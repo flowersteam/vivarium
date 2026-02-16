@@ -521,8 +521,11 @@ class WindowManager(Parameterized):
             conflicts = info.get('conflicts', [])
             restored = info.get('restored', [])
 
-            # Add folder prefix to each conflict file
+            # Add folder prefix to each conflict file (skip hidden files/dirs)
             for filename in conflicts:
+                parts = filename.replace("\\", "/").split("/")
+                if any(part.startswith(".") for part in parts):
+                    continue
                 all_conflicts.append(f"{folder}/{filename}")
             restored_count += len(restored)
 
