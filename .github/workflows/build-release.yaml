@@ -137,7 +137,6 @@ jobs:
               # Files modified by user but NOT by the update are restored from backup
               # Files modified by BOTH user and update use new version (user notified)
 
-              echo "Setup complete!"
               echo ""
           fi
 
@@ -178,7 +177,6 @@ jobs:
               # Files modified by user but NOT by the update are restored from backup
               # Files modified by BOTH user and update use new version (user notified)
 
-              echo "Setup complete!"
               echo ""
           fi
 
@@ -234,7 +232,6 @@ jobs:
           echo Extracting archive, please wait...
           powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
           del vivarium-build.zip
-          echo Setup complete!
           echo.
           )
           echo Starting Vivarium...
