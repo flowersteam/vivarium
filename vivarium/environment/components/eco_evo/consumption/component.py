@@ -1,4 +1,4 @@
-from jax import vmap
+from jax import vmap, lax
 import jax.numpy as jnp
 from jax_md import partition
 from jax_md.dataclasses import dataclass as md_dataclass
@@ -51,6 +51,8 @@ class ConsumptionComponent(Component):
             @md_dataclass
             class EntityState(state_cls.__annotations__['entity_state']):
                 consuming: jnp.ndarray = None
+                has_consumed_since_last_reset: jnp.ndarray = None
+                consuming_reset: jnp.ndarray = None
             state_cls.__annotations__['entity_state'] = EntityState
             setattr(state_cls, 'entity_state', None)
         state_cls.__annotations__[self.state_attr] = ConsumptionState
@@ -76,7 +78,9 @@ class ConsumptionComponent(Component):
         if self.consuming_in_entity_state:
             state = state.set(
                 entity_state=state.entity_state.set(
-                    consuming=jnp.full(state.entity_state.exists.shape[0], False, dtype=bool),
+                    consuming=jnp.full(state.entity_state.exists.shape[0], 0., dtype=jnp.float32),
+                    has_consumed_since_last_reset=jnp.full(state.entity_state.exists.shape[0], 0., dtype=jnp.float32),
+                    consuming_reset=jnp.full(state.entity_state.exists.shape[0], False, dtype=bool)
                 )
             )
         return state
@@ -120,10 +124,17 @@ class ConsumptionComponent(Component):
             )
             
             if self.consuming_in_entity_state:
-                consuming = jnp.any(consumption_matrix > 0, axis=1)
+                consuming = jnp.sum(consumption_matrix, axis=1)
+                has_consumed_since_last_reset = lax.select(
+                    state.entity_state.consuming_reset,
+                    jnp.full(state.entity_state.exists.shape[0], consuming, dtype=jnp.float32),
+                    state.entity_state.has_consumed_since_last_reset + consuming
+                )
                 state = state.set(
                     entity_state=state.entity_state.set(
                         consuming=consuming,
+                        has_consumed_since_last_reset=has_consumed_since_last_reset,
+                        consuming_reset=jnp.full(state.entity_state.exists.shape[0], False, dtype=bool)
                     )
                 )
             

@@ -169,6 +169,14 @@ class AgentController(EntityController):
         info_lines.append("")
 
         return print("\n".join(info_lines))
+    
+    def has_consumed(self):
+        """Check if the agent has consumed an entity since last call
+
+        :return: The number of entities consumed since last call (as a float as only a fraction could be consumed)
+        """
+        self.consuming_reset = True
+        return self.has_consumed_since_last_reset
 
 
 
