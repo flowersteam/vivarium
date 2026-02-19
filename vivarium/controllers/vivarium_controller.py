@@ -82,7 +82,7 @@ class VivariumController:
     @classmethod
     def start_session(cls, scene_name,
                       client=None,
-                      start_interface=True,
+                      start_interface=False,
                       start_controller_thread=True,
                       step_from_controller=True,
                       run_simulation=True,
@@ -245,7 +245,8 @@ class VivariumController:
 
         if self.is_controller_thread_running():
             self.stop_controller_thread()
-            self._controller_thread.join(timeout=2.0)
+            if self._controller_thread is not threading.current_thread():
+                self._controller_thread.join(timeout=2.0)
         # Close the client connection
         try:
             self.client.close()
@@ -496,9 +497,7 @@ class VivariumController:
 
     def close_all(self):
         """Send signal to close all clients and the simulator."""
-        if self.is_controller_thread_running():
-            self.stop_controller_thread()
-            self._controller_thread.join(timeout=2.0)
+        self.disconnect()
         if 'simulator' in self.controllers:
             self.simulator.close = True
             lg.info("Waiting for all clients to close ...")
