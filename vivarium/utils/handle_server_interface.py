@@ -535,17 +535,18 @@ def wait_for_grpc_server(host="localhost", port=50051, timeout=30.0, poll_interv
     return False
 
 
-def check_server_running(host="localhost", port=50051):
+def check_server_running(host="localhost", port=50051, timeout=1.0, poll_interval=0.2):
     """Check if the gRPC server is currently running.
 
     Args:
         host: Server hostname
         port: Server port
-
+        timeout: Maximum seconds to wait for server to be ready
+        poll_interval: Seconds between connection attempts
     Returns:
         True if server is running and responding to health checks, False otherwise
     """
-    return wait_for_grpc_server(host=host, port=port, timeout=1.0, poll_interval=0.2)
+    return wait_for_grpc_server(host=host, port=port, timeout=timeout, poll_interval=poll_interval)
 
 
 def wait_for_http(url, retries=1, delay=5.0, timeout=10.0):
