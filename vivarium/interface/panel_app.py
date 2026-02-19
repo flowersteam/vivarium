@@ -606,7 +606,11 @@ class WindowManager(Parameterized):
         """Callback to connect to an existing server."""
         try:
             client = SimulatorGRPCClient()
-            controller = VivariumController(client=client)
+            
+            # controller.apply_changes() is already called in update_plot_cb and the state is fetched through the state streaming mechanisl
+            # So we don't need the controller thread in addition. 
+            controller = VivariumController(client=client, start_controller_thread=False)
+            
             self._initialize_connected_ui(controller)
         except Exception as e:
             lg.error(f"Failed to connect to server: {e}")
@@ -638,7 +642,7 @@ class WindowManager(Parameterized):
         )
 
         for name, interface in self.interfaces.items():
-            interface.udpate_other_interfaces(self.interfaces)
+            interface.udpate_other_interfaces(self.interfaces) #TODO: fix typo udpate->update
 
         # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
         self.param_simulator = ParamSimulator(self.controller.controllers['simulator'])
@@ -838,7 +842,7 @@ class WindowManager(Parameterized):
 
         try:
             # Start the server and get a controller (controller manages server lifecycle)
-            controller = VivariumController(start_server=True, scene_name=scene_name, timeout=self.server_timeout)
+            controller = VivariumController(start_server=True, scene_name=scene_name, timeout=self.server_timeout, start_controller_thread=False)
             self._started_server = True
 
             # Transition to full simulation UI
