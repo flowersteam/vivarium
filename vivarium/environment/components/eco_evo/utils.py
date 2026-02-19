@@ -24,9 +24,11 @@ def non_existing(key, entity_state, entity_type=-1, subtype=-1):
 
 def set_random_pos_at(key, all_positions, idx, range, max_trial=100):
     def cond_fun(val):
+        #TODO: It seems that 2 entities at the same position no longer crashes the simulation
+        # So let's set atol very low
         pos, idx, other_positions, key, init, trial = val
         return jnp.logical_and(trial < max_trial,
-                               jnp.logical_or(init, is_position_close(pos, idx, other_positions, atol=6.))
+                               jnp.logical_or(init, is_position_close(pos, idx, other_positions, atol=0.01))
         )
     def body_fun(val):
         pos, idx, other_positions, key, init, trial = val
