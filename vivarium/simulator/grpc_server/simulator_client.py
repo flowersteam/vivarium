@@ -129,7 +129,12 @@ class SimulatorGRPCClient:
 
         :return: simulation state
         """
-        res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_and_cp_cls)
+        try:
+            res = proto_to_dataclass(self.stub.SetChangesAndStep(changes_to_proto(changes)), self.state_and_cp_cls)
+        except grpc.RpcError as e:
+            lg.warning(f"Error during step: {e}")
+            return self.state_and_cp_cls(state=self.state, controller_parameters=self.controller_parameters)
+        
         self.state = res.state
         self.controller_parameters = res.controller_parameters
         return res
