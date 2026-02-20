@@ -311,13 +311,15 @@ def proximity_map(step, braitenberg):
 @pytest.fixture
 def spawn(braitenberg):
     spawn = SpawnComponent(
-        name='spawn', 
-        precedence=1, 
-        subtype=0, 
-        period=1, 
-        start=True,
-        position_range=[50., 60., 50., 60.],
-        orientation_range=[3., 3.2]
+        name='spawn',
+        precedence=1,
+        default=dict(
+            subtype=0,
+            period=1,
+            start=True,
+            position_range=[50., 60., 50., 60.],
+            orientation_range=[3., 3.2]
+        )
     )
     return [*braitenberg, spawn]
 
@@ -330,9 +332,10 @@ def consumption(proximity_map):
         test_consumption = dict(
             source_subtype=0, 
             target_subtype=1, 
-            range=20.0,
+            range=1.0,
             start=True
-        )
+        ),
+        consuming_in_entity_state=True
     )
     return [*proximity_map, consumption]
 

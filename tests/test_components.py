@@ -78,8 +78,9 @@ def test_proximity_map(environment_and_state, proximity_map):
 
 def test_spawn(environment_and_state, spawn):
     env, state = environment_and_state(spawn)
-    assert state.spawn_state.start
-    
+    # SpawnState fields are now 2D [n_configs, ...]; index into config 0
+    assert state.spawn_state.start[0]
+
     for _ in range(4):
         assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0]
         state  = state.set(
@@ -92,12 +93,12 @@ def test_spawn(environment_and_state, spawn):
         prev_orientation_0 = state.entity_state.orientation[0]
         state = env.step(state)
         assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0]
-        assert state.entity_state.position[0, 0] >= state.spawn_state.position_range[0]
-        assert state.entity_state.position[0, 0] <= state.spawn_state.position_range[1]
-        assert state.entity_state.position[0, 1] >= state.spawn_state.position_range[2]
-        assert state.entity_state.position[0, 1] <= state.spawn_state.position_range[3]
-        assert state.entity_state.orientation[0] >= state.spawn_state.orientation_range[0]
-        assert state.entity_state.orientation[0] <= state.spawn_state.orientation_range[1]
+        assert state.entity_state.position[0, 0] >= state.spawn_state.position_range[0, 0]
+        assert state.entity_state.position[0, 0] <= state.spawn_state.position_range[0, 1]
+        assert state.entity_state.position[0, 1] >= state.spawn_state.position_range[0, 2]
+        assert state.entity_state.position[0, 1] <= state.spawn_state.position_range[0, 3]
+        assert state.entity_state.orientation[0] >= state.spawn_state.orientation_range[0, 0]
+        assert state.entity_state.orientation[0] <= state.spawn_state.orientation_range[0, 1]
         assert not jnp.equal(prev_pos_0, state.entity_state.position[0]).all()
         assert not jnp.equal(prev_orientation_0, state.entity_state.orientation[0]).all()
     

@@ -5,7 +5,7 @@ from vivarium.interface.parameterized import ParameterizedData
 from vivarium.environment.components.interface import Interface
 
 
-class SpawnParam(ParameterizedData):
+class SingleSpawnParam(ParameterizedData):
     subtype = param.Selector()
     period = param.Number()
     start = param.Boolean()
@@ -17,9 +17,26 @@ class SpawnParam(ParameterizedData):
         self.param.subtype.objects = controller._subtype_labels
 
 
+class SpawnParam(ParameterizedData):
+
+    def __init__(self, controller):
+        super().__init__(controller=controller)
+        self._single_spawn_params = [
+            SingleSpawnParam(controller=single_controller, name=name)
+            for name, single_controller in controller._single_spawn_controllers.items()
+        ]
+        self.param.add_parameter(
+            'spawn',
+            param.Selector(
+                objects=self._single_spawn_params,
+                default=self._single_spawn_params[0]
+            )
+        )
+
+
 class SpawnInterface(Interface):
     def __init__(self, controller, panel_cls=Column):
-        
+
         parameters = SpawnParam(controller=controller)
 
         super().__init__(controller, parameters, panel_cls=panel_cls)
