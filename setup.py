@@ -34,6 +34,9 @@ setup(
         "python-dotenv==1.2.1",
         "notebook==7.0.8",
         "certifi",  # SSL certificates for PyInstaller builds
+        # orbax-checkpoint>=0.10 requires uvloop which does not support Windows.
+        # Cap it globally for a consistent transitive dep across all platforms.
+        "orbax-checkpoint<0.10",
     ],
     
     extras_require={
