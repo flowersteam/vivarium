@@ -37,9 +37,9 @@ class ReproductionComponent(Component):
             recover_time: jnp.ndarray
         
         @md_dataclass
-        class AgentState(state_cls.__annotations__[self.entity_type]):
+        class EntityTypeState(state_cls.__annotations__[self.entity_type]):
             reproduction: ReproductionState = None
-        state_cls.__annotations__[self.entity_type] = AgentState
+        state_cls.__annotations__[self.entity_type] = EntityTypeState
         return state_cls
 
     def init_state_fn(self, state, neighbor_manager, key):
