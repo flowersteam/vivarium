@@ -37,7 +37,7 @@ def get_available_scenes() -> Dict[str, List[str]]:
             name = filename[:-5]
             if any(p in name for p in exclude_patterns):
                 continue
-            if name.startswith('session'):
+            if name.startswith('session') or name.startswith('miniproject'):
                 sessions.append(name)
             elif name in ['quickstart']:
                 tutorials.append(name)

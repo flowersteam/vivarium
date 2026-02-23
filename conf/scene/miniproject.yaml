@@ -1,0 +1,118 @@
+defaults:
+  - session_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn.client
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction
+  - environment/components/reproduction/default@environment.components.component_list.reproduction_agent
+  - _self_
+
+scene_name: miniproject
+
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 12
+        diameter:
+          _all_values_: 4.0
+        proxs_dist_max:
+          _all_values_: 20.0
+        subtype:
+          _all_values_: "${..subtype_labels.0}"
+      objects:
+        n_max: 32
+        diameter:
+          _all_values_: 4.0
+        subtype:
+          _all_values_: "${..subtype_labels.4}"
+        client:
+          controller_kwargs:
+            color:
+              _all_values_: green
+      spawn:
+        slot_1:
+          subtype: 0
+          period: 400
+          start: false
+          position_range: [0., 100., 0., 100.]
+          orientation_range: [0., 6.3]
+        slot_2:
+          subtype: 0
+          period: 400
+          start: false
+          position_range: [0., 100., 0., 100.]
+          orientation_range: [0., 6.3]
+        slot_3:
+          subtype: 0
+          period: 400
+          start: false
+          position_range: [0., 100., 0., 100.]
+          orientation_range: [0., 6.3]
+        slot_4:
+          subtype: 0
+          period: 400
+          start: false
+          position_range: [0., 100., 0., 100.]
+          orientation_range: [0., 6.3]
+        client:
+          controller_kwargs:
+            names: ['slot_1', 'slot_2', 'slot_3', 'slot_4']
+      consumption:
+        slot_1:
+          source_subtype: 0
+          target_subtype: 4
+          range: 1.0
+          start: false
+        slot_2:
+          source_subtype: 0
+          target_subtype: 4
+          range: 1.0
+          start: false
+        slot_3:
+          source_subtype: 0
+          target_subtype: 4
+          range: 1.0
+          start: false
+        slot_4:
+          source_subtype: 0
+          target_subtype: 4
+          range: 1.0
+          start: false
+        consuming_in_entity_state: true
+        client:
+          controller_kwargs:
+            names: ['slot_1', 'slot_2', 'slot_3', 'slot_4']
+      energy:
+        entity_type: objects
+        energy_init: 1.
+        energy_max: 1.0
+        energy_decay: 0.0
+        energy_burst: 1.
+        distribute_extra_energy: false
+      reproduction:
+        entity_type: objects
+        subtype: -1
+        birth_energy_threshold: 2.0
+        death_energy_threshold: 0.0
+      reproduction_agent:
+        entity_type: agents
+        subtype: -1
+        birth_energy_threshold: 2.0
+        death_energy_threshold: 0.0        
+
+subtype_labels:
+  - agent_subtype_1
+  - agent_subtype_2
+  - agent_subtype_3
+  - agent_subtype_4
+  - object_subtype_1
+  - object_subtype_2
+  - object_subtype_3
+  - object_subtype_4
+
+interface:
+  notebook:
+    path: notebooks/sessions/miniproject_template.ipynb
