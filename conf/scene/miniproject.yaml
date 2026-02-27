@@ -104,14 +104,14 @@ environment:
         death_energy_threshold: 0.0        
 
 subtype_labels:
-  - agent_subtype_1
-  - agent_subtype_2
-  - agent_subtype_3
-  - agent_subtype_4
-  - object_subtype_1
-  - object_subtype_2
-  - object_subtype_3
-  - object_subtype_4
+  - subtype_1
+  - subtype_2
+  - subtype_3
+  - subtype_4
+  - subtype_5
+  - subtype_6
+  - subtype_7
+  - subtype_8
 
 interface:
   notebook:
