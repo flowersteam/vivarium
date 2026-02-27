@@ -172,6 +172,8 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
             suffix, idx = split(item)
             self._setitem(suffix, val, idx)
             return
+        elif item == 'subtype' and val not in self._subtype_labels:
+            raise ValueError(f"'{val}' is not a valid subtype. Valid subtypes are: {self._subtype_labels}")
         else:
             pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
             super().__setattr__(pm.remote_attr, pm.ctrl_to_remote_fn(val))
@@ -253,7 +255,7 @@ class EntityList:
 
 class EntityListController(EntityList):
     def __init__(self, entity_type, remote, 
-                 subtype_labels=None,  # TODO: not used yet but should be to access/change it from the SimulatorController
+                 subtype_labels=None,  # TODO: not used yet but should be to access/change it from the VivariumController
                  controller_cls=None,
                  ):
         controller_cls = EntityController if controller_cls is None else controller_cls

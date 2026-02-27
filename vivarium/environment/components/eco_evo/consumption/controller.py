@@ -12,7 +12,7 @@ class SingleConsumptionController:
     def __getattr__(self, attr):
         if attr.startswith('_'):
             return object.__getattr__(self, attr)
-        value = getattr(self._remote.state, f'{self._global_controller_name}_state').__getattr__(attr)[self._idx].item()
+        value = getattr(self._remote.state, f'{self._global_controller_name}_state').__getattr__(attr)[self._idx]
         if attr == 'source_subtype' or attr == 'target_subtype':
             return self._subtype_labels[value]
         return value

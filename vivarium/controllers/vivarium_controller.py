@@ -141,6 +141,11 @@ class VivariumController:
         scene_config = scene_config or load_scene_config(client.scene_name)
         components_config = scene_config.environment.components
 
+        # Fetch subtype labels once. This list object is shared by reference across
+        # all entity/consumption/spawn controllers constructed below, so that
+        # set_subtype_labels() can update them all via a single in-place mutation.
+        subtype_labels = client.remote.controller_parameters.simulator.subtype_labels.obj()
+
         # Load controllers from scene config
         controllers = {}
         for name, c_config in components_config.component_list.items():
@@ -150,9 +155,31 @@ class VivariumController:
 
         self.controllers = controllers
         self.controllers['simulator'] = SimulatorController(name='simulator', remote=self.client.remote)
-        self.subtypes = self.controllers['simulator'].subtype_labels
+        self.subtypes = subtype_labels  # same object as in all controllers above
         if start_controller_thread:
             self.start_controller_thread()
+
+    def set_subtype_labels(self, new_labels):
+        """Rename subtype labels on this client.
+
+        Updates the label list in-place, so the change is immediately visible in
+        all entity, consumption, and spawn controllers (they all share the same
+        underlying list object).
+
+        You may provide fewer labels than the total number of subtypes; the
+        remaining ones keep their current labels. len(new_labels) must not
+        exceed len(self.subtypes).
+
+        Args:
+            new_labels: list of new label strings, at most len(self.subtypes) long.
+        """
+        self.ensure_connected()
+        if len(new_labels) > len(self.subtypes):
+            raise ValueError(
+                f"Expected at most {len(self.subtypes)} labels, got {len(new_labels)}. "
+                f"Current subtypes: {self.subtypes}"
+            )
+        self.subtypes[:] = list(new_labels) + self.subtypes[len(new_labels):]
 
     def is_connected(self, verify=True):
         """Check if connected to a server.

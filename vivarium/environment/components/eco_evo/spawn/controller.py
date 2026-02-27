@@ -15,7 +15,7 @@ class SingleSpawnController:
             return object.__getattribute__(self, attr)
         value = getattr(self._remote.state, f'{self._global_controller_name}_state').__getattr__(attr)[self._idx]
         if attr == 'subtype':
-            return self._subtype_labels[int(value.item())]
+            return self._subtype_labels[int(value)]
         if attr in ('position_range', 'orientation_range'):
             return tuple(value.tolist())
         return value.item()
