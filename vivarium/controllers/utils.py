@@ -12,7 +12,7 @@ lg = logging.getLogger(__name__)
 
 class Logger(object):
     def __init__(self):
-        """Logger class that logs data for the agents"""
+        """Logger class that logs data"""
         self.logs = {}
 
     def add(self, log_field, data):
@@ -40,7 +40,7 @@ class Logger(object):
 
     def clear(self, log_field=None):
         """Clear all logs of the logger"""
-        
+
         if log_field is None:
             del self.logs
             self.logs = {}
