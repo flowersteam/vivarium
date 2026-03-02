@@ -190,6 +190,10 @@ jupyter_pkg_datas = (
     + copy_metadata('jupyter_client')
     + copy_metadata('jupyter_server')
     + copy_metadata('ipykernel')
+    # matplotlib_inline registers 'inline' as a matplotlib backend via entry points.
+    # Without this metadata, matplotlib's BackendRegistry (3.9+) can't find 'inline'
+    # and %matplotlib inline raises RuntimeError: 'inline' is not a recognised backend.
+    + copy_metadata('matplotlib-inline')
 )
 
 jupyter_analysis = Analysis(
@@ -225,9 +229,17 @@ jupyter_analysis = Analysis(
       + collect_submodules('matplotlib_inline')
       + collect_submodules('vivarium'),
     hookspath=[],
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(project_root, 'scripts', 'rthook_jupyter_matplotlib.py')],
     excludes=[],
     noarchive=False,
+    # Tell the matplotlib backends hook to collect matplotlib_inline.
+    # Auto-discovery only finds backends via matplotlib.use() calls; IPython sets
+    # the inline backend via rcParams directly, so it is never auto-discovered.
+    hooksconfig={
+        'matplotlib': {
+            'backends': ['Agg', 'module://matplotlib_inline.backend_inline'],
+        },
+    },
 )
 
 # ============================================================================
