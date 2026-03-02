@@ -680,7 +680,7 @@ class WindowManager(Parameterized):
         )
 
         self.plot_fps = pn.widgets.FloatInput(
-            name="Plot FPS", value=15, width=80
+            name="Plot FPS", value=10, width=80
         )
 
         # Currently not displayed
