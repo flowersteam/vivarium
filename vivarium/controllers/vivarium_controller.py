@@ -109,7 +109,7 @@ class VivariumController:
             controller = cls(client=client)
         else:
             controller = cls()  # disconnected state
-            controller.start_server_process(scene_name, timeout=server_timeout)
+            controller.start_server_process(scene_name, timeout=server_timeout, start_controller_thread=start_controller_thread)
             if start_interface:
                 controller.start_interface()
 
