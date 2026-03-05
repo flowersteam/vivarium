@@ -1,9 +1,7 @@
 import numpy as np
 
-from vivarium.controllers.utils import RoutineHandler
-from vivarium.controllers.dataclass_wrapper import ChangeRecorder, create_dataclass_from_dict, update_dataclass
-
-from ..controller import AttributeMapping
+from vivarium.controllers.utils import RoutineHandler, Logger
+from ....controllers.controller import AttributeMapping
 
 class InternalData:
     pass
@@ -27,11 +25,11 @@ def create_property(field_name, rigid_body_field):
         else:
             if rigid_body_field == 'orientation':
                 if field_name == 'position':
-                    return self._state.entity_state.orientation[self._entity_idx]
+                    return self._remote.state.entity_state.orientation[self._entity_idx].obj()
                 else:
                     return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
             elif rigid_body_field == 'center':
-                return getattr(self._state.entity_state, field_name)[self._entity_idx]
+                return getattr(self._remote.state.entity_state, field_name)[self._entity_idx].obj()
             else:
                 return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
 
@@ -42,15 +40,15 @@ def create_property(field_name, rigid_body_field):
         else:
             idx = (self._entity_idx, idx)
         if self._is_rigid_body:
-            getattr(getattr(self._change_recorder.entity_state, field_name), rigid_body_field)[idx] = value
+            getattr(getattr(self._remote.state.entity_state, field_name), rigid_body_field)[idx] = value
         else:
             if rigid_body_field == 'orientation':
                 if field_name == 'position':
-                    self._change_recorder.entity_state.orientation[idx] = value
+                    self._remote.state.entity_state.orientation[idx] = value
                 else:
                     return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
             elif rigid_body_field == 'center':
-                getattr(self._change_recorder.entity_state, field_name)[idx] = value
+                getattr(self._remote.state.entity_state, field_name)[idx] = value
             else:
                 raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
     return prop
@@ -73,38 +71,40 @@ class EntityWrapper:
     force_orientation = create_property('force', 'orientation')
     mass_orientation = create_property('mass', 'orientation')
 
-    def __init__(self, state, ent_idx, entity_type):
-        object.__setattr__(self, '_state', state)
+    def __init__(self, remote, ent_idx, entity_type):
+        object.__setattr__(self, '_remote', remote)
         object.__setattr__(self, '_entity_idx', ent_idx)
-        object.__setattr__(self, '_entity_type_idx', state.entity_state.entity_type_idx[ent_idx])
-        object.__setattr__(self, '_is_rigid_body', self._state.entity_state.is_rigid_body())
-        object.__setattr__(self, '_change_recorder', ChangeRecorder())
+        object.__setattr__(self, '_entity_type_idx', remote.state.entity_state.entity_type_idx.obj()[ent_idx].item())
+        object.__setattr__(self, '_is_rigid_body', remote.state.entity_state.obj().is_rigid_body())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_fields', ['entity_subtype', 'diameter', 'friction',
-                               'exists', 'entity_idx', 'entity_type',
-                               'position', 'orientation', 'momentum', 'force', 'mass',
-                               'position_center', 'position_orientation',
-                               'momentum_center', 'momentum_orientation',
-                               'force_center', 'force_orientation',
-                               'mass_center', 'mass_orientation'])
+        object.__setattr__(self, '_entity_fields', 
+                           list(remote.state.entity_state.obj().__dataclass_fields__.keys()) + \
+                               [
+                                   'position_center', 'position_orientation',
+                                   'momentum_center', 'momentum_orientation',
+                                   'force_center', 'force_orientation',
+                                   'mass_center', 'mass_orientation'
+                               ]
+                        )
+        object.__setattr__(self, 'logger', Logger())
 
     def __getattr__(self, attr):
         if attr in self._entity_fields:
-            return getattr(self._state.entity_state, attr)[self._entity_idx]
-        return getattr(getattr(self._state, self._entity_type), attr)[self._state.entity_state.entity_type_idx[self._entity_idx]]
+            return getattr(self._remote.state.entity_state.obj(), attr)[self._entity_idx]
+        return getattr(getattr(self._remote.state, self._entity_type), attr).obj()[self._remote.state.entity_state.entity_type_idx.obj()[self._entity_idx]]
 
     def _setitem(self, attr, value, *idx):
         entity_state_idx = self._entity_idx if len(idx) == 0 else (self._entity_idx, *idx)
-        x_state_idx = self._state.entity_state.entity_type_idx[self._entity_idx].item() if len(idx) == 0 else (self._state.entity_state.entity_type_idx[self._entity_idx].item(), *idx)
+        x_state_idx = self._remote.state.entity_state.entity_type_idx[self._entity_idx] if len(idx) == 0 else (self._remote.state.entity_state.entity_type_idx[self._entity_idx], *idx)
         if attr in self._entity_fields:
             if attr.endswith('_center') or attr.endswith('_orientation'):
                 field_name, rigid_body_field = attr.split('_', 1)
                 p = create_property(field_name, rigid_body_field)
                 p.fset(self, value, idx)
             else:
-                getattr(self._change_recorder.entity_state, attr)[entity_state_idx] = value
+                getattr(self._remote.state.entity_state, attr)[entity_state_idx] = value
         else:
-            getattr(getattr(self._change_recorder, self._entity_type), attr)[x_state_idx] = value
+            getattr(getattr(self._remote.state, self._entity_type), attr)[x_state_idx] = value
 
     def __setattr__(self, attr, value):
         if attr in self.__dict__:
@@ -112,37 +112,28 @@ class EntityWrapper:
             return
         self._setitem(attr, value)
 
-    def apply_to_state(self, state):
-        changes = self._change_recorder.fetch_changes()
-        self._state = update_dataclass(state, changes)
-        self._change_recorder = ChangeRecorder()
-        return self._state
-
-    def set_state(self, state):
-        self._state = state
-
 
 def get_entity_parameter_mapping(subtype_labels):
     return {
         '_default_': lambda attr: AttributeMapping(
             attr,
-            jax_to_ctrl_fn=lambda x: x.item() if len(x.shape) == 0 else np.array(x),
-            ctrl_to_jax_fn=lambda x: np.array(x)
+            remote_to_ctrl_fn=lambda x: x.item() if len(x.shape) == 0 else np.array(x),
+            ctrl_to_remote_fn=lambda x: np.array(x)
         ),
         'mass': AttributeMapping(
-            'mass_center',
-            jax_to_ctrl_fn=lambda x: x[0].item(),
-            ctrl_to_jax_fn=lambda x: np.array([x])
+            'mass',
+            remote_to_ctrl_fn=lambda x: x[0].item(),
+            ctrl_to_remote_fn=lambda x: np.array([x])
         ),
         'exists': AttributeMapping(
             'exists',
-            jax_to_ctrl_fn=lambda x: bool(x.item()),
-            ctrl_to_jax_fn=lambda x: np.array(int(x))
+            remote_to_ctrl_fn=lambda x: bool(x.item()),
+            ctrl_to_remote_fn=lambda x: np.array(int(x))
         ),
         'subtype': AttributeMapping(
             'entity_subtype',
-            jax_to_ctrl_fn=lambda x: subtype_labels[x.item()],
-            ctrl_to_jax_fn=lambda x: np.array(subtype_labels.index(x), dtype=int)
+            remote_to_ctrl_fn=lambda x: subtype_labels[x.item()],
+            ctrl_to_remote_fn=lambda x: np.array(subtype_labels.index(x), dtype=int)
         )
     }
 
@@ -150,14 +141,13 @@ def get_entity_parameter_mapping(subtype_labels):
 class EntityController(EntityWrapper):  # TODO: How about merging the class and the superclass? Actually there is a logic (superclass has same attributes as state)
     """Entity class that represents an entity in the simulation"""
 
-    def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
-        super().__init__(state, ent_idx, entity_type)
-        object.__setattr__(self, 'controller_parameters', controller_parameters)
-        object.__setattr__(self, '_controller_change_recorder', ChangeRecorder())
+    def __init__(self, remote, ent_idx, entity_type, subtype_labels):
+        super().__init__(remote, ent_idx, entity_type)
         object.__setattr__(self, 'internal', InternalData())
         object.__setattr__(self, '_subtype_labels', subtype_labels)
         object.__setattr__(self, '_mapping', get_entity_parameter_mapping(subtype_labels))
-        self._hide_non_existing()
+        object.__setattr__(self, 'routine_handler', RoutineHandler())
+        object.__setattr__(self, '_controller_parameters_fields', getattr(remote.controller_parameters, self._entity_type).obj().__class__.__dataclass_fields__.keys())
 
     def __getattr__(self, item):
         if item in self.__dict__:
@@ -168,86 +158,25 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
             if suffix == 'position' and self._is_rigid_body:
                 field = field.center
             return field[idx]
-        if item in self.controller_parameters.__class__.__dataclass_fields__:
-            return getattr(self.controller_parameters, item)
+        if item in self._controller_parameters_fields:
+            return getattr(getattr(self._remote.controller_parameters, self._entity_type), item)[self._entity_type_idx]
         pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
-        return pm.jax_to_ctrl_fn(super().__getattr__(pm.jax_attr))
+        return pm.remote_to_ctrl_fn(super().__getattr__(pm.remote_attr))
 
     def __setattr__(self, item, val):
-        if item in self.controller_parameters.__class__.__dataclass_fields__:
-            getattr(self._controller_change_recorder, item)[self._entity_type_idx] = val
-            object.__setattr__(self.controller_parameters, item, val)
+        if item in self._controller_parameters_fields:
+            getattr(getattr(self._remote.controller_parameters, self._entity_type), item)[self._entity_type_idx] = val
         elif item in self.__dict__:
             super().__setattr__(item, val)
         elif is_split_attribute(item):
             suffix, idx = split(item)
             self._setitem(suffix, val, idx)
             return
+        elif item == 'subtype' and val not in self._subtype_labels:
+            raise ValueError(f"'{val}' is not a valid subtype. Valid subtypes are: {self._subtype_labels}")
         else:
             pm = self._mapping[item] if item in self._mapping else self._mapping['_default_'](item)
-            super().__setattr__(pm.jax_attr, pm.ctrl_to_jax_fn(val))
-        if item == 'hide_non_existing':
-            self._hide_non_existing(hide_non_existing=val)
-        elif item == 'exists':
-            self._hide_non_existing(exists=val)
-
-    def _hide_non_existing(self, hide_non_existing=None, exists=None):
-        hide_non_existing = self.hide_non_existing if hide_non_existing is None else hide_non_existing
-        exists = self.exists if exists is None else exists
-        if hide_non_existing:
-            self.visible = exists
-
-class EntityList:
-    def __init__(self, state, entity_type, entity_type_idx, entity_wrapper_list=None):
-        self._state = state
-        self.entity_type = entity_type
-        self._entity_list = entity_wrapper_list or [EntityWrapper(state, idx, entity_type) for idx, type in enumerate(state.entity_state.entity_type) if type == entity_type_idx]
-
-    def __getitem__(self, idx):
-        return self._entity_list[idx]
-
-    def __setitem__(self, idx, value):
-        raise NotImplementedError('Setting values directly is not supported.')
-
-    def __iter__(self):
-        return iter(self._entity_list)
-
-    def __len__(self):
-        return len(self._entity_list)
-
-    def __repr__(self):
-        return repr(self._entity_list)
-
-    def apply_to_state(self, state):
-        for entity in self._entity_list:
-            state = entity.apply_to_state(state)
-        return state
-
-    def set_state(self, state):
-        self._state = state
-        for entity in self._entity_list:  # TODO: Is this loop really needed? If it makes a copy of the state of each entity, might take a lot of space..
-            entity.set_state(state)
-
-    def fetch_changes(self):
-        changes = []
-        for e in self._entity_list:
-            c = e._change_recorder.fetch_changes()
-            if c:
-                changes.append(c)
-        changes = [{'state': c} for c in changes]
-        for e in self._entity_list:
-            c = e._controller_change_recorder.fetch_changes()
-            if c:
-                changes.append({'controller_parameters': {self.entity_type: c}})
-        return changes
-
-
-class NotebookControllerEntity(EntityController):
-    """Entity class that represents an entity in the simulation"""
-
-    def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
-        super().__init__(state, ent_idx, entity_type, subtype_labels, controller_parameters)
-        object.__setattr__(self, 'routine_handler', RoutineHandler())
+            super().__setattr__(pm.remote_attr, pm.ctrl_to_remote_fn(val))
 
     def attach_routine(self, routine_fn, name=None, interval=1):
         """Attach a routine to the entity
@@ -280,17 +209,16 @@ class NotebookControllerEntity(EntityController):
 
         :return: entity's infos
         """
-        dict_infos = self.config.to_dict()
 
         info_lines = []
         info_lines.append("Entity Overview:")
         info_lines.append(f"{'-' * 20}")
-        info_lines.append(f"Type: {self.etype.name}")
-        info_lines.append(f"Subtype: {self.subtype_label}")
-        info_lines.append(f"Idx: {self.idx}")
-        info_lines.append(f"Exists: {self.exists}")
+        info_lines.append(f"Type: {self._entity_type}")
+        info_lines.append(f"Subtype: {self._subtype_labels[self.entity_subtype]}")
+        info_lines.append(f"Idx: {self._entity_type_idx}")
+        info_lines.append(f"Exists: {bool(self.exists)}")
         info_lines.append(
-            f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}"
+            f"Position: x={self.x_position:.2f}, y={self.y_position:.2f}"
         )
         info_lines.append(f"Diameter: {self.diameter:.2f}")
         info_lines.append(f"Color: {self.color}")
@@ -301,43 +229,119 @@ class NotebookControllerEntity(EntityController):
     def print_routines(self):
         """Print the entity's routines"""
         self.routine_handler.print_routines()
+
+
+class EntityList:
+    def __init__(self, remote, entity_type, entity_type_idx, entity_wrapper_list=None):
+        self._remote = remote
+        self.entity_type = entity_type
+        self._entity_list = entity_wrapper_list or [EntityWrapper(remote, idx, entity_type) for idx, type in enumerate(remote.state.entity_state.entity_type.obj()) if type == entity_type_idx]
     
+    def __getitem__(self, idx):
+        return self._entity_list[idx]
+
+    def __setitem__(self, idx, value):
+        raise NotImplementedError('Setting values directly is not supported.')
+
+    def __iter__(self):
+        return iter(self._entity_list)
+
+    def __len__(self):
+        return len(self._entity_list)
+
+    def __repr__(self):
+        return repr(self._entity_list)
+
 
 class EntityListController(EntityList):
-    def __init__(self, entity_type, state, 
-                 subtype_labels=None,  # TODO: not used yet but should be to access/change it from the SimulatorController
+    def __init__(self, entity_type, remote, 
+                 subtype_labels=None,  # TODO: not used yet but should be to access/change it from the VivariumController
                  controller_cls=None,
-                 notebook_control=False,
-                 **kwargs
                  ):
-        controller_cls = (EntityController if not notebook_control else NotebookControllerEntity) if controller_cls is None else controller_cls
+        controller_cls = EntityController if controller_cls is None else controller_cls
         self.subtype_labels = subtype_labels
         self.name = entity_type
-        self.controller_parameters = create_dataclass_from_dict(
-            'ControllerParameters',
-            kwargs)
 
-        etype_int = getattr(state, entity_type).entity_type        
+        etype_int = getattr(remote.state, entity_type).entity_type
         super().__init__(
-            state=state, entity_type=entity_type, entity_type_idx=etype_int,
+            remote=remote, entity_type=entity_type, entity_type_idx=etype_int,
             entity_wrapper_list=[
-                controller_cls(state, idx, entity_type, subtype_labels,
-                                controller_parameters=self.controller_parameters[int(state.entity_state.entity_type_idx[idx])])
-                for idx, type in enumerate(state.entity_state.entity_type)
+                controller_cls(remote, idx, entity_type, subtype_labels)
+                for idx, type in enumerate(remote.state.entity_state.entity_type.obj())
                 if type == etype_int]            
         )
         
     @classmethod
-    def from_config(cls, name, client_config, state, notebook_control=False, **controller_kwargs):
+    def from_config(cls, name, remote):
         return cls(
             entity_type=name,
-            state=state,
-            subtype_labels=client_config['subtype_labels'],
-            notebook_control=notebook_control,
-            **controller_kwargs
+            remote=remote,
+            subtype_labels=remote.controller_parameters.simulator.subtype_labels.obj()
         )
         
     def step(self, time, catch_errors):
         # TODO : Add a check to ensure that the entity exists
         for entity in self._entity_list:
             entity.step(time, catch_errors=catch_errors)
+
+
+# class NotebookControllerEntity(EntityController):
+#     """Entity class that represents an entity in the simulation"""
+
+#     def __init__(self, state, ent_idx, entity_type, subtype_labels, controller_parameters):
+#         super().__init__(state, ent_idx, entity_type, subtype_labels, controller_parameters)
+#         object.__setattr__(self, 'routine_handler', RoutineHandler())
+
+#     def attach_routine(self, routine_fn, name=None, interval=1):
+#         """Attach a routine to the entity
+
+#         :param routine_fn: routine_fn
+#         :param name: routine name, defaults to None
+#         :param interval: routine execution interval, defaults to 1
+#         """
+#         self.routine_handler.attach_routine(routine_fn, name, interval)
+
+#     def detach_routine(self, name):
+#         """Detach a routine from the entity
+
+#         :param name: routine name
+#         """
+#         self.routine_handler.detach_routine(name)
+
+#     def detach_all_routines(self):
+#         """Detach all routines from the entity"""
+#         self.routine_handler.detach_all_routines()
+
+#     def step(self, time, catch_errors):
+#         """Execute the entity's routines with their corresponding execution intervals"""
+#         # Give self object as parameter to the routine function so it executes functions on the entity
+#         self.routine_handler.routine_step(self, time, catch_errors)
+
+#     def print_infos(self):
+#         # TODO: to fix according to recent refactoring
+#         """Print the entity's infos
+
+#         :return: entity's infos
+#         """
+#         dict_infos = self.config.to_dict()
+
+#         info_lines = []
+#         info_lines.append("Entity Overview:")
+#         info_lines.append(f"{'-' * 20}")
+#         info_lines.append(f"Type: {self.etype.name}")
+#         info_lines.append(f"Subtype: {self.subtype_label}")
+#         info_lines.append(f"Idx: {self.idx}")
+#         info_lines.append(f"Exists: {self.exists}")
+#         info_lines.append(
+#             f"Position: x={dict_infos['x_position']:.2f}, y={dict_infos['y_position']:.2f}"
+#         )
+#         info_lines.append(f"Diameter: {self.diameter:.2f}")
+#         info_lines.append(f"Color: {self.color}")
+#         info_lines.append("")
+
+#         return print("\n".join(info_lines))
+
+#     def print_routines(self):
+#         """Print the entity's routines"""
+#         self.routine_handler.print_routines()
+            

@@ -1,36 +1,48 @@
-import time
+"""Tests for server and interface start/stop utilities.
 
-import pytest
+These tests use subprocess server fixtures from conftest.py to verify
+that the start/stop utilities work correctly. They also serve as smoke
+tests to ensure the server and interface can start and respond to requests.
+"""
 
-from vivarium.utils.handle_server_interface import (
-    start_server_and_interface,
-    stop_server_and_interface,
-)
-
-WAIT_TIME = 0
-
-#TODO: A breakpoint in start_server_and_interface() is never reached, weird
-
-@pytest.fixture
-def start_and_stop_server():
-    def _start_and_stop(scene_name, notebook_mode):
-        start_server_and_interface(
-            scene_name=scene_name, notebook_mode=notebook_mode, wait_time=WAIT_TIME
-        )
-        time.sleep(1)
-        yield
-        stop_server_and_interface()
-
-    return _start_and_stop
+from vivarium.utils.handle_server_interface import check_server_running, wait_for_http
 
 
-def test_start_stop(start_and_stop_server):
+def test_start_stop_server(server_fixture):
+    """Test starting and stopping just the server.
+
+    Verifies:
+    - Server process starts successfully
+    - Server responds to gRPC health checks
+    """
     scene_name = "braitenberg"
-    start_and_stop_server(scene_name, False)
-    assert True
+    server_process = server_fixture.start(scene_name, timeout=30.0)
+    assert server_process is not None
+    assert server_process.poll() is None  # Process is still running
+    # Verify server responds to health checks
+    assert check_server_running(), "Server not responding to gRPC health check"
 
 
-def test_start_stop_notebook_mode(start_and_stop_server):
-    scene_name = "session_3"
-    start_and_stop_server(scene_name, True)
-    assert True
+def test_start_stop_server_and_interface(server_and_interface_fixture):
+    """Test starting and stopping server with interface.
+
+    Verifies:
+    - Server process starts successfully
+    - Interface process starts successfully
+    - Server responds to gRPC health checks
+    - Interface responds to HTTP requests
+    """
+    scene_name = "braitenberg"
+    server_process, interface_process = server_and_interface_fixture(scene_name, timeout=60.0)
+    assert server_process is not None
+    assert interface_process is not None
+    assert server_process.poll() is None  # Process is still running
+    assert interface_process.poll() is None  # Process is still running
+    # Verify server responds to health checks
+    assert check_server_running(), "Server not responding to gRPC health check"
+    # Verify interface responds to HTTP requests
+    assert wait_for_http(
+        'http://localhost:5006/run_interface',
+        retries=10,
+        delay=2.0
+    ), "Interface not responding to HTTP requests"

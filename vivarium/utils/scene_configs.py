@@ -1,17 +1,70 @@
-import os 
+import os
 import random
-import logging
 from math import pi
 from collections.abc import Iterable
+from typing import Dict, List
 
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
+from vivarium.utils.runtime import get_config_dir
+
 OmegaConf.register_new_resolver("range", lambda start, end: list(range(start, end)))
 
-abs_config_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf"))
+abs_config_dir_path = get_config_dir()
 config_dir_path = os.path.relpath(abs_config_dir_path, start=os.path.dirname(__file__))
+
+
+def get_available_scenes() -> Dict[str, List[str]]:
+    """List all available scene configurations, grouped by category.
+
+    Returns:
+        Dict with keys like 'Sessions', 'Tutorials', 'Research', 'Sandbox'
+        and values as lists of scene names.
+    """
+    scene_dir = os.path.join(get_config_dir(), 'scene')
+    exclude_patterns = ['base_scene', '_defaults', 'default', 'session_defaults', 'braitenberg_defaults']
+
+    # Categorize scenes
+    sessions = []
+    tutorials = []
+    research = []
+    sandbox = []
+
+    for filename in os.listdir(scene_dir):
+        if filename.endswith('.yaml'):
+            name = filename[:-5]
+            if any(p in name for p in exclude_patterns):
+                continue
+            if name.startswith('session') or name.startswith('miniproject') or name.startswith('reactive_rl'):
+                sessions.append(name)
+            elif name in ['quickstart']:
+                tutorials.append(name)
+            elif name in ['sandbox', 'simple', 'custom_positions']:
+                sandbox.append(name)
+            else:
+                research.append(name)
+
+    return {
+        'Sessions': sorted(sessions),
+        'Tutorials': sorted(tutorials),
+        'Research': sorted(research),
+        'Sandbox': sorted(sandbox)
+    }
+
+
+def get_available_scenes_flat() -> List[str]:
+    """List all available scene configurations as a flat list.
+
+    Returns:
+        List of scene names.
+    """
+    grouped = get_available_scenes()
+    scenes = []
+    for category_scenes in grouped.values():
+        scenes.extend(category_scenes)
+    return sorted(scenes)
 
 
 def generate_random_positions(n, position_range, seed=None):
@@ -27,6 +80,40 @@ def generate_random_positions(n, position_range, seed=None):
     return [[rng.uniform(x_min, x_max), rng.uniform(y_min, y_max)] for _ in range(n)]
 
 
+
+def generate_grid_positions(n, position_range):
+    """
+    Generate regularly spaced positions in a grid pattern within a given range.
+
+    :param n: approximate number of positions to generate (actual count may differ slightly to form a grid)
+    :param position_range: range of positions (x_min, x_max, y_min, y_max)
+    :return: list of positions [[x, y], ...]
+    """
+    x_min, x_max, y_min, y_max = position_range
+    width = x_max - x_min
+    height = y_max - y_min
+
+    # Calculate grid dimensions that best approximate n positions
+    # while respecting the aspect ratio of the position range
+    aspect_ratio = width / height if height > 0 else 1.0
+    ny = max(1, int((n / aspect_ratio) ** 0.5))
+    nx = max(1, int(n / ny))
+
+    # Adjust to get closer to n if needed
+    while nx * ny < n and (nx + 1) * ny <= n * 1.2:
+        nx += 1
+
+    # Generate grid positions
+    positions = []
+    for i in range(nx):
+        for j in range(ny):
+            x = x_min + (i + 0.5) * width / nx
+            y = y_min + (j + 0.5) * height / ny
+            positions.append([x, y])
+
+    return positions
+
+
 def generate_random_orientations(n, seed=None):
     # Generate random orientations
     rng = random.Random(seed)
@@ -38,6 +125,10 @@ def load_config(rel_config_dir_path, config_name, overrides=[]):
 
     with hydra.initialize(config_path=path, version_base=None):
         cfg = hydra.compose(config_name=config_name, overrides=overrides)
+        
+        # Allow dynamically adding new fields to DictConfig
+        # OmegaConf.set_struct(cfg, False)
+        
         return cfg
 
 
@@ -63,9 +154,12 @@ def extend_kwargs(kwargs, n):
             for each in val:
                 for label, data in each.items():
                     for k, v in data.items():
-                        if k != 'indices' and k != 'client':
+                        if k != 'indices' and k != 'client' and k != 'n_exists':
                             for idx in data.indices:
                                 kwargs[k][idx] = v
+                        elif k == 'n_exists':
+                            for i, idx in enumerate(data.indices):
+                                kwargs['exists'][idx] = i < data.n_exists
             
     return kwargs
 
@@ -84,9 +178,12 @@ def extend_controller_kwargs(kwargs, by_indices, n):
 
 def compute_parameters(config):
     n = config.n_max
-    if '_range_' in config.position:
+    if '_range_' in config.position and config.position['_range_'] is not None:
         # Generate random positions within a specified range
         config.position = generate_random_positions(n, config.position['_range_'])  # , self.seed)
+    elif '_regular_grid_' in config.position and config.position['_regular_grid_'] is not None:
+        # Generate regularly spaced positions in a grid pattern
+        config.position = generate_grid_positions(n, config.position['_regular_grid_'])
     if config.orientation == '_random_':
         # Generate random orientations if not provided
         config.orientation = generate_random_orientations(n)  # , self.seed)

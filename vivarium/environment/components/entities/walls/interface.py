@@ -2,7 +2,7 @@ import param
 from panel.layout import Column
 
 from vivarium.environment.components.interface import Interface, Renderer
-from vivarium.controllers.panel_controller import ParameterizedData
+from vivarium.interface.parameterized import ParameterizedData
 
 class WallRenderer(Renderer):
     
@@ -33,7 +33,7 @@ class WallParam(ParameterizedData):
     alpha = param.Number()
 
     def __init__(self, controller, **params):
-        super().__init__(data=controller, **params)
+        super().__init__(controller=controller, **params)
         
 
 class WallInterface(Interface):

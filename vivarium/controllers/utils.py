@@ -1,14 +1,18 @@
 import logging
+import IPython
 import threading
-
 import numpy as np
+from time import sleep
+
+
+from vivarium.utils.handle_server_interface import stop_server_and_interface
 
 lg = logging.getLogger(__name__)
 
 
 class Logger(object):
     def __init__(self):
-        """Logger class that logs data for the agents"""
+        """Logger class that logs data"""
         self.logs = {}
 
     def add(self, log_field, data):
@@ -22,7 +26,7 @@ class Logger(object):
         else:
             self.logs[log_field].append(data)
 
-    def get_log(self, log_field):
+    def get(self, log_field):
         """Get the log of the logger for a specific log_field
 
         :param log_field: log_field
@@ -34,10 +38,17 @@ class Logger(object):
         else:
             return self.logs[log_field]
 
-    def clear(self):
+    def clear(self, log_field=None):
         """Clear all logs of the logger"""
-        del self.logs
-        self.logs = {}
+
+        if log_field is None:
+            del self.logs
+            self.logs = {}
+        else:
+            if log_field in self.logs:
+                del self.logs[log_field]
+            else:
+                print("No topic called " + log_field)
 
 
 class RoutineHandler(object):
@@ -294,3 +305,28 @@ class BehaviorHandler(object):
                 if full_infos:
                     for name, (fn, interval, weight) in self._behaviors.items():
                         print(f"Behavior {name}: interval={interval}, weight={weight}")
+
+
+def kill_session(global_vars, controller_variable_name='controller'):
+    """
+    Try to properly close the session by calling VivariumController.close_session() on a controller instance
+    if it exists in the provided global_vars dictionary.
+    If it does not exist, it calls stop_server_and_interface() to ensure the server and interface are stopped.
+    
+    :param global_vars: Dictionary of global variables, typically globals() from a notebook or script.
+    :param controller_variable_name: Name of the controller variable in global_vars, defaults to 'controller'.
+    """
+    try:
+        c = global_vars[controller_variable_name]
+        c.close_session()
+        del c
+    except KeyError:
+        stop_server_and_interface(safe_mode=False)
+
+    sleep(2)
+
+    kernel = IPython.Application.instance().kernel
+
+    kernel.do_shutdown(True)
+    
+    print('If a message says that "The Kernel crashed ...", it means the session was successfully killed.')

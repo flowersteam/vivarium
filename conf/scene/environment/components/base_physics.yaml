@@ -1,5 +1,6 @@
 defaults:
   - reset/default@reset
   - collision/default@collision
+  - ../../clients/collision@collision.client
   - friction/default@friction
   - step/default@step

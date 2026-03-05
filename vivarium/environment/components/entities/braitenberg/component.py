@@ -12,6 +12,7 @@ class AgentState(BaseParticleState):
     prox: jnp.array
     prox_per_subtype: jnp.array
     motor: jnp.array
+    max_speed: jnp.array
     behavior_params: jnp.array
     sensed_mask: jnp.array
     wheel_diameter: jnp.array
@@ -24,7 +25,7 @@ class BraitenbergComponent(EntityComponent):
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction,
                  exists, n_behaviors, n_subtypes,
-                 wheel_diameter, proxs_dist_max, proxs_cos_min,
+                 wheel_diameter, max_speed, proxs_dist_max, proxs_cos_min,
                  subtype_labels=None, controller_kwargs=None):
 
         super().__init__(name=name, precedence=precedence,
@@ -37,6 +38,7 @@ class BraitenbergComponent(EntityComponent):
         self.n_behaviors = n_behaviors
         self.n_subtypes = n_subtypes
         self.wheel_diameter = jnp.array(wheel_diameter)
+        self.max_speed = jnp.array(max_speed)
         self.proxs_dist_max = jnp.array(proxs_dist_max)
         self.proxs_cos_min = jnp.array(proxs_cos_min)
         self.controller_kwargs = controller_kwargs
@@ -47,6 +49,7 @@ class BraitenbergComponent(EntityComponent):
             'n_behaviors': self.n_behaviors,
             'n_subtypes': self.n_subtypes,  # Do we need this? (in the yaml config it computes it from ${scene.subtypes})
             'wheel_diameter': getattr(state, self.entity_type).wheel_diameter.tolist(),
+            'max_speed': getattr(state, self.entity_type).max_speed.tolist(),
             'proxs_dist_max': getattr(state, self.entity_type).proxs_dist_max.tolist(),
             'proxs_cos_min': getattr(state, self.entity_type).proxs_cos_min.tolist(),
         })
@@ -65,7 +68,8 @@ class BraitenbergComponent(EntityComponent):
                            prox=jnp.zeros((self.n_max, 2)),
                            prox_per_subtype=jnp.zeros((self.n_max, 2, self.n_subtypes)),
                            motor=jnp.zeros((self.n_max, 2)),
-                           behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 3)),
+                           max_speed=jnp.full((self.n_max,), self.max_speed),
+                           behavior_params= jnp.zeros((self.n_max, self.n_behaviors, 2, 5)),
                            sensed_mask=jnp.ones((self.n_max, self.n_behaviors, self.n_subtypes), dtype=int),
                            wheel_diameter=jnp.full((self.n_max,), self.wheel_diameter),
                            proxs_dist_max=jnp.full((self.n_max,), self.proxs_dist_max),

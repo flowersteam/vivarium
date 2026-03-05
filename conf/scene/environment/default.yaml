@@ -2,6 +2,6 @@ defaults:
   - kwargs: default
   - components: empty
 
-_target_: vivarium.environment.Environment
+_target_: vivarium.environment.environment.Environment
 
 subtype_labels: ${..subtype_labels}

@@ -9,18 +9,31 @@ import threading
 from functools import partial
 from omegaconf import OmegaConf
 from contextlib import contextmanager
+from dataclasses import dataclass, is_dataclass
 from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
 
+from vivarium.utils.dataclass_wrapper import (
+    update_dataclass_from_change_list, create_dataclass_from_dict, Remote
+)
 from vivarium.utils.scene_configs import extend_controller_kwargs
-from vivarium.utils.converters import access_nested_fields
-from vivarium.simulator.config import SimulatorConfiguration
-from vivarium.controllers.dataclass_wrapper import update_dataclass_from_change_list, create_dataclass_from_dict
 
+from vivarium.utils.timer import SleepTimer, sleep_timer
 
 lg = logging.getLogger(__name__)
+# lg.setLevel(logging.DEBUG)
 
 
-nested_fields_to_access = {
+def update_from_dataclass(obj, dataclass_instance, exclude_fields=[]):
+    for field in dataclass_instance.__dataclass_fields__.keys():
+        if field not in exclude_fields:
+            if is_dataclass(getattr(dataclass_instance, field)):
+                setattr(obj, field, update_from_dataclass(getattr(obj, field), getattr(dataclass_instance, field), exclude_fields))
+            else:
+                setattr(obj, field, getattr(dataclass_instance, field))
+    return obj
+
+
+nested_fields_to_access = { # Now unused?
     'env': [
         'box_size',
         'neighbor_radius',
@@ -29,85 +42,104 @@ nested_fields_to_access = {
     ]
 }
 
+@dataclass
+class StateAndControllerParameters:
+    state: any
+    controller_parameters: any
 
-@access_nested_fields(nested_fields_to_access)
+
 class Simulator:
     def __init__(self, env, state=None, controller_parameters=None, scene_name=None, freq=-1):
-        
         self.env = env
         self.controller_parameters = controller_parameters
-        self.scene_name = scene_name
-        self.state = state or env.init_state()
-        self.freq = freq
-        self._is_started = False
-        self._to_stop = False
 
-        # Attributes to record simulation
+        self.state = state or env.init_state()
+        
+        self._freq = freq
+        self.sleep_timer = SleepTimer(freq)        
+        self._is_running = False
+        self._to_stop = False
+        self._was_running = False
+        self.name = 'server'
+        self.remote = Remote(self)
+
+        # Attributes to record simulation (probably broken for now)
         self.recording = False
         self.records = None
         self.saving_dir = None
-
-        lg.info("Simulator initialized")
-
-    @classmethod
-    def from_config(cls, config):
-
         
-        try:
-            kwargs = {}
-            for name, c_config in config.env.components.component_list.items():
-                if 'client' in c_config and 'controller_kwargs' in c_config.client:
+        self.is_grpc_client = False
+        
+        lg.info("Simulator initialized")
+        
+    @classmethod
+    def from_config(cls, simulator_config):
+        kwargs = {}
+        if 'client' in simulator_config and 'controller_kwargs' in simulator_config.client:
+            kwargs['simulator'] = OmegaConf.to_container(simulator_config.client.controller_kwargs, resolve=True)
+        for name, c_config in simulator_config.env.components.component_list.items():
+            if 'client' in c_config and 'controller_kwargs' in c_config.client:
+                if 'n_max' in c_config:
                     n_max = c_config.n_max
                     controller_kwargs = extend_controller_kwargs(c_config.client.controller_kwargs, getattr(c_config, 'by_indices', []), n_max)
-                    kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
                 else:
-                    kwargs[name] = {}
-            cp = create_dataclass_from_dict('ControllerParameters', kwargs)
-        except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
-            logging.warning("Client configuration not found, Simulator.controller_parameters will be None.")
-            cp = None
+                    controller_kwargs = c_config.client.controller_kwargs
+                kwargs[name] = OmegaConf.to_container(controller_kwargs, resolve=True)
+
+        cp = create_dataclass_from_dict('ControllerParameters', kwargs)
 
         try:
-            scene_name = config.scene_name
+            scene_name = simulator_config.client.controller_kwargs.scene_name
         except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
             logging.warning("Scene name not found, Simulator.scene_name will be None.")
             scene_name = None
         
-        return cls(
-            env=hydra.utils.get_class(config.env._target_).from_config(config.env),
-            freq=config.freq,
-            scene_name=scene_name,
-            controller_parameters=cp
-        )
+        if 'client' in simulator_config and 'controller_kwargs' in simulator_config.client and 'freq' in simulator_config.client.controller_kwargs:
+            freq = simulator_config.client.controller_kwargs.freq 
+        else:
+            freq = -1
+        
+        return cls(env=hydra.utils.get_class(simulator_config.env._target_).from_config(simulator_config.env),
+                   controller_parameters=cp,
+                   scene_name=scene_name,
+                   freq=freq
+                  )
     
     def to_config(self, state):
         
         with hydra.initialize(config_path='../../conf/scene/simulator', version_base=None):
             cfg = hydra.compose(config_name="base_simulator")
-            cfg = OmegaConf.merge(cfg, OmegaConf.create({
-                'freq': self.freq,
-                'env': self.env.to_config(state)
-            }))
+            cfg = OmegaConf.merge(
+                cfg, 
+                OmegaConf.create(
+                    {'client': {
+                        'controller_kwargs': {
+                            'subtype_labels': self.controller_parameters.simulator.subtype_labels,
+                            'freq': self.freq,
+                            'scene_name': self.scene_name
+                            }
+                        },
+                     'env': self.env.to_config(state)
+                     }
+            ))
         return cfg
+    
+    @property
+    def scene_name(self):
+        return self.controller_parameters.simulator.scene_name
 
-    # def load_scene(self, scene_name):
-    #     """Load a scene in the simulator
+    @scene_name.setter
+    def scene_name(self, value):
+        raise AttributeError("scene_name is read-only and cannot be modified directly.")
 
-    #     :param scene_name: scene to load
-    #     """
-    #     lg.info("Loading a new scene\n")
-
-    #     if self.is_started():
-    #         self.stop(blocking=True)
-    #     scene_config = SceneConfiguration(scene_name=scene_name)
-    #     self.freq = scene_config.config.simulator.kwargs.freq
-    #     del self.env
-    #     self.env = scene_config.create_environment()
-    #     self.state = self.env.state
-
-    def init_state(self):
-        if self.state.entity_state.momentum is None:
-            self.state = self.env.init_fn(self.state)
+    @property
+    def freq(self):
+        return self._freq
+    
+    @freq.setter
+    def freq(self, value):
+        self._freq = value
+        self.sleep_timer.frequency = value
 
     def _step(self, state):
         """Do num_updates jitted steps in the simulation. This is done by converting state into environment state, and convert it back to simulation state during return
@@ -122,15 +154,22 @@ class Simulator:
         if self.recording:
             self.record(new_state)
 
-        # return the next sim state (convert new env state)
-        return new_state  # self.env_to_sim_state(new_env_state)
+        return new_state
 
-    def step(self, changes=[]):
-        """Do a step in the simulation by calling _step"""
-        if len(changes) > 0:
-            self.apply_changes(changes)
+    def step(self, changes=None):
+        
+        if changes is not None and len(changes) > 0:
+            self.set_changes(changes)
         self.state = self._step(self.state)
-        return self.state
+        
+        # record the env state because it is the one we can plot and use without client-server interaction
+        if self.recording:
+            self.record(self.state)
+            
+        if changes is None:
+            return self.state
+        else:
+            return StateAndControllerParameters(state=self.state, controller_parameters=self.controller_parameters)
 
     def run(self, threaded=False, num_steps=math.inf, save=False, saving_name=None):
         """Run the simulator for the desired number of timesteps, either in a separate thread or not. Return the final state
@@ -140,8 +179,8 @@ class Simulator:
         :raises ValueError: raise an error if the simulator is already running
         """
         # Check is the simulator isn't already running
-        if self._is_started:
-            raise ValueError("Simulator is already started")
+        if self._is_running:
+            raise ValueError("Simulator is already runnning")
         # Else run it either in a thread or not
         if threaded:
             # Set the _run attribute with a partial function to launch it in a thread
@@ -157,55 +196,119 @@ class Simulator:
 
         :param num_steps: number of simulation steps
         """
-        self._is_started = True
+        lg.debug("Starting simulator _run")
+        self._is_running = True
         lg.info("Simulation run starts")
 
         loop_count = 0
-        sleep_time = 0
-
+        
         if save:
             self.start_recording(saving_name)
 
         # Update the simulation with step for num_steps
         while loop_count < num_steps:
-            start = time.time()
-            if self._to_stop:
-                self._to_stop = False
-                break
+            with sleep_timer(timer=self.sleep_timer):
+            
+                if self._to_stop:
+                    lg.debug("Stopping simulator _run as requested")
+                    self._to_stop = False
+                    break
 
-            self.step()
-            loop_count += 1
-
-            # Sleep for updated sleep_time seconds
-            end = time.time()
-            sleep_time = self.update_sleep_time(
-                frequency=self.freq, elapsed_time=end - start
-            )
-            time.sleep(sleep_time)
-
+                self.step()
+                loop_count += 1
+            
         if save:
             self.stop_recording()
 
-        # Encode that the simulation isn't started anymore
-        self._is_started = False
+        self._is_running = False
         lg.info("Simulation run stops")
 
-    def update_sleep_time(self, frequency, elapsed_time):
-        """Compute the time we need to sleep to respect the update frequency
+    def is_running(self):
+        return self._is_running or self._was_running
 
-        :param frequency: update state frequency
-        :param elapsed_time: time already used to compute the state
-        :return: time needed to sleep in addition to elapsed time to respect the frequency
+    def set_changes(self, changes, update_from_server=True):
+        # update_from_server is only here to match the SimulatorGRPCClient interface
+        
+        lg.debug("Applying changes to simulator")
+        lg.debug(f"Changes: {changes}")
+        self = update_dataclass_from_change_list(self, changes)
+
+        self = update_from_dataclass(self, self.controller_parameters.simulator, exclude_fields=['scene_name'])
+        
+        if self.run_from == self.name:
+            if self.is_running() != self.simulation_running:
+                if self.simulation_running:
+                    lg.debug("Starting simulator from server apply_changes")
+                    self.run(threaded=True)
+                else:
+                    lg.debug("Stopping simulator from server apply_changes")
+                    self.stop()
+        elif self.is_running():
+            lg.debug("Stopping simulator from server apply_changes (2nd case)")
+            self.stop()                    
+
+        return self.controller_parameters
+
+    def get_state(self):
+        """Get current simulation state
+
+        :return: simulation state
         """
-        # if we use the freq, compute the correct sleep time
-        if float(frequency) > 0.0:
-            perfect_time = 1.0 / float(frequency)
-            sleep_time = max(perfect_time - elapsed_time, 0)
-        # Else set it to zero
-        else:
-            sleep_time = 0
-        return sleep_time
+        return self.state
 
+    def get_controller_parameters(self):
+        return self.controller_parameters
+    
+    def get_state_and_controller_parameters(self):
+        return StateAndControllerParameters(state=self.state, controller_parameters=self.controller_parameters)
+
+    def stop(self, blocking=True):
+        """Stop the simulation
+
+        :param blocking: If True, wait for the simulation to actually stop before returning
+        """
+        if self._is_running:
+            self._to_stop = True
+        if blocking:
+            while self._is_running:
+                time.sleep(0.01)
+                lg.info("still running")
+            lg.info("now stopped")
+            
+    def register_client(self, client_name):
+        if client_name not in self.controller_parameters.simulator.client_names:
+            self.controller_parameters.simulator.client_names.append(client_name)
+            lg.info(f"Client {client_name} registered to simulator.")
+        else:
+            lg.warning(f"Client {client_name} is already registered.")
+
+    def unregister_client(self, client_name):
+        if client_name in self.controller_parameters.simulator.client_names:
+            self.controller_parameters.simulator.client_names.remove(client_name)
+            lg.info(f"Client {client_name} unregistered from simulator.")
+        else:
+            lg.warning(f"Client {client_name} is not registered.")
+
+    @contextmanager
+    def pause(self):
+        """Pause the simulation
+
+        :yield: dummy self
+        """
+        lg.debug("Pausing simulator")
+        self._was_running = self.is_running()
+        lg.debug(f"Was running: {self._was_running}")
+        if self._was_running:
+            self.stop(blocking=True)
+        try:
+            yield self
+        finally:
+            lg.debug(f"Resuming simulator: was_running={self._was_running}, simulation_running={self.simulation_running}, _is_running={self._is_running}")
+            if self._was_running and self.simulation_running and not self._is_running:
+                lg.debug("Running simulator from pause context manager")
+                self.run(threaded=True)
+            self._was_running = False
+                
     def start_recording(self, saving_name):
         """Start the recording of the simulation
         :param saving_name: optional name of the saving file
@@ -269,51 +372,3 @@ class Simulator:
             data = pickle.load(f)
             lg.info("Simulation loaded from %s", saving_path)
             return data
-
-    def apply_changes(self, changes):
-        self = update_dataclass_from_change_list(self, changes)
-
-    def start(self):
-        """Start the simulation"""
-        self.run(threaded=True)
-
-    def stop(self, blocking=True):
-        """Stop the simulation
-
-        :param blocking: If True, wait for the simulation to actually stop before returning
-        """
-        self._to_stop = True
-        if blocking:
-            while self._is_started:
-                time.sleep(0.01)
-                lg.info("still started")
-            lg.info("now stopped")
-
-    def is_started(self):
-        """Check if simulation is started
-
-        :return: True if started else False
-        """
-        return self._is_started
-
-    @contextmanager
-    def pause(self):
-        """Pause the simulation
-
-        :yield: dummy self
-        """
-        self.stop(blocking=True)
-        try:
-            yield self
-        finally:
-            self.run(threaded=True)
-
-    def get_state(self):
-        """Get current simulation state
-
-        :return: simulation state
-        """
-        return self.state
-    
-    def get_simulator_parameters(self):
-        return SimulatorConfiguration.from_simulator(self)

@@ -36,13 +36,13 @@ class Renderer:
 
 
 class Interface:
-    def __init__(self, controller, parameters, panel_cls=Column, renderer=None, default_widget=True):
+    def __init__(self, controller, parameters, panel_cls=Column, renderer=None, build_widget=True):
         self.parameters = parameters
         self.renderer = renderer
         self.controller = controller
         self.panel_cls = panel_cls
-        if default_widget:
-            self.widget = self.default_widget()
+        if build_widget:
+            self.build_widget()
 
     def default_widget(self):
         self.parameters.update_from_server = True
@@ -58,3 +58,9 @@ class Interface:
                 scroll=True,
                 name=self.controller.name,            
             )
+
+    def build_widget(self):
+        self.widget = self.default_widget()
+
+    def udpate_other_interfaces(self, interfaces):
+        pass

@@ -1,126 +1,185 @@
-box_size: 400
-neighbor_radius: 400
+defaults:
+  - braitenberg_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn.client
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy_agents
+  # - environment/components/energy/default@environment.components.component_list.energy_objects
+  - environment/components/reproduction/default@environment.components.component_list.reproduction_agents
+  # - environment/components/reproduction/default@environment.components.component_list.reproduction_objects
+  - _self_
 
-# Entity data definitions
-entities_data:
-  # Define the different subtypes 
-  EntitySubTypes:
-    - MEDIUM_PREYS
-    - MEDIUM_PREDS
-    - SMALL_PREYS
-    - BIG_PREDS
-    - RESOURCES
-    - POISON
-    - OBSTCALES
+scene_name: prey_predator_large
 
-  # Define the different entities
-  Entities:
-  
-    MEDIUM_PREYS:
-      type: AGENT
-      num: 15
-      color: blue
-      diameter: 7.0
-      prox_dist_max: 20.0
-      prox_cos_min: -0.70
-      selective_behaviors:
-        love:
-          beh: LOVE
-          sensed: 
-            - MEDIUM_PREYS
-            - RESOURCES
-        fear:
-          beh: FEAR
-          sensed: 
-            - MEDIUM_PREDS
-            - BIG_PREDS
-            - POISON
-            - OBSTCALES
+environment:
+  kwargs:
+    box_size: 400
+    neighbor_radius: 400
+  components:
+    component_list:
+      agents:
+        n_max: 45
+        n_behaviors: 2
+        by_indices:
+          - medium_prey:
+              indices: "${range: 0, 15}"
+              subtype: medium_prey
+              diameter: 7.0
+              proxs_dist_max: 20.0
+              proxs_cos_min: -0.70
+              client:
+                color: blue
+                behaviors:
+                  - LOVE: [medium_prey, resource]
+                  - FEAR: [medium_pred, big_pred, poison, obstacle]
+          - medium_pred:
+              indices: "${range: 15, 25}"
+              subtype: medium_pred
+              diameter: 10.0
+              proxs_dist_max: 50.0
+              proxs_cos_min: 0.60
+              client:
+                color: orange
+                behaviors:
+                  - AGGRESSION: [medium_prey, small_prey]
+                  - SHY: [poison, big_pred, obstacle]
+          - big_pred:
+              indices: "${range: 25, 30}"
+              subtype: big_pred
+              diameter: 15.0
+              wheel_diameter: 1.0
+              proxs_dist_max: 50.0
+              proxs_cos_min: 0.30
+              client:
+                color: red
+                behaviors:
+                  - AGGRESSION: [medium_prey, small_prey, medium_pred]
+                  - SHY: [poison]
+          - small_prey:
+              indices: "${range: 30, 45}"
+              subtype: small_prey
+              diameter: 5.0
+              wheel_diameter: 3.0
+              proxs_dist_max: 15.0
+              proxs_cos_min: -0.90
+              client:
+                color: cyan
+                behaviors:
+                  - FEAR: [medium_prey, medium_pred, big_pred, small_prey, resource, poison, obstacle]
+                  - SHY: [medium_prey, medium_pred, big_pred, small_prey, resource, poison, obstacle]
+      objects:
+        n_max: 34
+        by_indices:
+          - resource:
+              indices: "${range: 0, 15}"
+              subtype: resource
+              diameter: 7.0
+              n_exists: 5
+              client:
+                color: green
+          - poison:
+              indices: "${range: 15, 30}"
+              subtype: poison
+              diameter: 5.0
+              n_exists: 3
+              client:
+                color: purple
+          - obstacle:
+              indices: "${range: 30, 34}"
+              subtype: obstacle
+              diameter: 20.0
+              n_exists: 4
+              client:
+                color: grey
+      # Spawn resources periodically to sustain the ecosystem
+      spawn:
+        subtype: 4  # resource
+        period: 1
+        start: false  # DISABLED FOR DEBUGGING - re-enable after testing
+        position_range: [50., 350., 50., 350.]
+        orientation_range: [0., 6.3]
+      # Food chain consumption rules
+      consumption:
+        # Big predators eat everything smaller
+        big_pred_to_medium_prey:
+          source_subtype: 2  # big_pred
+          target_subtype: 0  # medium_prey
+          range: 20.0
+          start: true
+        big_pred_to_small_prey:
+          source_subtype: 2  # big_pred
+          target_subtype: 3  # small_prey
+          range: 20.0
+          start: true
+        big_pred_to_medium_pred:
+          source_subtype: 2  # big_pred
+          target_subtype: 1  # medium_pred
+          range: 20.0
+          start: true
+        # Medium predators eat preys
+        medium_pred_to_medium_prey:
+          source_subtype: 1  # medium_pred
+          target_subtype: 0  # medium_prey
+          range: 15.0
+          start: true
+        medium_pred_to_small_prey:
+          source_subtype: 1  # medium_pred
+          target_subtype: 3  # small_prey
+          range: 15.0
+          start: true
+        # Preys eat resources
+        medium_prey_to_resource:
+          source_subtype: 0  # medium_prey
+          target_subtype: 4  # resource
+          range: 12.0
+          start: true
+        # small_prey_to_resource:
+        #   source_subtype: 3  # small_prey
+        #   target_subtype: 4  # resource
+        #   range: 10.0
+        #   start: true
+        client:
+          controller_kwargs:
+            names: ['big_pred_to_medium_prey', 'big_pred_to_small_prey', 'big_pred_to_medium_pred', 'medium_pred_to_medium_prey', 'medium_pred_to_small_prey', 'medium_prey_to_resource']
+      # Energy system for agents
+      energy_agents:
+        entity_type: agents
+        energy_init: 1.0
+        energy_max: 5.0
+        energy_decay: 0.0  #0005
+        energy_burst: 0.5
+        distribute_extra_energy: false
+      # Energy system for objects (resources)
+      # energy_objects:
+      #   entity_type: objects
+      #   # subtype: 4  # resource
+      #   energy_init: 1.0
+      #   energy_max: 1.0
+      #   energy_decay: 0.0
+      #   energy_burst: 1.0
+      #   distribute_extra_energy: false
+      # Reproduction/death for agents
+      reproduction_agents:
+        entity_type: agents
+        # subtype: -1  # All agent subtypes
+        birth_energy_threshold: 4.0
+        death_energy_threshold: 0.0
+        birth_energy: 2.0
+        birth_radius: 20.0
+        birth_recovery_time: 0
+      # Reproduction/death for objects (resources die when consumed)
+      # reproduction_objects:
+      #   entity_type: objects
+      #   subtype: 4  # resource
+      #   birth_energy_threshold: 2.0  # > energy_max to prevent reproduction
+      #   death_energy_threshold: 0.0
 
-    MEDIUM_PREDS:
-      type: AGENT
-      num: 10
-      color: orange
-      diameter: 10.0
-      prox_dist_max: 50.0
-      prox_cos_min: 0.60
-      selective_behaviors:
-        aggr:
-          beh: AGGRESSION
-          sensed: 
-            - MEDIUM_PREYS
-            - SMALL_PREYS
-        fear:
-          beh: SHY
-          sensed: 
-            - POISON
-            - BIG_PREDS
-            - OBSTCALES
-
-    BIG_PREDS:
-      type: AGENT
-      num: 5
-      color: red
-      diameter: 15.0
-      prox_dist_max: 50.0
-      prox_cos_min: 0.30
-      wheel_diameter: 1.0
-      selective_behaviors:
-        aggr:
-          beh: AGGRESSION
-          sensed: 
-            - MEDIUM_PREYS
-            - SMALL_PREYS
-            - MEDIUM_PREDS
-        shy:
-          beh: SHY
-          sensed: 
-            - POISON
-
-    SMALL_PREYS:
-      type: AGENT
-      num: 15
-      color: cyan
-      diameter: 5.0
-      prox_dist_max: 15.0
-      prox_cos_min: -0.90
-      wheel_diameter: 3.0
-      selective_behaviors:
-        fear:
-          beh: FEAR
-          sensed: 
-            - MEDIUM_PREYS
-            - MEDIUM_PREDS
-            - BIG_PREDS
-            - SMALL_PREYS
-            - RESOURCES
-            - POISON
-            - OBSTCALES
-        shy:
-          beh: SHY
-          sensed: 
-            - MEDIUM_PREYS
-            - MEDIUM_PREDS
-            - BIG_PREDS
-            - SMALL_PREYS
-            - RESOURCES
-            - POISON
-            - OBSTCALES
-
-    RESOURCES:
-      type: OBJECT
-      num: 15
-      diameter: 7.0
-      color: green
-      
-    POISON:
-      type: OBJECT
-      num: 15
-      diameter: 5.0
-      color: purple
-
-    OBSTCALES:
-      type: OBJECT
-      num: 4
-      diameter: 20.0
-      color: grey
+subtype_labels:
+  - medium_prey
+  - medium_pred
+  - big_pred
+  - small_prey
+  - resource
+  - poison
+  - obstacle

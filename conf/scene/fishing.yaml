@@ -1,0 +1,124 @@
+defaults:
+  - base_scene
+  - environment/components/base_physics@environment.components.component_list
+  - environment/components/entities/braitenberg@environment.components.component_list.agents
+  - clients/braitenberg@environment.components.component_list.agents.client
+  - environment/components/entities/objects@environment.components.component_list.objects
+  - clients/objects@environment.components.component_list.objects.client
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - clients/spawn@environment.components.component_list.spawn.client  
+  - environment/components/reproduction/default@environment.components.component_list.reproduction_agents
+  - environment/components/reproduction/default@environment.components.component_list.reproduction_objects
+
+scene_name: fishing
+
+environment:
+  kwargs:
+    box_size: 250.0
+    neighbor_radius: 8.0
+    dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
+    num_scan_steps: 1
+  components:
+    component_list:
+      step:
+        dt: 0.2
+      agents:
+        n_max: 300
+        n_behaviors: 2
+        client:
+          controller_kwargs:
+            visible_wheels: 
+              _all_values_: false
+            visible_proxs: 
+              _all_values_: false
+        by_indices:
+          - fish:
+              indices: "${range: 0, 220}"
+              n_exists: 0
+              subtype: fish
+              diameter: 2.0
+              wheel_diameter: 6.0
+              proxs_cos_min: 0.7
+              proxs_dist_max: 10.0              
+              client:
+                color: green
+                behaviors:
+                  - LOVE: [fish]
+                  - AGGRESSION: [plankton]
+          - boat:
+              indices: "${range: 220, 300}"
+              n_exists: 0
+              subtype: boat
+              diameter: 5.0
+              wheel_diameter: 8.0
+              proxs_cos_min: -0.5
+              proxs_dist_max: 10.0
+              client:
+                color: red
+                behaviors:
+                  - SHY: [boat]
+      objects:
+        n_max: 100
+        n_exists: 0
+        diameter:
+          _all_values_: 1.0
+        subtype:
+          _all_values_: plankton
+        client:
+          controller_kwargs:
+            color:
+              _all_values_: white
+      spawn:
+        subtype: 2
+        period: 1
+        start: true
+        position_range: [50., 200., 50., 200.]
+        orientation_range: [0., 6.3]
+      consumption:
+        fish_to_plankton:
+          source_subtype: 0
+          target_subtype: 2
+          range: 10.0
+          start: true
+        boat_to_fish:
+          source_subtype: 1
+          target_subtype: 0
+          range: 10.0
+          start: true
+        client:
+          controller_kwargs:
+            names: ['fish_to_plankton', 'boat_to_fish']
+
+      energy:
+        entity_type: agents
+        energy_init: 1.
+        energy_max: 3000.0
+        energy_decay: 0.0001
+        energy_burst: 0.01
+      reproduction_agents:
+        entity_type: agents
+        subtype: 0
+        birth_energy_threshold: 2.0
+        birth_energy: 1.
+        birth_radius: 10.
+        birth_recovery_time: 0
+      reproduction_objects:
+        entity_type: objects
+        birth_energy_threshold: 2.0
+        birth_energy: 1.
+        birth_radius: 10.
+        birth_recovery_time: 0                      
+
+
+simulator:
+  client:
+    controller_kwargs:
+      freq: -1.0
+
+subtype_labels:
+  - fish
+  - boat
+  - plankton

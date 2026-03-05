@@ -17,21 +17,44 @@ service SimulatorServer {
   // Get state of the simulation
   rpc GetState(google.protobuf.Empty) returns (Dataclass) {}
   
-  rpc GetSimulatorParameters(google.protobuf.Empty) returns (Dataclass) {}
   rpc GetControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
-  rpc SetControllerAtrributes(Dataclass) returns (google.protobuf.Empty) {}
+  rpc GetStateAndControllerParameters(google.protobuf.Empty) returns (Dataclass) {}
 
-  // send changes made on the client side to the simulator server
+  // send changes made on the client side to the simulator server (returns updated state)
+  rpc SetChangesReturnsState(StateChangeList) returns (Dataclass) {}
+  
+  // send changes without returning state (for use with streaming)
   rpc SetChanges(StateChangeList) returns (google.protobuf.Empty) {}
 
   // send the labels of subtypes and scene name
   rpc GetSceneName(Scene) returns (Scene) {}
 
+  rpc RegisterClient(Client) returns (google.protobuf.Empty) {}
+  rpc UnregisterClient(Client) returns (google.protobuf.Empty) {}
+
   // Handle the connection between the server and the clients
-  rpc IsStarted(google.protobuf.Empty) returns (IsStartedState) {}
+  rpc IsRunning(google.protobuf.Empty) returns (IsRunningState) {}
   rpc Start(google.protobuf.Empty) returns (google.protobuf.Empty) {}
   rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+  // ============ Streaming RPCs ============
+  
+  // Server-side streaming: Subscribe to state updates when server is running
+  // Server pushes state whenever it changes (after each step)
+  rpc StreamState(StreamConfig) returns (stream Dataclass) {}
+  
+  // Bidirectional streaming: Send commands, receive state updates
+  // Client sends changes, server responds with updated state after each step
+  rpc BidirectionalStep(stream StateChangeList) returns (stream Dataclass) {}
+}
+
+// Configuration for streaming RPCs
+message StreamConfig {
+  // Maximum updates per second (0 = unlimited)
+  int32 max_fps = 1;
+  // Whether to include controller parameters in updates
+  bool include_controller_params = 2;
 }
 
 message Dataclass {
@@ -75,6 +98,7 @@ message Value {
     ListFloat list_float_value = 7;
     ListString list_string_value = 8;
     ListBool list_bool_value = 9;
+    ListBehaviors list_behaviors_value = 10;
   }
 }
 
@@ -88,6 +112,18 @@ message ListString {
 
 message ListBool {
   repeated bool list = 1;
+}
+
+message Behavior {
+  map<string, ListString> behavior_to_sensed = 1;
+}
+
+message Behaviors {
+  repeated Behavior behaviors = 1;
+}
+
+message ListBehaviors {
+  repeated Behaviors list = 1;
 }
 
 message Change {
@@ -117,10 +153,14 @@ message RigidBody {
   NDArray orientation = 2;
 }
 
-message IsStartedState {
-  bool is_started = 1;
+message IsRunningState {
+  bool is_running = 1;
 }
 
 message Scene {
   string scene_name = 1;
+}
+
+message Client {
+  string name = 1;
 }

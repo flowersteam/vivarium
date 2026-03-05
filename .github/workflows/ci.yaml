@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      os:
+        description: 'Operating system to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - ubuntu
+          - macos
+          - windows
+
+jobs:
+  test-ubuntu:
+    name: Tests (ubuntu-latest, Python ${{ matrix.python }})
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
+  test-ubuntu-arm64:
+    name: Tests (ubuntu-24.04-arm, Python 3.12)
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'ubuntu'
+
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
+  test-macos:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'macos'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS Apple Silicon
+          - os: macos-latest
+            python: '3.12'
+          # macOS Intel - use Python 3.11 (grpcio has no 3.12 wheel for x86_64)
+          - os: macos-15-intel
+            python: '3.11'
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Patch jax-md for Intel Mac
+        if: matrix.os == 'macos-15-intel'
+        run: python scripts/patch_jax_md.py
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
+  test-windows:
+    name: Tests (windows-latest, Python 3.12)
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all' || github.event.inputs.os == 'windows'
+
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pytest-timeout
+
+      - name: Run pytest
+        run: pytest -v --timeout=120
+
+
+  # Test the installation script on all platforms
+  test-installer:
+    name: Test Installer (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.os == 'all'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.12'
+          - os: ubuntu-24.04-arm
+            python: '3.12'
+          - os: macos-latest
+            python: '3.12'
+          - os: macos-15-intel
+            python: '3.11'
+          - os: windows-latest
+            python: '3.12'
+          # Windows ARM64: Not supported (no jaxlib wheel available)
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run installer (CI mode)
+        run: python install/install.py --ci
+
+      - name: Verify vivarium import (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source venv_vivarium/bin/activate
+          python -c "import vivarium; print('Vivarium imported successfully!')"
+
+      - name: Verify vivarium import (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv_vivarium\Scripts\activate
+          python -c "import vivarium; print('Vivarium imported successfully!')"
+
+      - name: Run basic tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source venv_vivarium/bin/activate
+          pip install pytest-timeout
+          pytest tests/ -v --timeout=120
+
+      - name: Run basic tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          venv_vivarium\Scripts\activate
+          pip install pytest-timeout
+          pytest tests/ -v --timeout=120

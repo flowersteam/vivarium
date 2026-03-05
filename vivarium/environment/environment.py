@@ -79,7 +79,8 @@ class Environment:
                  neighbor_manager,
                  base_state_cls=BaseState,
                  factories=[], 
-                 num_scan_steps=1, to_jit=True, seed=42):
+                 num_scan_steps=1, to_jit=True, seed=42,
+                 debug_mode=False):
 
         self.key = random.PRNGKey(seed)
         self.base_state_cls = base_state_cls
@@ -87,8 +88,9 @@ class Environment:
         self.factories_names_to_idx = {f.name: idx for idx, f in enumerate(factories)}
         self.neighbor_manager = neighbor_manager
         self.num_scan_steps = num_scan_steps
-        self.to_jit = to_jit
-        if to_jit:
+        self.to_jit = to_jit and not debug_mode
+        self.debug_mode = debug_mode
+        if self.to_jit:
             self._step_env = jit(self._step_env, static_argnums=(2,))
 
     @classmethod
@@ -108,7 +110,8 @@ class Environment:
             base_state_cls=base_state_cls,
             factories=component_factories,
             num_scan_steps=config.kwargs.num_scan_steps,
-            to_jit=config.kwargs.to_jit
+            to_jit=config.kwargs.to_jit,
+            debug_mode=config.kwargs.debug_mode
             )
 
     def to_config(self, state):
@@ -120,7 +123,8 @@ class Environment:
                 'neighbor_radius': self.neighbor_radius,
                 'dr_threshold': self.dr_threshold,
                 'num_scan_steps': self.num_scan_steps,
-                'to_jit': self.to_jit
+                'to_jit': self.to_jit,
+                'debug_mode': self.debug_mode,
             },
             'components': {
                 'component_list': {
@@ -173,7 +177,7 @@ class Environment:
         return self.factories[self.factories_names_to_idx[name]]
     
     def _step_env(
-        self, state, neighbors, num_scan_steps=1
+        self, state, neighbors, num_scan_steps, env_key
     ):
         def step_fn(carry, _):
             """Apply a step function to return new state and neighbors in a jax.lax.scan update
@@ -185,12 +189,12 @@ class Environment:
             state, neighbors, key = carry
             for fn in self.step_functions:
                 key, sub_key = random.split(key)
-                state = fn(state, neighbors, sub_key) 
+                state = fn(state, neighbors, sub_key)
             neighbors = neighbors.update(state.entity_state.position)
             state = state.set(time=state.time + 1)
             carry = (state, neighbors, key)
             return carry, carry
-        (state, neighbors, key), _ = lax.scan(step_fn, (state, neighbors, self.key), xs=None, length=num_scan_steps)
+        (state, neighbors, key), _ = lax.scan(step_fn, (state, neighbors, env_key), xs=None, length=num_scan_steps)
         return state, neighbors, key
         
 
@@ -198,13 +202,13 @@ class Environment:
 
         neighbors = self.neighbor_manager.neighbors
 
-        if scan:
-            new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps)
+        if scan and not self.debug_mode:
+            new_state, neighbors, self.key = self._step_env(state, neighbors, self.num_scan_steps, self.key)
         else:  # For debugging purpose
             new_state = state
             for fn in self.step_functions:
                 self.key, sub_key = random.split(self.key)
-                new_state = fn(new_state, neighbors, sub_key) 
+                new_state = fn(new_state, neighbors, sub_key)
             neighbors = self.neighbor_manager.update(new_state.entity_state.position)
             if not self.neighbor_manager.reallocate_if_overflow(new_state.entity_state.unified_position):
                 new_state = new_state.set(time=state.time + 1)
@@ -215,6 +219,9 @@ class Environment:
                 f"NEIGHBORS BUFFER OVERFLOW: rebuilding neighbors"
             )
             neighbors = self.neighbor_manager.neighbor_fn.allocate(state.entity_state.position)
+            self.neighbor_manager.neighbors = neighbors
+            for factory in self.factories:
+                state = factory.neighbor_update(state, self.neighbor_manager, self.key)         
         else:
             state = new_state
 

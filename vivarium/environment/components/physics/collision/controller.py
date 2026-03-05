@@ -1,22 +1,14 @@
-import numpy as np
-
-from ...controller import ComponentController, AttributeMapping
+from .....controllers.controller import Controller
 
 
-class CollisionController(ComponentController):
-    def __init__(self, name, state, mapping=None):
-        
-        mapping = mapping or {
-            'epsilon': AttributeMapping(
-                'collision_eps',
-                jax_to_ctrl_fn=lambda x: x.item(),
-                ctrl_to_jax_fn=lambda x: np.array(x)
-            ),
-            'alpha': AttributeMapping(
-                'collision_alpha',
-                jax_to_ctrl_fn=lambda x: x.item(),
-                ctrl_to_jax_fn=lambda x: np.array(x)
-            )
-        }
+class CollisionController(Controller):
 
-        super().__init__(name, state, mapping=mapping)
+    def __getattr__(self, attr):
+        return getattr(self._remote.state, f'{self._name}_state').__getattr__(attr)
+    
+    def __setattr__(self, attr, value):
+        if attr.startswith('_'):
+            object.__setattr__(self, attr, value)
+        else:
+            getattr(self._remote.state, f'{self._name}_state').__setattr__(attr, value)
+            

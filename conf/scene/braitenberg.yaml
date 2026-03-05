@@ -1,11 +1,5 @@
 defaults:
-  - base_scene
-  - environment/components/base_physics@environment.components.component_list
-  - environment/components/entities/braitenberg@environment.components.component_list.agents
-  - environment/components/entities/objects@environment.components.component_list.objects
-  - clients/braitenberg@environment.components.component_list.agents.client
-  - clients/objects@environment.components.component_list.objects.client
-  - clients/collision@environment.components.component_list.collision.client
+  - braitenberg_defaults
 
 scene_name: braitenberg
 
@@ -28,7 +22,6 @@ environment:
       objects:
         subtype:
           _all_values_: resource
-
 
 subtype_labels:
   - prey

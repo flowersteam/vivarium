@@ -1,127 +1,58 @@
-This directory contains educational sessions that enable you controlling a simulation from a Notebook controller.
+This document contains instructions on how to install Vivarium, the software we will use for the practical sessions.
 
-You will need a set of software tools installed on your computer, which are listed below. **If you are unsure about how to install or use them, first ask a professor or another student, we will help you.**
+# Install Vivarium
+## Download the version corresponding to your operating system:
 
-- ## 1 - Installation of the required software tools
+You will find the last version of Vivarium at https://github.com/flowersteam/vivarium/releases/latest
 
-    - A Python distribution
-        - On Linux it is usually pre-installed
-        - On MacOS, the recommended one is [Anaconda](https://www.anaconda.com/)
-        - On Windows, we recommend to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), which provide a Linux environment on that platform. If you use WSL, you can follow the installation instructions for Linux.
-    - A virtual environment
-        - Either `venv` or `conda` (we recommend `venv`, which usually comes pre-installed with Python)
-    - [pip](https://pypi.org/project/pip/)
-    - [git](https://git-scm.com/)
+You need to download the version corresponding to your operating system:
 
+- **For Linux (Ubuntu):**  Download `vivarium-linux-x64.tar.gz`
+- **For MacOS (Apple Silicon M1/.../M4):** Download `vivarium-macos-arm64.tar.gz`
+- **For MacOS (Intel)**: Download `vivarium-macos-x64.tar.gz`
+- **For Windows**: Download `vivarium-windows-x64.zip`
 
-    - First create a dedicated directory on your computer, e.g. within your `Documents` folder, and execute the intallation instructions from this directory. In the following we will refer to this directory as `<PATH_TO_LOCAL_VIVARIUM_REPO>`.
-    - Just follow the installation steps below.
+If you don't know if you are on a Mac with Apple Silicon vs. Intel:
+- Click the Apple menu in the top-left corner of your screen
+- Select About This Mac
+- Look for the Chip or Processor information:
+    - If you are on Apple Silicon it will say "Apple M1", "Apple M2", "Apple M3", or "Apple M4"
+    - If you are on Intel it will say something like "Intel Core i5" or "Intel Core i7"
 
-- ## 2 - Installation of the Vivarium project
+## Extract the downloaded archive
 
-    - ### 2.1 - Automatic installation (not available for Windows)
+Place the downloaded file in a folder where you can easily find it again, e.g. your `Documents` folder.
 
-    - If you work from an UPF computer with Ubuntu (Linux), or from a machine with any Unix distribution (Linux or Mac OS), you can do an automatic installation of the project. To do so open a terminal, navigate to the vivarium directory that you created and execute the following commands:
+Then extract the archive:
+- On Windows: right-click on the file, then "Extract all".
+- On MacOs and Linux Ubuntu: double-click on the file. 
 
-        ```bash
-        # update the package list (you might need to enter your password)
-        sudo apt update
-        # install wget if you don't have it
-        sudo apt install wget
-        # download the automatic installation script
-        wget https://raw.githubusercontent.com/flowersteam/vivarium/refs/heads/main/linux_install.sh
-        # make it executable
-        chmod u+x linux_install.sh
-        # run the script
-        ./install.sh
-        ```
+## First launch
 
-    - This will install the project and all its dependencies. You can then skip to the next sub-sections and directly start the educational sessions (see how to do it in part 3 below).
+In the extracted folder, you will find a file called `Start-Vivarium`, which will start the software. 
 
-    - ### 2.1 - Manual installation (for all platforms)
+- **On Linux Ubuntu:** right-click on the file and choose `Run as a program`.
+- **On MacOS:** double-click on the file. It will most likely refuse to open it because it was downloaded from internet and not from the AppStore. To allow opening it, you will have to go to `Settings -> Privacy and Security`. Near the bottom of these settings click on "Open Anyway". Then click on "Open Anyway" again (it will ask for your password since this is a security setting).
+- **On Windows:** Double-click on the file. It will show a security warning because the app is downloaded from internet, choose "Run".
 
-    - #### 1- Clone the repository:
+A terminal window will open. Wait a bit for the installation to proceed. Once completed it will open a tab in your browser with the Vivarium interface.
 
-        Before following the next instructions, make sure you have Python installed with a version between 3.10 and 3.12. 
+On Windows, it might ask you to enable network connections at some points. Always choose "Allow".
 
-        ```bash
-        # first clone the repository (copy and execute the right command for your case)
-        git clone https://github.com/flowersteam/vivarium.git #(if you don't have a GitHub account)
-        git clone git@github.com:flowersteam/vivarium.git #(if you have a GitHub account and SSH keys set up)
+# Open a session
 
-        # then go to the repository directory
-        cd vivarium/
-        ```
-    - #### 2- Create and activate a virtual environment:
+Once the Vivarium interface appears in your browser, you will be able to select a scene. The practical sessions correspond to scene prefixed with `Sessions:...`. Select the first session, i.e. `Sessions: session_1` and click "Start Simulation". Wait a bit for the session to open.
 
-        For Linux users:
+Then click the button `Start Jupyter Server`, then on `Open session_1.ipynb`. A Jupyter Notebook will open. This is your starting point, all the instructions for the session are in this notebook. Read the rest of the instructions below, then start following the instructions in the notebook. 
 
-        ```bash
-        # create a virtual environment
-        python3 -m venv env_vivarium
+# Quit Vivarium
 
-        # if the above command doesn't work and you are asked to install the `venv` module, execute this:
-        sudo apt install -y python3-venv
-        # (then run the first command again to create the virtual environment)
+Once you have completed your session, or if you want to stop and restart later, first **save your notebook**. At the top of the notebook there is a small "floppy disk" icon which will save the notebook if you click it. Or you can do File -> Save Notebook (in the File menu of the notebook panel in the webpage, **not** the File menu of your browser). It is recommended to regularly save your notebook to avoid losing your work if the something goes wrong. 
 
-        # activate the virtual environment
-        source env_vivarium/bin/activate #(for Linux users)
-        ```
+Once your notebook is saved, you can quit Vivarium by pressing `Ctrl-C` on the terminal window that spawned when you first opened it (on some operating systems you might need to press `Ctrl-C` twice and to confirm you really want to quit by entering `Y` in the terminal).
 
-        For Windows users (in PowerShell):
-        ```bash
-        # create a virtual environment
-        python -m venv env_vivarium
+When you want to continue on your sessions, you can reopen it [as explained above](#first-launch) and open the session you want to work on.
 
-        # activate the virtual environment
-        env_vivarium\Scripts\Activate.ps1 #(for Windows users)
-        ```
+# Updating Vivarium
 
-    - #### 3- Install the dependencies:
-
-        You should now have an indication in your terminal that you are in the virtual environment, e.g. `(env_vivarium)`. You can now install the dependencies inside:
-
-        ```bash
-        pip install -r requirements.txt
-        pip install -e . 
-        ```
-
-        Now you are ready to start the Jupyter Notebook server and open the educational sessions.
-
-- ## 3 - Use the project
-
-    - From now on you will start every session by launching `jupyter lab` (or `jupyter notebook`). To do so, open another terminal (on Windows: use PowerShell), navigate to the repository directory, activate the virtual environment, and start the Jupyter Notebook server:
-
-        ```bash
-        # go to the repository directory
-        cd <PATH_TO_LOCAL_VIVARIUM_REPO>
-
-        # download the latest changes from the repository if there are any
-        git pull
-
-        # activate the virtual environment to have access to the installed dependencies
-        source env_vivarium/bin/activate #(for Linux users)
-        env_vivarium\Scripts\Activate.ps1 #(for Windows users)
-
-        # start the Jupyter Notebook server
-        jupyter notebook
-        ```
-    - This will open a web page in the browser with a list of files and directories. Go to `notebooks/sessions` and open the practical session you want to do (`session_1.ipynb` if it is the first class).
-
-    - if you are a Windows user without WSL, you will also need to start the server and the interface manually from command line (it will be mentionned in the notebook). To do so, open a new terminal (PowerShell) and navigate to the repository directory, activate the virtual environment, and start them with the following commands:
-
-        ```bash
-        .\start_all.bat session_1 # for the first session, change the number for the desired session
-        ```
-
-The rest of the session is described in this newly opened document, please continue from there. 
-Here is a quick overview of the available sessions:
-
-- [Session 1](session_1.ipynb): Introduction to basic of the Notebook controller API
-- [Session 2](session_2.ipynb): Defining behaviors definition for agents
-- [Session 3](session_3.ipynb): Implementing parallel behaviors and add more sensing abilities
-- [Session 4](session_4.ipynb): Modulating internal states and sensing other agent's attributes
-- [Session 5](session_5_logging.ipynb): Logging and plotting data
-- [Session 6](session_6_bonus.ipynb): Understanding routines and creating a simple Eco-Evolutionary simulation
-
-If you have to configure your own simulation for a project, you can have a look at the [custom scene creation tutorial (student version)](./create_custom_scene_tutorial_simple.md).
+If a new version of Vivarium becomes available it will notify at start-up and propose to update the software. We recommend you to do the update in this case. 

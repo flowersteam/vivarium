@@ -1,5 +1,17 @@
 _target_: vivarium.simulator.Simulator
-scene_name: ${..scene_name}
-freq: 40.
+client:
+  controller_kwargs:
+    scene_name: ${....scene_name}
+    subtype_labels: ${....subtype_labels}
+    freq: -1
+    client_names: []
+    run_from: server
+    simulation_running: false
+    close: false
+    env:
+      box_size: ${....env.kwargs.box_size}
+      neighbor_radius: ${....env.kwargs.neighbor_radius}
+      num_scan_steps: ${....env.kwargs.num_scan_steps}
+      to_jit: ${....env.kwargs.to_jit}
 env: ${..environment}
 clients: ${..clients.client_list}

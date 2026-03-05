@@ -2,14 +2,13 @@ import param
 import panel as pn
 from enum import Enum
 from threading import Lock
-from dataclasses import asdict
 from panel.layout import Column
 from bokeh.plotting import figure
 from bokeh.models import BooleanFilter, CDSView
 
 import numpy as np
 
-from vivarium.controllers.panel_controller import ParameterizedData
+from vivarium.interface.parameterized import ParameterizedData
 from vivarium.environment.components.interface import Interface, Renderer
 
 
@@ -29,9 +28,19 @@ class Selected(param.Parameterized):
     """Class to store the selected entities in the interface"""
 
     selection = param.ListSelector([0], objects=[0])
+    
+    subtype_selection = param.ListSelector([], objects=[])
+    
+    def __init__(self, n_entities, subtype_labels, **params):
+        super().__init__(**params)
+        self.param.selection.objects = list(range(n_entities))
+        self.param.subtype_selection.objects = subtype_labels
 
     def __len__(self):
         return len(self.selection)
+
+class ParamGlobal(param.Parameterized):
+    hide_non_existing = param.Boolean()
 
 
 class ParamEntity(ParameterizedData):
@@ -45,7 +54,6 @@ class ParamEntity(ParameterizedData):
     color = param.Color()
     shape = param.String()
     visible = param.Boolean()
-    hide_non_existing = param.Boolean()
 
     def __init__(self, entities, subtype_labels, **params):
 
@@ -59,7 +67,7 @@ class ParamEntity(ParameterizedData):
 
     @property
     def selected_entity_data(self):
-        return self.data[self.selection[0]]
+        return self.controller[self.selection[0] if len(self.selection) > 0 else 0]
 
 
 class EntityRenderer(Renderer):
@@ -70,13 +78,13 @@ class EntityRenderer(Renderer):
         selected, etype, state,
         shape,
         line_width=1.0,
+        hide_non_existing=True,
     ):
         self.etype = etype
-        # TODO: for now only the shape of the first entity is considered
-        self.shape = getattr(Shape, shape[0].upper()) if isinstance(shape[0], str) else shape[0]
+        
+        self.shape = getattr(Shape, shape.upper()) if isinstance(shape, str) else shape
         self.entities = entities
         
-        super().__init__(state, use_point_draw_tool=True)
         
         self.selected_param_entity = selected_param_entity
         self.selected = selected
@@ -85,8 +93,13 @@ class EntityRenderer(Renderer):
         
         
         self.line_width = line_width
-        self.cds.on_change("data", self.drag_cb)
+        self.hide_non_existing = hide_non_existing
+        
         self.cds_view = self.create_cds_view()
+        
+        super().__init__(state, use_point_draw_tool=True)
+        
+        self.cds.on_change("data", self.drag_cb)
         selected.param.watch(
             self.update_selected_plot, ["selection"], onlychanged=True, precedence=0
         )
@@ -94,10 +107,6 @@ class EntityRenderer(Renderer):
         self.selected_param_entity.param.watch(self.update_cds_view,
                                                self.panel_visibility_parameters,
                                                onlychanged=True)
-        self.selected_param_entity.param.watch(self.apply_visible_filter,
-                                               ["exists", "hide_non_existing"],
-                                               onlychanged=True)
-        self.apply_visible_filter()
         
         self._lock = Lock()
 
@@ -120,10 +129,11 @@ class EntityRenderer(Renderer):
         :param state: The state coming from the server
         :return: Data dictionary for the ColumnDataSource
         """
-        pos = state.position_center(self.etype)
+        etype_state = getattr(state, self.etype)
+        pos = state.entity_state.position[etype_state.entity_idx]
         x, y = pos[:, 0], pos[:, 1]
-        o = state.position_orientation(self.etype)
-        d = state.diameter(self.etype)
+        o = state.entity_state.orientation[etype_state.entity_idx]
+        d = state.entity_state.diameter[etype_state.entity_idx]
 
         colors = [e.color for e in self.entities]
 
@@ -139,6 +149,7 @@ class EntityRenderer(Renderer):
         """
         with self._lock:
             super().update_cds(state)
+            self.apply_visible_filter(state)
 
     def create_cds_view(self):
         """Creates a ColumnDataSource view for each visibility attribute
@@ -174,10 +185,10 @@ class EntityRenderer(Renderer):
         self.cds.selected.indices = event.new
 
 
-    def apply_visible_filter(self, *args, **kwargs):
-        f = [e.visible for e in self.entities]
+    def apply_visible_filter(self, state):
+        entity_type_exists = state.entity_state.exists[getattr(state, self.etype).entity_idx]
         for attr in self.panel_visibility_parameters:
-            self.cds_view[attr].filter = BooleanFilter(f)
+            self.cds_view[attr].filter = BooleanFilter([(bool(state_exists.item()) if self.hide_non_existing else e.visible) and getattr(e, attr) for e, state_exists in zip(self.entities, entity_type_exists)])
 
     def update(self):
         """Updates the list of selected entities in the Selection list"""
@@ -234,35 +245,79 @@ class EntityInterface(Interface):
     param_cls = ParamEntity
     renderer_cls = EntityRenderer
     
-    def __init__(self, controller, state, panel_cls=Column):
+    def __init__(self, controller, panel_cls=Column):
         
-        parameters = self.param_cls(controller, controller.subtype_labels, **asdict(controller.controller_parameters[0]))
+        self.parameters = self.param_cls(controller, controller.subtype_labels)
         
-        self.selected = Selected()
-        self.selected.param.selection.objects = state.entity_type_idx(controller.entity_type).tolist() 
+        
+        state = controller._remote.state.obj()
+        
+        self.selected = Selected(
+            n_entities=getattr(state, controller.entity_type).count(), 
+            subtype_labels=controller.subtype_labels
+            )
         
         renderer = self.renderer_cls(
                 entities = controller._entity_list,
-                selected_param_entity=parameters,
+                selected_param_entity=self.parameters,
                 selected=self.selected,
                 etype=controller.entity_type,
                 state=state,
-                shape=controller.controller_parameters.shape,
+                shape=controller[0].shape, # TODO: for now only the shape of the first entity is considered
             )
         
-        super().__init__(controller, parameters, panel_cls=panel_cls, renderer=renderer)
+        super().__init__(controller, self.parameters, panel_cls=panel_cls, renderer=renderer, build_widget=False)
         
-        self.widget.insert(1, pn.panel(self.selected, name=None, widgets={'selection': {'width': 100}}))
+        self.global_params = ParamGlobal(hide_non_existing=self.renderer.hide_non_existing)
         
-
+        self.build_widget()
+        
         self.selected.param.watch(
             self.pull_selected_entities,
             ["selection"],
             onlychanged=True,
             precedence=1,
         )
-
+        
+        self.selected.param.watch(
+            self.select_by_subtype,
+            ["subtype_selection"],
+            onlychanged=True,
+            precedence=1,
+        )
+        
+        self.global_params.param.watch(
+            self.set_hide_non_existing,
+            ["hide_non_existing"],
+            onlychanged=True,
+            precedence=1,
+        )
+    
+    def build_widget(self):
+        super().build_widget()
+        self.widget.insert(1, pn.panel(self.global_params))
+        self.widget.insert(
+            2, 
+            pn.panel(
+                self.selected, name=None, 
+                widgets={
+                    'selection': {'width': 100}, 
+                    'subtype_selection': pn.widgets.CheckBoxGroup
+                    }
+                )
+            )
+    
+    def set_hide_non_existing(self, event):
+        self.renderer.hide_non_existing = event.new
+        
     def pull_selected_entities(self, *events):
         """Pull the selected configurations"""
         self.parameters.selection = self.selected.selection
         self.parameters.update_from_server = True
+        
+    def select_by_subtype(self, *events):
+        """Select entities by subtype"""
+        selected_subtypes = self.selected.subtype_selection
+        new_selection = [i for i, e in enumerate(self.controller._entity_list) if e.subtype in selected_subtypes]
+        self.selected.selection = new_selection
+        

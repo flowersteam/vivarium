@@ -2,7 +2,7 @@ defaults:
   - _self_
   - base_entities
 
-_target_: vivarium.environment.components.entities.braitenberg.BraitenbergComponent
+_target_: vivarium.environment.components.entities.braitenberg.component.BraitenbergComponent
 precedence: 10
 n_max: 10
 mass:
@@ -17,6 +17,8 @@ n_subtypes:
   _args_: ["${...subtype_labels}"]
 wheel_diameter:
   _all_values_: 3.0
+max_speed:
+  _all_values_: 1.0
 proxs_dist_max:
   _all_values_: 20.0
 proxs_cos_min:

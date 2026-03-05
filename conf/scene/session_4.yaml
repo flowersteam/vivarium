@@ -1,38 +1,80 @@
-seed: 42
-box_size: 300
-neighbor_radius: 300
-prox_dist_max: 60
+defaults:
+  - session_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn.client
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction    
+  - _self_
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-  ## Care : make sure to order entities in a good order (first the agents and then the objects) ...
-    - agents
-    - resources
-    - s_obstacles
-    - b_obstacles
+scene_name: session_4
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 3
-      color: blue
-      diameter: 10
-      
-    resources:
-      type: OBJECT
-      num: 15
-      existing: 7
-      color: green
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 3
+        diameter:
+          _all_values_: 8.0
+        proxs_dist_max: 
+          _all_values_: 20.0
+      objects:
+        n_max: 24
+        by_indices:
+          - resource:
+              indices: "${range: 0, 15}"
+              n_exists: 8
+              subtype: resource
+              diameter: 3.0
+              client:
+                color: green
+          - small_obstacle:
+              indices: "${range: 15, 20}"
+              subtype: small_obstacle
+              diameter: 5.0
+          - big_obstacle:
+              indices: "${range: 20, 24}"
+              subtype: big_obstacle
+              diameter: 7.0
+              client:
+                color: red
+      spawn:
+        subtype: 1
+        period: 400
+        start: false
+        position_range: [0., 100., 0., 100.]
+        orientation_range: [0., 6.3]
+      consumption:
+        agent_to_resource:
+          source_subtype: 'agent'
+          target_subtype: 'resource'
+          range: 1.0
+          start: false
+        consuming_in_entity_state: true
+        client:
+          controller_kwargs:
+            names: ['agent_to_resource']
+      energy:
+        entity_type: objects
+        energy_init: 1.
+        energy_max: 1.0
+        energy_decay: 0.0
+        energy_burst: 1.
+        distribute_extra_energy: false
+      reproduction:
+        entity_type: objects
+        subtype: -1 # Enable death of all object subtypes if students want to experience different consumption patterns? Maybe entity_type=-1 as well then?
+        birth_energy_threshold: 2.0 # > energy_max to prevent reproduction
+        death_energy_threshold: 0.0          
 
-    s_obstacles:
-      type: OBJECT
-      num: 7
-      color: orange
-      diameter: 3
+subtype_labels:
+  - agent
+  - resource
+  - small_obstacle
+  - big_obstacle
 
-    b_obstacles:
-      type: OBJECT
-      num: 7
-      color: red
-      diameter: 10
+interface:
+  notebook:
+    path: notebooks/sessions/session_4.ipynb
+

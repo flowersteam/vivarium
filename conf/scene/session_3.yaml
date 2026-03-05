@@ -1,31 +1,73 @@
-seed: 42
-box_size: 200
-neighbor_radius: 200
-prox_dist_max: 60
+defaults:
+  - session_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn.client
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction  
+  - _self_
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-    - agents
-    - resources
-    - obstacles
+scene_name: session_3
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 2
-      existing: 1
-      color: blue
-      diameter: 10
-      
-    resources:
-      type: OBJECT
-      num: 12
-      existing: 3
-      color: green
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 2
+        n_exists: 1
+        proxs_dist_max: 15.0
+      objects:
+        n_max: 25
+        friction: 
+          _all_values_: 0.3
+        by_indices:
+          - resource:
+              indices: "${range: 0, 15}"
+              n_exists: 8
+              subtype: resource
+              diameter: 3.0
+              client:
+                color: green
+          - obstacle:
+              indices: "${range: 15, 25}"
+              subtype: obstacle
+              diameter: 5.0
+      spawn:
+        subtype: 1
+        period: 400
+        start: false
+        position_range: [0., 100., 0., 100.]
+        orientation_range: [0., 6.3]
+      consumption:
+        agent_to_resource:
+          source_subtype: 0
+          target_subtype: 1
+          range: 1
+          start: false
+        client:
+          controller_kwargs:
+            names: ['agent_to_resource']
+      energy:
+        entity_type: objects
+        # subtype: 1
+        energy_init: 1.
+        energy_max: 10000000.0
+        energy_decay: 0.0
+        energy_burst: 1.
+        distribute_extra_energy: false
+      reproduction:
+        entity_type: objects
+        subtype: -1
+        birth_energy_threshold: 2.0 # > energy_max to prevent reproduction
+        death_energy_threshold: 0.0   
 
-    obstacles:
-      type: OBJECT
-      num: 15
-      color: orange
-      diameter: 8
+subtype_labels:
+  - agent
+  - resource
+  - obstacle
+
+interface:
+  notebook:
+    path: notebooks/sessions/session_3.ipynb
+

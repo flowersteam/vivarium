@@ -1,0 +1,510 @@
+name: Build and Release
+
+on:
+  # Trigger on version tags
+  push:
+    tags:
+      - 'v*'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a GitHub release'
+        required: false
+        default: false
+        type: boolean
+      version:
+        description: 'Version name (for manual builds)'
+        required: false
+        default: 'dev'
+        type: string
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64
+          - os: ubuntu-latest
+            python: '3.12'
+            artifact_name: vivarium-linux-x64
+
+          # Linux ARM64
+          - os: ubuntu-24.04-arm
+            python: '3.12'
+            artifact_name: vivarium-linux-arm64
+
+          # macOS Apple Silicon (ARM64)
+          - os: macos-latest
+            python: '3.12'
+            artifact_name: vivarium-macos-arm64
+
+          # macOS Intel (x86_64)
+          - os: macos-15-intel
+            python: '3.11'
+            artifact_name: vivarium-macos-x64
+
+          # Windows x64
+          - os: windows-latest
+            python: '3.12'
+            artifact_name: vivarium-windows-x64
+
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: 'pip'
+          cache-dependency-path: setup.py
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Patch jax-md for Intel Mac
+        if: matrix.os == 'macos-15-intel'
+        run: python scripts/patch_jax_md.py
+
+      - name: Set version from tag
+        shell: bash
+        run: |
+          # Extract version from tag (removes 'v' prefix)
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "Setting VERSION to: $VERSION"
+          echo "$VERSION" > VERSION
+
+      - name: Build with PyInstaller
+        run: pyinstaller vivarium_multi.spec --noconfirm
+
+      - name: Sign macOS binaries (ad-hoc)
+        if: runner.os == 'macOS'
+        run: |
+          # Ad-hoc sign all executables in the vivarium folder
+          find dist/vivarium -type f -perm +111 -exec codesign --force --deep --sign - {} \; 2>/dev/null || true
+
+      - name: Create inner archive and package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          # Create inner archive with executables and _internal
+          cd dist/vivarium
+          tar -czvf ../vivarium-build.tar.gz *
+          cd ..
+
+          # Create outer package folder
+          mkdir -p vivarium-package
+          mv vivarium-build.tar.gz vivarium-package/
+
+      - name: Create launcher script (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cat > dist/vivarium-package/Start-Vivarium.command << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+
+          if [ -f "vivarium-build.tar.gz" ]; then
+              echo "Installing/updating Vivarium..."
+
+              # Backup user data if it exists (update scenario)
+              # Python will perform smart merge on startup, restoring user modifications
+              # only for files that weren't updated
+              if [ -d "conf" ] || [ -d "notebooks" ]; then
+                  BACKUP_DIR="update_backup_$(date +%Y%m%d_%H%M%S)"
+                  mkdir -p "$BACKUP_DIR"
+                  [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
+                  [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
+                  echo "User data backed up to $BACKUP_DIR"
+              fi
+
+              # Clear quarantine (macOS only)
+              xattr -cr vivarium-build.tar.gz 2>/dev/null || true
+
+              # Extract new version (overwrites conf/ and notebooks/ with new defaults)
+              echo "Extracting archive, please wait..."
+              tar -xzf vivarium-build.tar.gz
+              rm vivarium-build.tar.gz
+
+              # Note: User modifications are restored selectively by the app on startup
+              # Files modified by user but NOT by the update are restored from backup
+              # Files modified by BOTH user and update use new version (user notified)
+
+              echo ""
+          fi
+
+          echo "Starting Vivarium..."
+          echo "Close this terminal window to quit."
+          echo ""
+          ./vivarium-interface
+          EOF
+          chmod +x dist/vivarium-package/Start-Vivarium.command
+
+      - name: Create launcher script (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cat > dist/vivarium-package/start-vivarium.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+
+          if [ -f "vivarium-build.tar.gz" ]; then
+              echo "Installing/updating Vivarium..."
+
+              # Backup user data if it exists (update scenario)
+              # Python will perform smart merge on startup, restoring user modifications
+              # only for files that weren't updated
+              if [ -d "conf" ] || [ -d "notebooks" ]; then
+                  BACKUP_DIR="update_backup_$(date +%Y%m%d_%H%M%S)"
+                  mkdir -p "$BACKUP_DIR"
+                  [ -d "conf" ] && cp -r conf "$BACKUP_DIR/"
+                  [ -d "notebooks" ] && cp -r notebooks "$BACKUP_DIR/"
+                  echo "User data backed up to $BACKUP_DIR"
+              fi
+
+              # Extract new version (overwrites conf/ and notebooks/ with new defaults)
+              echo "Extracting archive, please wait..."
+              tar -xzf vivarium-build.tar.gz
+              rm vivarium-build.tar.gz
+
+              # Note: User modifications are restored selectively by the app on startup
+              # Files modified by user but NOT by the update are restored from backup
+              # Files modified by BOTH user and update use new version (user notified)
+
+              echo ""
+          fi
+
+          echo "Starting Vivarium..."
+          echo "Close this terminal window to quit."
+          echo ""
+          ./vivarium-interface
+          EOF
+          chmod +x dist/vivarium-package/start-vivarium.sh
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          tar -czvf ../${{ matrix.artifact_name }}.tar.gz -C vivarium-package .
+
+      - name: Create inner archive and package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist\vivarium
+          Compress-Archive -Path * -DestinationPath ..\vivarium-build.zip
+          cd ..
+          New-Item -ItemType Directory -Path vivarium-package
+          Move-Item vivarium-build.zip vivarium-package\
+
+      - name: Create launcher script (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Note: No empty lines or :: comments inside if-blocks (causes batch syntax errors)
+          $script = @"
+          @echo off
+          setlocal EnableDelayedExpansion
+          cd /d "%~dp0"
+          if exist "vivarium-build.zip" (
+          echo Installing/updating Vivarium...
+          set "BACKUP_DIR="
+          if exist "conf" (
+          for /f %%a in ('powershell -Command "Get-Date -Format \"yyyyMMdd_HHmmss\""') do set "BACKUP_DIR=update_backup_%%a"
+          mkdir "!BACKUP_DIR!" 2>nul
+          xcopy /E /I /Q "conf" "!BACKUP_DIR!\conf" >nul
+          echo User data backed up to !BACKUP_DIR!
+          )
+          if exist "notebooks" (
+          if not defined BACKUP_DIR (
+          for /f %%a in ('powershell -Command "Get-Date -Format \"yyyyMMdd_HHmmss\""') do set "BACKUP_DIR=update_backup_%%a"
+          mkdir "!BACKUP_DIR!" 2>nul
+          )
+          xcopy /E /I /Q "notebooks" "!BACKUP_DIR!\notebooks" >nul
+          if not exist "conf" echo User data backed up to !BACKUP_DIR!
+          )
+          echo Extracting archive, please wait...
+          powershell -Command "Expand-Archive -Path vivarium-build.zip -DestinationPath . -Force"
+          del vivarium-build.zip
+          echo.
+          )
+          echo Starting Vivarium...
+          echo Close this window to quit.
+          echo.
+          vivarium-interface.exe
+          endlocal
+          "@
+          $script | Set-Content -Path dist\vivarium-package\Start-Vivarium.bat -Encoding ASCII
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path vivarium-package\* -DestinationPath ../${{ matrix.artifact_name }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_name }}.tar.gz
+            ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0  # Already compressed, avoid double compression
+
+      - name: Extract outer archive for smoke tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p smoke-test
+          tar -xzf ${{ matrix.artifact_name }}.tar.gz -C smoke-test
+          ls -la smoke-test
+
+      - name: Extract outer archive for smoke tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path smoke-test
+          Expand-Archive -Path ${{ matrix.artifact_name }}.zip -DestinationPath smoke-test
+          Get-ChildItem smoke-test
+
+      - name: Smoke test - Launcher extracts and Interface starts
+        continue-on-error: true  # Windows has issues, don't block release
+        run: |
+          # Run the launcher script which extracts the inner archive and starts interface
+          cd smoke-test
+          echo "Starting launcher..."
+          echo "Directory contents before launcher:"
+          ls -la
+
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            bash Start-Vivarium.command > launcher.log 2>&1 &
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            bash start-vivarium.sh > launcher.log 2>&1 &
+          else
+            # Windows: run in background and capture output
+            cmd.exe /c "Start-Vivarium.bat > launcher.log 2>&1" &
+          fi
+          INTERFACE_PID=$!
+
+          # Give the launcher time to extract and start (Windows is slower)
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "Windows detected, waiting 60s for extraction and startup..."
+            sleep 60
+          else
+            sleep 20
+          fi
+
+          echo "Directory contents after launcher:"
+          ls -la
+
+          echo "Launcher log:"
+          cat launcher.log 2>/dev/null || echo "(no log file)"
+
+          # Check if interface is responding to HTTP (more retries for Windows)
+          python -c "
+          from vivarium.utils.handle_server_interface import wait_for_http
+          import sys
+          import os
+          retries = 12 if os.name == 'nt' else 6
+          if wait_for_http('http://localhost:5006/run_interface', retries=retries, delay=5, timeout=30):
+              print('[OK] Interface health check passed')
+              sys.exit(0)
+          else:
+              print('[FAIL] Interface health check failed')
+              sys.exit(1)
+          "
+          kill $INTERFACE_PID 2>/dev/null || true
+        shell: bash
+
+      - name: Smoke test - Server starts
+        continue-on-error: true  # Windows has issues, don't block release
+        run: |
+          # Inner archive already extracted by launcher, test server directly
+          cd smoke-test
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./vivarium-server.exe &
+          else
+            ./vivarium-server &
+          fi
+          SERVER_PID=$!
+          sleep 60
+          # Check if server is responding (using grpc health check)
+          python -c "
+          from vivarium.utils.handle_server_interface import check_server_running
+          import sys
+          if check_server_running():
+              print('[OK] Server health check passed')
+              sys.exit(0)
+          else:
+              print('[FAIL] Server health check failed')
+              sys.exit(1)
+          "
+          kill $SERVER_PID 2>/dev/null || true
+        shell: bash
+
+      - name: Smoke test - Jupyter starts
+        continue-on-error: true  # Windows has issues, don't block release
+        run: |
+          # Inner archive already extracted by launcher, test jupyter directly
+          cd smoke-test
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            ./vivarium-jupyter.exe --port 8889 &
+          else
+            ./vivarium-jupyter --port 8889 &
+          fi
+          JUPYTER_PID=$!
+          sleep 15
+          # Check if Jupyter is responding
+          python -c "
+          from vivarium.utils.handle_server_interface import check_jupyter_running
+          import sys
+          if check_jupyter_running(8889):
+              print('[OK] Jupyter health check passed')
+              sys.exit(0)
+          else:
+              print('[FAIL] Jupyter health check failed')
+              sys.exit(1)
+          "
+          kill $JUPYTER_PID 2>/dev/null || true
+        shell: bash
+
+      - name: Smoke test - Version consistency
+        continue-on-error: true  # Windows has issues, don't block release
+        run: |
+          cd smoke-test
+
+          # Verify VERSION file exists in distribution
+          if [ ! -f "VERSION" ]; then
+            echo "[FAIL] VERSION file not found in distribution"
+            exit 1
+          fi
+          echo "[OK] VERSION file exists"
+
+          # Read version from file
+          FILE_VERSION=$(cat VERSION)
+          echo "Version from file: $FILE_VERSION"
+
+          # Verify version format (PEP 440 compatible)
+          # Allows: 1.2.3, 1.2.3rc1, 1.2.3a1, 1.2.3b1, 1.2.3.dev1
+          if ! echo "$FILE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+|\.dev[0-9]+)?$'; then
+            echo "[FAIL] Invalid version format: $FILE_VERSION"
+            exit 1
+          fi
+          echo "[OK] Version format valid"
+
+          # Verify _defaults directory exists
+          if [ ! -d "_defaults" ]; then
+            echo "[FAIL] _defaults directory not found"
+            exit 1
+          fi
+          echo "[OK] _defaults directory exists"
+
+          # Verify _defaults contains conf and notebooks
+          if [ ! -d "_defaults/conf" ] || [ ! -d "_defaults/notebooks" ]; then
+            echo "[FAIL] _defaults missing conf/ or notebooks/"
+            exit 1
+          fi
+          echo "[OK] _defaults structure correct"
+        shell: bash
+
+      - name: Smoke test - First run initialization
+        continue-on-error: true  # Intel Mac has issues, don't block release
+        run: |
+          cd smoke-test
+
+          # Remove conf and notebooks to simulate first run
+          rm -rf conf notebooks
+
+          echo "Starting interface for first-run initialization test..."
+
+          # Run interface briefly (it should copy from _defaults)
+          if [ "$RUNNER_OS" == "macOS" ]; then
+            ./vivarium-interface --dont-open-browser > init.log 2>&1 &
+          elif [ "$RUNNER_OS" == "Linux" ]; then
+            ./vivarium-interface --dont-open-browser > init.log 2>&1 &
+          else
+            ./vivarium-interface.exe --dont-open-browser > init.log 2>&1 &
+          fi
+          INTERFACE_PID=$!
+
+          # Wait for initialization (up to 30 seconds, checking every 2 seconds)
+          for i in {1..15}; do
+            if [ -d "conf" ] && [ -d "notebooks" ]; then
+              echo "[OK] Directories created after $((i*2)) seconds"
+              break
+            fi
+            echo "Waiting for initialization... (attempt $i/15)"
+            sleep 2
+          done
+
+          kill $INTERFACE_PID 2>/dev/null || true
+
+          # Show logs for debugging
+          echo "Interface log (first 50 lines):"
+          head -50 init.log 2>/dev/null || echo "(no log file)"
+
+          # Verify conf and notebooks were created
+          if [ ! -d "conf" ]; then
+            echo "[FAIL] conf/ not created on first run"
+            echo "Directory listing:"
+            ls -la
+            exit 1
+          fi
+          echo "[OK] conf/ created from _defaults"
+
+          if [ ! -d "notebooks" ]; then
+            echo "[FAIL] notebooks/ not created on first run"
+            exit 1
+          fi
+          echo "[OK] notebooks/ created from _defaults"
+        shell: bash
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only create release on tag push or manual trigger with create_release=true
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.event.inputs.version || 'dev' }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Vivarium ${{ steps.version.outputs.version }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: ${{ contains(steps.version.outputs.version, 'alpha') || contains(steps.version.outputs.version, 'beta') || contains(steps.version.outputs.version, 'rc') }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip

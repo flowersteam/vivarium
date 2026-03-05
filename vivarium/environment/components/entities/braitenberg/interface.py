@@ -22,6 +22,7 @@ class ParamAgent(ParamEntity):
     right_motor = param.Number()
     left_prox = param.Number()
     right_prox = param.Number()
+    max_speed = param.Number()
     wheel_diameter = param.Number()
     proxs_dist_max = param.Number()
     proxs_cos_min = param.Number()
@@ -30,6 +31,10 @@ class ParamAgent(ParamEntity):
     visible_proxs = param.Boolean()
 
     def __init__(self, entities, subtype_labels, **params):
+        
+        # Behaviors are added dynamically below, dont't pass them to the parent class
+        # TODO: However, now that behaviors are part of the controller parameters, we could maybe simplify this 
+        params.pop('behaviors', None)
         
         super().__init__(entities, subtype_labels, **params)
         
@@ -57,14 +62,14 @@ class ParamAgent(ParamEntity):
     def update_behavior(self, event, slot_idx, subtype):
         for ag_idx in self.selection:
             if event.name.startswith('behavior_'):
-                self.data[ag_idx].behaviors[slot_idx].label = Behaviors[event.new]
+                self.controller[ag_idx].behaviors[slot_idx].label = Behaviors[event.new]
             elif event.name.startswith('sensed_'):
-                sensed = set(self.data[ag_idx].behaviors[slot_idx].sensed)
+                sensed = set(self.controller[ag_idx].behaviors[slot_idx].sensed)
                 if event.new:
                     sensed.add(subtype)
                 else:
                     sensed.discard(subtype)
-                self.data[ag_idx].behaviors[slot_idx].sensed = list(sensed)
+                self.controller[ag_idx].behaviors[slot_idx].sensed = list(sensed)
 
 
 class AgentRenderer(EntityRenderer):
@@ -133,7 +138,7 @@ class AgentRenderer(EntityRenderer):
             lpi=proxs[:, 1],
             mar=max_angle_r,
             mal=max_angle_l,
-            mpr=max_prox,
+            mpr=max_prox + radii,
             wd=wheel_diameter,
         )
 

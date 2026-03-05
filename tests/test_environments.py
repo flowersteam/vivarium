@@ -7,18 +7,23 @@ from vivarium.environment import Environment
 NUM_STEPS = 5
 
 
-@pytest.mark.parametrize("scene_name", ["braitenberg", "particle_lenia", "lenia_braitenberg"])
+@pytest.mark.parametrize("scene_name", [
+    "braitenberg", 
+    "particle_lenia", 
+    "lenia_braitenberg", 
+    "non_transitive", 
+    "fishing"])
 def test_env(scene_name, scene_config):
     """Test the stepping mechanism of the env with occlusion (default)"""
     config = scene_config(scene_name)
-    config.environment.kwargs['to_jit'] = False
+    # config.environment.kwargs['to_jit'] = False
     env = Environment.from_config(config.environment)
     state = env.init_state()
     previous_state = state
     for t in range(NUM_STEPS):
         prev_prev = previous_state
         previous_state = state
-        state = env.step(state, scan=False)
+        state = env.step(state) #, scan=False)
         if jnp.isnan(state.entity_state.position).any():
             print(f"NaN detected at step {t}")
             state = prev_prev  # revert to previous state twice
@@ -39,8 +44,9 @@ def test_load_save_env_config(scene_config):
 
     env.box_size = 42.
     state = state.set(
-        collision_eps=42.,
-    )
+        collision_state = state.collision_state.set(
+            epsilon=42.,
+    ))
 
     new_env_config = env.to_config(state)
 
@@ -53,4 +59,4 @@ def test_load_save_env_config(scene_config):
     
     assert new_env.box_size == 42.
     assert new_env.get_factory_by_name('collision').epsilon == 42.
-    assert new_state.collision_eps == 42.
+    assert new_state.collision_state.epsilon == 42.

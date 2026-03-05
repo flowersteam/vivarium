@@ -1,0 +1,47 @@
+defaults:
+  - braitenberg_defaults
+
+environment:
+  kwargs:
+    box_size: 100
+    neighbor_radius: 150
+    num_scan_steps: 1
+    to_jit: true
+  components:
+    component_list:
+      collision:
+        epsilon: 4.0
+        alpha: 0.7
+      agents:
+        n_max: 1
+        n_behaviors: 1
+        subtype:
+          _all_values_: agent
+        diameter:
+          _all_values_: 10.0
+        wheel_diameter:
+          _all_values_: 5.0
+        proxs_dist_max:
+          _all_values_: 30.0
+        client:
+          controller_kwargs:
+            color:
+              _all_values_: blue
+            behaviors:
+              _all_values_:
+                - MANUAL: []
+      objects:
+        n_max: 8
+        subtype:
+          _all_values_: object
+        diameter:
+          _all_values_: 5.0
+        client:
+          controller_kwargs:
+            color:
+              _all_values_: orange
+
+simulator:
+  client:
+    controller_kwargs:
+      freq: -1.

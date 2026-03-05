@@ -52,3 +52,6 @@ class Component:
         def step_fn(state, neighbors, key):
             return state
         return step_fn
+    
+    def neighbor_update(self, state, neighbor_manager, key):
+        return state

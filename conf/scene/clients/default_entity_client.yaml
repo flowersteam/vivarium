@@ -6,7 +6,5 @@ controller_kwargs:
     _all_values_: red
   visible:
     _all_values_: true
-  hide_non_existing:
-    _all_values_: true
   shape:
     _all_values_: circle

@@ -1,0 +1,121 @@
+defaults:
+  - base_scene
+  - environment/components/base_physics@environment.components.component_list
+  - environment/components/entities/braitenberg@environment.components.component_list.agents
+  - clients/braitenberg@environment.components.component_list.agents.client
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction
+
+scene_name: non_transitive
+
+environment:
+  kwargs:
+    box_size: 150.0
+    neighbor_radius: 10.0
+    dr_threshold: 1.0  # A scalar specifying the maximum distance particles can move before rebuilding the neighbor list.
+    num_scan_steps: 1
+  components:
+    component_list:
+      step:
+        dt: 0.2
+      agents:
+        n_max: 900
+        n_behaviors: 2
+        diameter:
+          _all_values_: 2.0
+        wheel_diameter:
+          _all_values_: 2.0
+        max_speed:
+          _all_values_: 2.0
+        proxs_cos_min:
+          _all_values_: -1.0
+        proxs_dist_max:
+          _all_values_: 10.0           
+        client:
+          controller_kwargs:
+            visible_wheels: 
+              _all_values_: false
+            visible_proxs: 
+              _all_values_: false
+        by_indices:
+          - A:
+              indices: "${range: 0, 300}"
+              n_exists: 200
+              subtype: A           
+              client:
+                color: red
+                behaviors:
+                  # - CUSTOM: [A]
+                  # - CUSTOM: [B]
+                  # - CUSTOM: [C]
+                  - AGGRESSION: [B]
+                  - SHY: [A,C]
+          - B:
+              indices: "${range: 300, 600}"
+              n_exists: 200
+              subtype: B
+              client:
+                color: green
+                behaviors:
+                  # - CUSTOM: [A]
+                  # - CUSTOM: [B]
+                  # - CUSTOM: [C]
+                  - AGGRESSION: [C]
+                  - SHY: [A,B]
+          - C:
+              indices: "${range: 600, 900}"
+              n_exists: 200
+              subtype: C
+              client:
+                color: blue
+                behaviors:
+                  # - CUSTOM: [A]
+                  # - CUSTOM: [B]
+                  # - CUSTOM: [C]
+                  - AGGRESSION: [A]
+                  - SHY: [B,C]                  
+      consumption:
+        a2b:
+          source_subtype: 0
+          target_subtype: 1
+          range: 3.0
+          start: true
+        b2c:
+          source_subtype: 1
+          target_subtype: 2
+          range: 3.0
+          start: true
+        c2a:
+          source_subtype: 2
+          target_subtype: 0
+          range: 3.0
+          start: true
+        client:
+          controller_kwargs:
+            names: ['a2b', 'b2c', 'c2a']
+      energy:
+        entity_type: agents
+        # subtype: -1
+        energy_init: 1.
+        energy_max: 2.00001
+        energy_decay: 0.0
+        energy_burst: 1
+        distribute_extra_energy: true
+      reproduction:
+        entity_type: agents
+        birth_energy_threshold: 2.0
+        birth_energy: 1.
+        birth_radius: 10.
+        birth_recovery_time: 0
+
+simulator:
+  client:
+    controller_kwargs:
+      freq: -1
+
+subtype_labels:
+  - A
+  - B
+  - C

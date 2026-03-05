@@ -5,4 +5,4 @@ controller_kwargs:
   color:
     _all_values_: blue
   shape:
-    _all_values_: square
+    _all_values_: circle

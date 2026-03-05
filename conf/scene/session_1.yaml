@@ -1,21 +1,14 @@
-box_size: 200
-neighbor_radius: 200
-prox_dist_max: 60
+defaults:
+  - session_defaults
+  - _self_
 
-# Entity data definitions
-entities_data:
-  EntitySubTypes:
-    - agents
-    - objects
+scene_name: session_1
 
-  Entities:
-    agents:
-      type: AGENT
-      num: 1
-      existing: 1
-      color: blue
-      
-    objects:
-      type: OBJECT
-      num: 8
-      color: red
+subtype_labels:
+  - agent
+  - object
+
+interface:
+  notebook:
+    path: notebooks/sessions/session_1.ipynb
+  

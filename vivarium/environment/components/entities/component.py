@@ -1,6 +1,5 @@
 import jax.numpy as jnp
 
-from vivarium.environment.components.entities.controller import EntityController
 from vivarium.environment.components.component import Component
 from vivarium.utils.scene_configs import compute_parameters
 
@@ -11,8 +10,6 @@ from vivarium.utils.scene_configs import compute_parameters
 
 
 class EntityComponent(Component):
-
-    controller_cls = EntityController
 
     def __init__(self, name, precedence, entity_type, subtype,
                  position, orientation, mass, diameter, friction, exists, subtype_labels=None
@@ -61,10 +58,14 @@ class EntityComponent(Component):
     def get_kwargs(config, exclude=[]):
         kwargs = super(EntityComponent, EntityComponent).get_kwargs(config)
                             
+        if 'n_exists' in config:
+            n_exists = config.n_exists
+            kwargs['exists'] = [i < n_exists for i in range(config['n_max'])]
+        
         config.update(kwargs)
         kwargs.update(compute_parameters(config))
 
-        exclude = exclude + ['_target_', 'n_max', 'subtype_labels', 'by_indices', 'client']
+        exclude = exclude + ['_target_', 'n_max', 'n_exists', 'subtype_labels', 'by_indices', 'client']
         kwargs = {k: v for k, v in config.items()
                     if k not in exclude}
 
@@ -73,7 +74,7 @@ class EntityComponent(Component):
         return kwargs
 
     def init_base_entity(self, entity_state):
-        self.entity_type_int = entity_state.entity_type.max() + 1 if len(entity_state.entity_type) > 0 else 0
+        self.entity_type_int = jnp.array(entity_state.entity_type.max() + 1 if len(entity_state.entity_type) > 0 else 0)
         self.offset = entity_state.exists.shape[0]
         return entity_state.add_new_entities(
             positions=self.position,
@@ -86,3 +87,4 @@ class EntityComponent(Component):
             entity_subtype=self.subtype,
             entity_type_idx=jnp.arange(self.n_max),
         )
+        

@@ -1,4 +1,3 @@
-from dataclasses import is_dataclass
 import numpy as np
 
 import jax.numpy as jnp
@@ -6,9 +5,9 @@ import jax.numpy as jnp
 from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import fields
 
-from vivarium.controllers.dataclass_wrapper import create_dataclass_from_dict
+from vivarium.utils.dataclass_wrapper import create_dataclass_from_dict
 
-import simulator_pb2
+from vivarium.simulator.grpc_server import simulator_pb2
 
 from vivarium.simulator.grpc_server.numproto.numproto import (
     proto_to_ndarray,
@@ -42,7 +41,7 @@ def idx_to_proto(idx):
 
 
 def changes_to_proto(changes):
-    if isinstance(changes, list) and '__idx' in changes[0]:
+    if isinstance(changes, list) and len(changes) > 0 and '__idx' in changes[0]:
         proto_changes = simulator_pb2.Changes()
         for change in changes:
             proto_change = simulator_pb2.Change()
@@ -224,11 +223,22 @@ def proto_to_dataclass(dataclass, dataclass_type=None):
     elif dataclass.value.HasField('str_value'):
         return dataclass.value.str_value
     elif dataclass.value.HasField('list_float_value'):
-        return dataclass.value.list_float_value.list
+        return list(dataclass.value.list_float_value.list)
     elif dataclass.value.HasField('list_string_value'):
-        return dataclass.value.list_string_value.list
+        return list(dataclass.value.list_string_value.list)
     elif dataclass.value.HasField('list_bool_value'):
-        return dataclass.value.list_bool_value.list
+        return list(dataclass.value.list_bool_value.list)
+    elif dataclass.value.HasField('list_behaviors_value'):
+        list_behaviors = []
+        for behaviors in dataclass.value.list_behaviors_value.list:
+            list_behavior = []
+            for behavior in behaviors.behaviors:
+                behavior_dict = {}
+                for label, sensed in behavior.behavior_to_sensed.items():
+                    behavior_dict[label] = list(sensed.list)
+                list_behavior.append(behavior_dict)
+            list_behaviors.append(list_behavior)
+        return list_behaviors
     elif dataclass.value.HasField('ndarray'):
         return proto_to_ndarray(dataclass.value.ndarray)
     elif 'center' in dataclass.nested_fields and 'orientation' in dataclass.nested_fields:
@@ -256,13 +266,22 @@ def dataclass_to_proto(dataclass):
                     simulator_pb2.Value(bool_value=dataclass)
                 )
     elif isinstance(dataclass, list):
-        if isinstance(dataclass[0], bool):
+        if len(dataclass) == 0 or isinstance(dataclass[0], bool):
             value = simulator_pb2.Value(list_bool_value=simulator_pb2.ListBool(list=dataclass))
         elif isinstance(dataclass[0], (float, int)):
             value = simulator_pb2.Value(list_float_value=simulator_pb2.ListFloat(list=dataclass))
         elif isinstance(dataclass[0], str):
             value = simulator_pb2.Value(list_string_value=simulator_pb2.ListString(list=dataclass))
-
+        elif isinstance(dataclass[0], list) and isinstance(dataclass[0][0], dict):
+            value = simulator_pb2.Value(list_behaviors_value=simulator_pb2.ListBehaviors())
+            for item in dataclass:
+                behaviors = simulator_pb2.Behaviors()
+                for behavior in item:
+                    b = simulator_pb2.Behavior()
+                    for label, sensed in behavior.items():
+                        b.behavior_to_sensed[label].CopyFrom(simulator_pb2.ListString(list=sensed))
+                    behaviors.behaviors.append(b)
+                value.list_behaviors_value.list.append(behaviors)
         else:
             raise ValueError(f"List items of type {type(dataclass[0])} not supported yet.")
         message.value.CopyFrom(value)

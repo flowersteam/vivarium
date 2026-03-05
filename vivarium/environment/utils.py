@@ -209,3 +209,5 @@ def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
     )
     mask = jnp.logical_and(mask_entity_type, mask_subtype)
     return mask
+
+

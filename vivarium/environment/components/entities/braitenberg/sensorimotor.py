@@ -15,14 +15,14 @@ from vivarium.environment.components.entities.braitenberg.behaviors import Behav
 SPACE_NDIMS = 2
 
 
-def linear_behavior(proxs, params):
+def linear_behavior(proxs, motors, params):
     """Compute the activation of motors with a linear combination of proximeters and parameters
 
     :param proxs: proximeter values of an agent
     :param params: parameters of an agent (mapping proxs to motor values)
     :return: motor values
     """
-    return params.dot(jnp.hstack((proxs, 1.0)))
+    return params.dot(jnp.hstack((1.0, proxs, motors)))
 
 
 v_linear_behavior = vmap(linear_behavior, in_axes=(0, 0))
@@ -37,6 +37,7 @@ def lr_2_fwd_rot(left_spd, right_spd, base_length, wheel_diameter):
     :param wheel_diameter: diameter of wheels
     :return: forward and angular speeds
     """
+    # TODO: Check if the constants are correct (4.0?) and if there would be a way to better vectorize this
     fwd = (wheel_diameter / 4.0) * (left_spd + right_spd)
     rot = 0.5 * (wheel_diameter / base_length) * (right_spd - left_spd)
     return fwd, rot
@@ -56,7 +57,7 @@ def fwd_rot_2_lr(fwd, rot, base_length, wheel_diameter):
     return left, right
 
 
-def motor_command(wheel_activation, base_length, wheel_diameter):
+def motor_command(wheel_activation, max_speed, base_length, wheel_diameter):
     """Return the forward and angular speed according to wheels speeds
 
     :param wheel_activation: wheels speeds
@@ -64,13 +65,14 @@ def motor_command(wheel_activation, base_length, wheel_diameter):
     :param wheel_diameter: wheel diameters
     :return: forward and angular speeds
     """
+    wheel_activation = wheel_activation * max_speed
     fwd, rot = lr_2_fwd_rot(
         wheel_activation[0], wheel_activation[1], base_length, wheel_diameter
     )
     return fwd, rot
 
 
-motor_command = vmap(motor_command, (0, 0, 0))
+motor_command = vmap(motor_command, (0, 0, 0, 0))
 
 
 def motor_force(state, braitenberg_state, mask):
@@ -86,22 +88,19 @@ def motor_force(state, braitenberg_state, mask):
     n = normal(state.entity_state.unified_orientation[agent_idx])
 
     fwd, rot = motor_command(braitenberg_state.motor,
+                             braitenberg_state.max_speed,
                              state.entity_state.diameter[agent_idx],
                              braitenberg_state.wheel_diameter)
 
+    target_vel = n * jnp.tile(fwd, (SPACE_NDIMS, 1)).T
+    
+    
     cur_vel = (
         state.entity_state.unified_momentum[agent_idx]
         / state.entity_state.unified_mass[agent_idx]
     )
-
-    cur_fwd_vel = vmap(jnp.dot)(cur_vel, n)
-
-    fwd_delta = fwd - cur_fwd_vel
-
-    fwd_force = (
-        n
-        * jnp.tile(fwd_delta, (SPACE_NDIMS, 1)).T
-    )
+    
+    fwd_force = target_vel - cur_vel
 
     center = (
         jnp.zeros_like(state.entity_state.unified_position).at[agent_idx].set(fwd_force)
@@ -114,15 +113,14 @@ def motor_force(state, braitenberg_state, mask):
             / state.entity_state.mass.orientation[agent_idx]
         )
         rot_delta = rot - cur_rot_vel
-        rot_force = rot_delta  # * state.agent_state.theta_mul
+        # In this case of a rigid body, `orientation` below will be summed to the current orientation force
+        # in `sum_force_to_entities`
+        orientation = jnp.zeros_like(state.entity_state.position.orientation).at[agent_idx].set(rot_delta / state.dt)        
     else:
-        rot_force = state.dt * rot
-
-    orientation = (
-        jnp.zeros_like(state.entity_state.unified_orientation)
-        .at[agent_idx]
-        .set(rot_force)
-    )
+        # rot is a rotation speed.
+        # In this case of a non-rigid body, `orientation` below will be summed to the current orientation
+        # in `sum_force_to_entities`
+        orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(rot * state.dt)
 
     orientation = jnp.where(mask, orientation, 0.0)
     mask = jnp.stack([mask] * SPACE_NDIMS, axis=1)
@@ -149,7 +147,7 @@ def compute_motor(proxs, params, motors):
     :param motors: current motor values
     :return: new motor values
     """
-    motor_values = linear_behavior(proxs, params)
+    motor_values = linear_behavior(proxs, motors, params)
     return motor_values
 
 
@@ -158,24 +156,30 @@ def compute_motor_selective(prox_per_subtype, sensed, params, motors):
     return compute_motor(prox, params, motors)
 
 
-def left_or_right_prox(mask, dist, relative_theta, dist_max, cos_min, agent_neighbors):
+def proximeters(mask, dist, relative_theta, diameter, braitenberg_mask, dist_max, cos_min, agent_neighbors):
 
     sensed = mask & (jnp.cos(relative_theta) > jnp.tile(cos_min, (relative_theta.shape[1], 1)).T)
     dist = jnp.where(sensed, dist, jnp.inf)
     min_dist_neigbor = jnp.argmin(dist, axis=1)
     distance_to_target = dist[jnp.arange(dist.shape[0]), min_dist_neigbor]
+    prox_idx = agent_neighbors[jnp.arange(agent_neighbors.shape[0]), jnp.argmin(dist, axis=1)]
+    
+    # Sensor is positioned at the border of the agent and sensed proximity to the border of an entity
+    # Hence we remove the radius of bith source and target
+    distance_to_target -= (diameter[braitenberg_mask] + diameter[prox_idx]) / 2
+    distance_to_target = distance_to_target.clip(0.)
+    
     prox = jnp.where(
         distance_to_target < dist_max,
         1. - distance_to_target / dist_max,
         0.
     )
 
-    prox_idx = agent_neighbors[jnp.arange(agent_neighbors.shape[0]), jnp.argmin(dist, axis=1)]
-
     return prox, prox_idx
 
+proximeters = vmap(proximeters, in_axes=(0, None, None, None, None, None, None, None))
 
-def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, proxs_dist_max, proxs_cos_min):
+def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, neighbors_idx, displacement, positions, orientations, diameter, proxs_dist_max, proxs_cos_min):
 
     agent_neighbors = neighbors_idx[braitenberg_mask]
     mask = neighbors_entity_mask(agent_neighbors, source_mask, target_mask, neighbor_mask[braitenberg_mask])
@@ -195,29 +199,22 @@ def compute_proxs(braitenberg_mask, source_mask, target_mask, neighbor_mask, nei
         all_dist, 
         jnp.inf)
 
-    left_prox, left_idx = left_or_right_prox(
-        mask & (jnp.sin(all_relative_theta) >= 0),
+    prox, idx = proximeters(
+        jnp.stack((
+            mask & (jnp.sin(all_relative_theta) >= 0),
+            mask & (jnp.sin(all_relative_theta) < 0),
+        )),
         all_dist,
         all_relative_theta,
+        diameter,
+        braitenberg_mask,
         proxs_dist_max,
         proxs_cos_min,
         agent_neighbors
     )
 
-    right_prox, right_idx = left_or_right_prox(
-        mask & (jnp.sin(all_relative_theta) < 0),
-        all_dist,
-        all_relative_theta,
-        proxs_dist_max,
-        proxs_cos_min,
-        agent_neighbors
-    )
-
-    return (
-        jnp.vstack((left_prox, right_prox)).T,
-        jnp.vstack((left_idx, right_idx)).T
-    )
-
+    return prox.T, idx.T
+    
 
 def extend_prox_per_subtype(prox, prox_idx, entity_subtype, n_subtypes):
     subtype_mask = entity_subtype[prox_idx][:, :, jnp.newaxis] == jnp.arange(n_subtypes)[jnp.newaxis, jnp.newaxis, :]
@@ -243,6 +240,7 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
             displacement=displacement,
             positions=state.entity_state.position,
             orientations=state.entity_state.orientation,
+            diameter=state.entity_state.diameter,
             proxs_dist_max=braitenberg_state.proxs_dist_max,
             proxs_cos_min=braitenberg_state.proxs_cos_min
         )
@@ -259,8 +257,6 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
         braitenberg_state = braitenberg_state.set(
             prox=proxs,
             prox_per_subtype=prox_per_subtype,
-            # proximity_map_dist=proximity_dist_map,
-            # proximity_map_theta=proximity_dist_theta,
             motor=motors,
         )
 

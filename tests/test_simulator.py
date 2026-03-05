@@ -28,13 +28,13 @@ def test_load_save_simulator_config(scene_config):
 
     updated_config = simulator.to_config(state)
 
-    assert updated_config.freq == 42.
+    assert updated_config.client.controller_kwargs.freq == 42.
 
     new_simulator = Simulator.from_config(updated_config)
 
     assert new_simulator.freq == 42.
     assert new_simulator
 
-    # assert hasattr(new_simulator.controller_parameters, 'agents')
+    # assert hasattr(new_simulator.controller_parameters, 'agents') # TODO: to fix
 
     pass
