@@ -1,0 +1,87 @@
+defaults:
+  - session_defaults
+  - environment/components/spawn/default@environment.components.component_list.spawn_A
+  - environment/components/spawn/default@environment.components.component_list.spawn_B
+  - environment/components/consumption/default@environment.components.component_list.consumption
+  - clients/spawn@environment.components.component_list.spawn_A.client
+  - clients/spawn@environment.components.component_list.spawn_B.client
+  - clients/consumption@environment.components.component_list.consumption.client
+  - environment/components/energy/default@environment.components.component_list.energy
+  - environment/components/reproduction/default@environment.components.component_list.reproduction  
+  - _self_
+
+scene_name: reactive_rl
+
+environment:
+  components:
+    component_list:
+      agents:
+        n_max: 1
+        n_exists: 1
+        n_behaviors: 2
+        diameter:
+          _all_values_: 6.0
+      objects:
+        n_max: 20
+        by_indices:
+          - A:
+              indices: "${range: 0, 10}"
+              subtype: A
+              diameter: 3.0
+              client:
+                color: green
+          - B:
+              indices: "${range: 10, 20}"
+              subtype: B
+              diameter: 3.0
+              client:
+                color: yellow
+      spawn_A:
+        subtype: 1
+        period: 60
+        position_range: [0., 100., 0., 100.]
+        orientation_range: [0., 6.3]
+        start: true
+      spawn_B:
+        subtype: 2
+        period: 60
+        position_range: [0., 100., 0., 100.]
+        orientation_range: [0., 6.3]
+        start: true     
+      consumption:
+        consuming_in_entity_state: true
+        agent_to_A:
+          source_subtype: 0
+          target_subtype: 1
+          range: 1.0
+          start: true
+        agent_to_B:
+          source_subtype: 0
+          target_subtype: 2
+          range: 1.0
+          start: true
+        client:
+          controller_kwargs:
+            names: ['agent_to_A', 'agent_to_B']
+      energy:
+        entity_type: objects
+        energy_init: 1.
+        energy_max: 10000000.0
+        energy_decay: 0.0
+        energy_burst: 1.
+        distribute_extra_energy: false
+      reproduction:
+        entity_type: objects
+        subtype: -1
+        birth_energy_threshold: 2.0 # > energy_max to prevent reproduction
+        death_energy_threshold: 0.0   
+
+subtype_labels:
+  - agent
+  - A
+  - B
+
+interface:
+  notebook:
+    path: notebooks/sessions/reactive_rl.ipynb
+
