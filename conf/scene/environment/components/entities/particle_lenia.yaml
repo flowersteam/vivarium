@@ -12,7 +12,7 @@ diameter:
 friction:
   _all_values_: 1.
 position:
-  _range_: [20, 40, 20, 40]
+  _range_: [40, 60, 40, 60]
 orientation:
   _all_values_: 0.0
 mu_k:
