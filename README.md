@@ -70,7 +70,7 @@ python3 scripts/run_server.py scene=prey_predator_large
 Once the server is running, start the web interface:
 
 ```bash
-panel serve scripts/run_interface.py --autoreload
+python3 scripts/run_interface.py
 ```
 
 Once this command will have completed, it will output a URL looking like `http://localhost:5006/run_interface`. Just click on it, and it will open the web interface in your browser. From here, you can observe and interact with the simulation. We recommend starting with the [Web Interface Tutorial](notebooks/tutorials/web_interface_tutorial.md) to get a better understanding of the interface and its functionalities.
