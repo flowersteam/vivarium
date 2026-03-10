@@ -1,6 +1,6 @@
 # 🌱 Vivarium
 
-**Vivarium** is framework for for building and running multi-agents simulations using Jax. It allows you to design simple agents equipped with two motors and two sensors, inspired by [Braitenberg Vehicles ](https://en.wikipedia.org/wiki/Braitenberg_vehicle), operating in a 2D rigid-body physics environment powered by [Jax-MD](https://github.com/jax-md/jax-md).
+**Vivarium** Vivarium is a multi-agent simulation framework built with JAX for running large-scale simulations with real-time interaction capabilities. It enables users to design simple agents (e.g. Braitenberg Vehicles) operating in a 2D particle physics environment.
 
 ### **Key Features**:
 - **Predefined and Custom Simulations**: Quickly start with built-in scenes or create your own with customizable parameters.
@@ -34,6 +34,7 @@ env_vivarium\Scripts\Activate.ps1 #(for Windows users)
 ```bash
 pip install -e . 
 ```
+<!-- TODO: Also document extra from setup.py -->
 
 If you are a UPF student, continue from [here](notebooks/sessions/README.md).
 
@@ -50,51 +51,53 @@ Vivarium can be used in three main ways:
 To run the simulation in a server, use the following command:
 
 ```bash
-python3 scripts/run_server.py
+python3 scripts/run_server.py scene=<SCENE_NAME>
 ```
 
-By default, the simulation will use the configuration specified in the `default.yaml` scene file, located in the `conf/scene` directory. This system enables you to create custom scene files to define the initial parameters of your simulations with [Hydra](https://hydra.cc/docs/intro/).
+The available scenes are located in the `conf/scene` directory as YAML files. It is possible to create custom scene files to define the initial parameters of your simulations with [Hydra](https://hydra.cc/docs/intro/).
 
 #### Using custom scene files 🌄
 
-You can customize the initial simulation parameters by creating your own scene files in YAML format and placing them in this `conf/scene` directory. Scene files can specify parameters such as the number of objects, their size, or the colors, positions, and behaviors of agents for example. See Tutorial [Create a custom Scene](notebooks/tutorials/create_custom_scene_tutorial.md) for more information.
+You can customize the initial simulation parameters by creating your own scene files in YAML format and placing them in this `conf/scene` directory. Scene files can specify parameters such as the number of objects, their size, or the colors, positions, and behaviors of agents for example. 
+<!-- TODO: Add documentation on how to write custom scene files -->
 
-To use a custom scene file in your simulation, pass the `scene` option followed by the name of the scene file (without the `.yaml` extension) to the `run_server.py` script. For example, to run the `prey_predator_large` scene, use the following command:
+To use a custom scene file in your simulation, pass the `scene` option followed by the name of the scene file (without the `.yaml` extension) to the `run_server.py` script. For example, to run the `particle_lenia` scene, use the following command:
 
 ```bash
-python3 scripts/run_server.py scene=prey_predator_large
+python3 scripts/run_server.py scene=particle_lenia
 ```
 
 ### 2. Interact via the web interface 🌐
 
-Once the server is running, start the web interface:
+You can start the web interface with:
 
 ```bash
 python3 scripts/run_interface.py
 ```
 
-Once this command will have completed, it will output a URL looking like `http://localhost:5006/run_interface`. Just click on it, and it will open the web interface in your browser. From here, you can observe and interact with the simulation. We recommend starting with the [Web Interface Tutorial](notebooks/tutorials/web_interface_tutorial.md) to get a better understanding of the interface and its functionalities.
+It will open a new tab in your browser, where you will be able to select the scene to open. From here, you can observe and interact with the simulation. We recommend starting with the [Web Interface Tutorial](notebooks/tutorials/web_interface_tutorial.md) to get a better understanding of the interface and its functionalities.
 
 
 ### 3. Control simulations from Jupyter Notebooks 📓
 
-You can control the simulator programmatically using Jupyter Notebooks. This allows you to manage agent behaviors, internal states, and environmental dynamics (e.g., spawning resources or interaction mechanisms). With this approach, there's no need to manually start the server or interfac. Everything can be initiated directly from the provided commands within the notebooks. 
+You can control the simulator programmatically using Jupyter Notebooks. This allows you to manage agent behaviors, internal states, and environmental dynamics (e.g., spawning resources or interaction mechanisms) using a pythonic interface hiding the complexity of JAX. There are several ways to connect a Jupyter Notebook with a simulation server:
 
-To get started, we recommend completing the [web interface tutorial](notebooks/tutorials/web_interface_tutorial.md) first. You can then start controlling the simulation from a Jupyter Notebook by following the [quickstart tutorial](notebooks/tutorials/quickstart_tutorial.ipynb).
+- Creating an instance of `VivariumController` within a notebook, from which you can either connect to an existing server or start a new one and the interface.
+- Using the Notebook tab in the web interface, from which you can open a notebook that appears directly within the interface.
 
 ## 📚 Tutorials
 
 To help you get started and explore the project, we provide a set of Jupyter notebook tutorials located in the `notebooks/tutorials` [directory](notebooks/tutorials/README.md). These tutorials cover various aspects of the project, from using the graphical interface to interacting with simulations and understanding the backend.
 
-- **Web Interface Tutorial**: Begin with the [web interface tutorial](notebooks/tutorials/web_interface_tutorial.md) to gain a basic understanding of the project and learn how to use the graphical interface.
-- **Quickstart Tutorial**: To learn how to interact with a simulation from a Jupyter notebook, follow the [quickstart tutorial](notebooks/tutorials/quickstart_tutorial.ipynb). This tutorial will guide you through creating, running, and manipulating simulations within a notebook environment.
-- **Create a custom Scene**: If you want to create your own simulations with custom parameters, check out the [create a custom scene tutorial](notebooks/tutorials/create_custom_scene_tutorial.md). This tutorial will show you how to create and use custom scene files to define the initial parameters of your simulations. 
-- **Simulator tutorial**: For a deeper understanding of the simulator backend and its capabilities, check out the [simulator tutorial](notebooks/tutorials/simulator_tutorial.ipynb). This tutorial provides insights into the underlying mechanics of the simulator and demonstrates how to leverage its features for advanced use cases
+<!-- TODO: List available tutorials here when they will be ready -->
+
 
 ## 🎓 Educational sessions 
 
-We offer a series of educational Jupyter Notebooks designed to teach the fundamentals of multi-agent simulation. These six sessions range from assigning basic agent behaviors to building complex eco-evolutionary environments and logging data for advanced projects.You can find these sessions in the `notebooks/sessions` [directory](notebooks/sessions/README.md). They cover topics such as:
-- **Assigning reactive behaviors to agents**
+We offer a series of educational Jupyter Notebooks designed to teach the fundamentals of multi-agent simulations. These six sessions range from assigning basic agent behaviors to building complex eco-evolutionary environments and logging data for advanced projects. The educational sessions are prefixed by "Session:" in the scene selection page of the interface. After opening a session scene in the interface, you can start the associated notebook directly from there.
+
+Otherwise, you can find the notebook sessions in the `notebooks/sessions` [directory](notebooks/sessions/README.md). They cover topics such as:
+- **Assigning reactive behaviors to multiple agents**
 - **Controlling the environmental dynamics**
 - **Logging and analyzing simulation data**
 
@@ -102,7 +105,7 @@ We offer a series of educational Jupyter Notebooks designed to teach the fundame
 
 ### gRPC Configuration 🔄
 
-The projecte uses gRPC to communicate between server and clients. If you made any changes in the .proto file, you will need to recompile the gRPC files. Here is the command line instruction to do so:
+The project uses gRPC to communicate between server and clients. If you made any changes in the `simulator/grpc_server/protos/simulator.proto` file, you will need to recompile the gRPC files. Here is the command line instruction to do so:
 
 ```bash
 python -m grpc_tools.protoc -I./vivarium/simulator/grpc_server/protos --python_out=./vivarium/simulator/grpc_server/ --pyi_out=./vivarium/simulator/grpc_server/ --grpc_python_out=./vivarium/simulator/grpc_server/ ./vivarium/simulator/grpc_server/protos/simulator.proto
@@ -118,4 +121,4 @@ pytest
 
 ## Acknowledgments
 
-The main contributors of this repository are Corentin Léger and Clément Moullin-Frier from the Flowers team at Inria, with participation of Martial Marzloff. CMF initiated the code base architecture in 2023 and CL was the main developper in 2024. CL was funded by the [French National Research Agency](https://anr.fr/), project ECOCURL, Grant ANR-20-CE23-0006. 
+The main contributors of this repository are Clément Moulin-Frier and Corentin Léger from the Flowers team at Inria, with participation of Martial Marzloff. CMF initiated the code base architecture in 2023, CL was the main developer in 2024 with the help of MM, and CMF took over from 2025. CL was funded by the [French National Research Agency](https://anr.fr/), project ECOCURL, Grant ANR-20-CE23-0006. 
