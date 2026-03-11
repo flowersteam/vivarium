@@ -1,6 +1,6 @@
 # 🌱 Vivarium
 
-**Vivarium** Vivarium is a multi-agent simulation framework built with JAX for running large-scale simulations with real-time interaction capabilities. It enables users to design simple agents (e.g. Braitenberg Vehicles) operating in a 2D particle physics environment.
+**Vivarium** is a massively multi-agent 2D simulator with realistic physics for research and education in Artificial Intelligence and Artificial Life. It facilitates the design of complex multi-agent ecosystems where thousands of artificial agents interact in a shared environment. The interface is modular, enabling to compose diverse types of agents and entities, each one with its particular dynamics, in a reusable way. It is designed to be usable to a large audience: from high-school students with a code-free web interface, to computer science university students through a pythonic interface enabling real-time interactions, as well to computer science researchers with GPU-accelerated simulation that can run on supercomputers. The core simulator is written in JAX, the web interface with Panel, and the client-server communication relies on gRPC.
 
 ### **Key Features**:
 - **Predefined and Custom Simulations**: Quickly start with built-in scenes or create your own with customizable parameters.
