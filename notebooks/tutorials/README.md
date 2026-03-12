@@ -1,3 +1,5 @@
+**Important**: Most notebooks in this directory are outdated. We will either adapt it or completely rewrite it.
+
 This directory contains different tutorials covering different levels of API of Vivarium: 
 
 - [**Web Interface**](web_interface_tutorial.md): This tutorial explains how to interact with the simulation using the Web Interface.
