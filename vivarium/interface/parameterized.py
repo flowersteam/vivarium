@@ -3,9 +3,6 @@ import logging
 from dataclasses import asdict
 
 
-# TODO: (2025-08-26) Rename this file, which will only contain code for param<->simulator/state communication
-
-
 lg = logging.getLogger(__name__)
 
 
