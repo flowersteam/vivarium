@@ -356,8 +356,9 @@ def energy(consumption):
 
 @pytest.fixture
 def reproduction(energy):
-    # Disable the ConsumptionComponent for the reproduction test by setting its range to 0.
-    energy[-2].consumption_params_dict['test_consumption']['range'] = 0.
+    # Disable the ConsumptionComponent for the reproduction test.
+    # range=0 is insufficient because overlapping entities (d_r < diameter sum) still consume.
+    energy[-2].consumption_params_dict['test_consumption']['start'] = False
     reproduction = ReproductionComponent(
         name='reproduction', 
         precedence=3,

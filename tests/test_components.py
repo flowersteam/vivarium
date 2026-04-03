@@ -208,6 +208,81 @@ def test_reproduction(environment_and_state, reproduction):
     assert state.entity_state.exists.sum() == n_exists + 1
 
 
+def test_reproduction_birth(environment_and_state, reproduction):
+    """Birth triggers when energy exceeds threshold and recovery time is sufficient."""
+    env, state = environment_and_state(reproduction, debug_mode=True)
+    parent_idx = 0
+    etype_idx = state.entity_state.entity_type_idx[parent_idx]
+    # Free a slot for the offspring
+    state = state.set(
+        entity_state=state.entity_state.set(
+            exists=state.entity_state.exists.at[1].set(0),
+        )
+    )
+    n_exists = state.entity_state.exists.sum()
+    # Set parent energy above birth_threshold (0.5) and recovery time above birth_recovery_time (100)
+    state = state.set(
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[parent_idx].set(1.),
+        ),
+        agents=state.agents.set(
+            reproduction=state.agents.reproduction.set(
+                recover_time=state.agents.reproduction.recover_time.at[etype_idx].set(1e5),
+            )
+        )
+    )
+    state = env.step(state, scan=False)
+    assert state.entity_state.exists.sum() == n_exists + 1
+
+
+def test_reproduction_recovery_time_prevents_birth(environment_and_state, reproduction):
+    """Recovery time below threshold prevents reproduction even with sufficient energy."""
+    env, state = environment_and_state(reproduction, debug_mode=True)
+    parent_idx = 0
+    # Free a slot for potential offspring
+    state = state.set(
+        entity_state=state.entity_state.set(
+            exists=state.entity_state.exists.at[1].set(0),
+        )
+    )
+    n_exists = state.entity_state.exists.sum()
+    # Set parent energy above birth_threshold but leave recover_time at 0 (below birth_recovery_time=100)
+    state = state.set(
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[parent_idx].set(1.),
+        )
+    )
+    state = env.step(state, scan=False)
+    assert state.entity_state.exists.sum() == n_exists
+
+
+def test_reproduction_nonexisting_entities_dont_reproduce(environment_and_state, reproduction):
+    """Non-existing entities don't trigger reproduction."""
+    env, state = environment_and_state(reproduction, debug_mode=True)
+    parent_idx = 0
+    etype_idx = state.entity_state.entity_type_idx[parent_idx]
+    # Make parent non-existing, and free another slot for potential offspring
+    state = state.set(
+        entity_state=state.entity_state.set(
+            exists=state.entity_state.exists.at[parent_idx].set(0).at[1].set(0),
+        )
+    )
+    n_exists = state.entity_state.exists.sum()
+    # Give parent high energy and sufficient recovery time
+    state = state.set(
+        entity_state=state.entity_state.set(
+            energy=state.entity_state.energy.at[parent_idx].set(1.),
+        ),
+        agents=state.agents.set(
+            reproduction=state.agents.reproduction.set(
+                recover_time=state.agents.reproduction.recover_time.at[etype_idx].set(1e5),
+            )
+        )
+    )
+    state = env.step(state, scan=False)
+    assert state.entity_state.exists.sum() == n_exists
+
+
 def test_braitenberg(environment_and_state, braitenberg):
     env, state = environment_and_state(braitenberg)
     state = env.step(state)
