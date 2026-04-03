@@ -29,7 +29,7 @@ _These apply to every task below._
 4. Inform the user of how you plan to proceed and iterate before executing. For complex tasks (structural changes, many files), use Plan mode.
 
 **During execution:**
-5. Only change what the task describes. If you spot an unrelated issue, flag it to the user with a recommendation on whether to address it now or note it for later.
+5. Only change what the task describes. If you spot an unrelated bug, flag it to the user and add it to the **Discovered Bugs** section below with a short description, location, and severity.
 6. When writing or modifying docstrings, use **Google-style format** (not reST/Sphinx). This is the project standard.
 
 **Reviewing:**
@@ -38,7 +38,7 @@ _These apply to every task below._
 
 **Completing a task:**
 9. In parallel: (a) ask the user if `pytest` should be run, and (b) update affected CLAUDE.md files as specified in the task.
-10. Mark the task `[x]` in PLAN.md and move it to the Completed section.
+10. Remove the task in `PLAN.md` and add a summary the Completed section.
 11. Propose a commit message (unsigned).
 12. The user reviews, commits, and handles the merge to `dev`.
 
@@ -47,6 +47,9 @@ _These apply to every task below._
 - Full `pytest` — all green
 - Full review of all CLAUDE.md files against actual codebase
 - No dangling dependencies or TBD items in Phase 3
+
+**In general**
+Before running the full test suite, first carefully consider if this is necessary or if it is sufficient to run a subset. The full suite takes quite a long time to execute. If you have a doubt, just ask.
 
 ---
 
@@ -59,52 +62,8 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-#### P2.00 — Strip CLAUDE.md files to descriptive content
-- **Status:** [ ]
-- **Dependencies:** none
-- **Key files:** `CLAUDE.md`, `vivarium/environment/CLAUDE.md`, `vivarium/simulator/CLAUDE.md`, `vivarium/controllers/CLAUDE.md`, `vivarium/interface/CLAUDE.md`, `vivarium/utils/CLAUDE.md`, `conf/CLAUDE.md`, `scripts/CLAUDE.md`, `tests/CLAUDE.md`, `notebooks/CLAUDE.md`
-- **CLAUDE.md updates:** This task *is* the update.
-
-All 10 CLAUDE.md files currently mix descriptive content (what the code is) with diagnostic content (what's wrong with it). Now that all issues have been processed into PLAN.md tasks or the deferred backlog, the diagnostic sections are redundant and risk causing confusion during future tasks (e.g., Claude might try to fix an issue that's planned as a separate task).
-
-**Remove the following section types from all CLAUDE.md files:**
-- Known Issues
-- Refactoring Opportunities
-- Structural Questions
-- Dead Code to Remove (global CLAUDE.md)
-- Cross-Package Issues (global CLAUDE.md)
-- Audience Journey Readiness (global CLAUDE.md)
-
-**Keep:**
-- Purpose / overview
-- Structure / Files (directory trees, file tables)
-- Architecture (diagrams, patterns, data flow)
-- Public API
-- Who Imports From X / Dependencies
-- Test Coverage
-
-**Additional cleanup:**
-- Remove LOC counts from all file tables (keep the tables, just drop the size column).
-- After removing sections, review remaining text for dangling references to removed content (e.g., the Architecture section in global CLAUDE.md mentions the component location flaw — rephrase to describe the current state without framing it as a problem to fix).
-
-#### P2.01 — Fix test_reproduction and add reproduction tests
-- **Status:** [ ]
-- **Dependencies:** none
-- **Key files:** `vivarium/environment/components/reproduction/component.py`, `tests/test_components.py`
-- **CLAUDE.md updates:** none (diagnostic content will already be stripped in P2.00)
-
-The `test_reproduction` test has a pre-existing failure. The root cause is an index mismatch in `reproduction/component.py`: `entity_type_energy` is built by selecting only entities of the target type, but the code indexes into it using global entity indices (`entity_type_idx`) instead of component-specific indices. Same issue for `recover_time`. Fix at ~4 locations.
-
-After fixing, add 4 targeted tests:
-1. Birth triggers when energy exceeds threshold
-2. Death triggers when energy drops below threshold
-3. Recovery time prevents immediate re-reproduction
-4. Non-existing entities don't reproduce
-
-Run `pytest` to confirm all tests pass — this establishes the green baseline for all subsequent tasks.
-
 #### P2.02 — Write exhaustive feature tests for student-facing API
-- **Status:** [ ]
+- **Status:** [x]
 - **Dependencies:** P2.01 (green baseline)
 - **Key files:** `tests/test_edu_sessions.py`, `notebooks/sessions/session_1.ipynb`, `notebooks/sessions/session_2.ipynb`, `notebooks/sessions/session_3.ipynb`, `notebooks/sessions/session_4.ipynb`, `notebooks/sessions/miniproject_template.ipynb`
 - **CLAUDE.md updates:** none
@@ -200,7 +159,18 @@ tests/
   controllers/
     __init__.py
     test_vivarium_controller.py
-    test_edu_sessions.py
+    test_edu_sessions/             # already a directory (from P2.02)
+      __init__.py
+      conftest.py
+      test_subtype_labels.py
+      test_entity_access.py
+      test_properties.py
+      test_sensing.py
+      test_behaviors.py
+      test_routines.py
+      test_logger.py
+      test_consumption_spawn.py
+      test_internal_state.py
   interface/
     __init__.py
     test_panel_app.py
@@ -819,6 +789,27 @@ Stub files for untested modules (makes gaps visible in file tree). Directory-lev
 **D.18 — Standalone API reference documentation.**
 A reference document or generated docs (Sphinx) covering the full public API. Tutorials (P3.01–P3.06) + docstrings (P3.10) are sufficient for the release; a standalone reference is a post-release improvement.
 
+## Discovered Bugs
+
+_Bugs found during task execution that are outside the scope of the current task. Fix these when working on the relevant area, or as a standalone fix if blocking._
+
+**B.01 — `SingleSpawnController.__getattr__` crashes on plain Python types (in-process path)**
+- **Location:** `vivarium/environment/components/eco_evo/spawn/controller.py:21`
+- **Severity:** Low (only affects in-process Simulator usage, not the gRPC path used by notebooks/interface)
+- **Description:** The getter calls `.item()` on the return value, but when using the in-process Simulator (no gRPC), controller parameter values are plain Python types (`int`, `bool`) rather than JAX/numpy arrays. `.item()` fails with `AttributeError`. Affects reads of `period`, `start`, `position_range`, and `orientation_range`.
+- **Fix:** Guard `.item()` with a `hasattr` check, or use a try/except to return the value directly if it's already a Python scalar. But first consider if this could involve any slow down.
+- **Tests:** 3 xfail tests in `tests/test_edu_sessions/test_consumption_spawn.py` — remove xfail markers after fixing.
+- **Discovered in:** P2.02
+
+---
+
 ## Completed
 
-_Tasks moved here when done._
+#### P2.00 — Strip CLAUDE.md files to descriptive content
+Removed diagnostic sections (Known Issues, Refactoring Opportunities, Structural Questions, Cross-Package Issues, Dead Code to Remove, Audience Journey Readiness) from all 10 CLAUDE.md files. Removed LOC/Size columns, audit-related titles, and fixed dangling references.
+
+#### P2.01 — Fix test_reproduction and add reproduction tests
+The reproduction fixture's consumption disablement (`range=0`) was insufficient — overlapping entities still triggered consumption. Changed to `start=False`. Added 3 targeted reproduction tests (birth, recovery time gating, non-existing entity exclusion). Full pytest green (191 passed).
+
+#### P2.02 — Write exhaustive feature tests for student-facing API
+Replaced `tests/test_edu_sessions.py` with `tests/test_edu_sessions/` package (9 test files + conftest). Complete feature inventory (13 categories) in conftest docstring. 101 tests total: 72 new covering entity access, properties, sensing, behaviors, routines, logger, consumption/spawn, internal state + 30 moved subtype_labels tests - 1 dropped (superseded). Discovered B.01 (SingleSpawnController `.item()` bug, 3 xfail tests). Updated P2.05 target structure. Full pytest green (262 passed, 3 xfailed).

@@ -1,62 +1,10 @@
 import pytest
-import jax.numpy as jnp
 
 from vivarium.controllers.vivarium_controller import VivariumController
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 
 
 NUM_STEPS = 4
-
-
-@pytest.mark.parametrize('scene_name', ['session_1', 'session_2', 'session_3', 'session_4'])
-def test_session(scene_name, vivarium_controller_start_session):
-
-    controller = vivarium_controller_start_session(scene_name, overrides=["environment.kwargs.debug_mode=true"])
-
-    def beh(agent):
-        left, right = agent.proximeters()
-        return 1 - right, 1 - left
-
-    idx = 0
-    pos = controller.client.state.entity_state.position[idx]
-
-    ag = controller.agents[idx]
-
-    ag.attach_behavior(beh)
-
-    assert (jnp.equal(pos, ag.position).all())
-
-    controller.simulator.simulation_running = True
-
-    # Step twice to initialize force and momentum
-    controller.step()
-    controller.step()
-
-    for _ in range(NUM_STEPS):
-        pos = controller.client.state.entity_state.position[idx]
-        controller.step()
-        assert (not jnp.equal(pos, ag.position).all())
-
-    ag.color = 'pink'
-    controller.step()
-
-    # Sessions 3 and 4 include consumption and spawn controllers.
-    # Verify that their subtype setters and getters still work after a simulation run.
-    if 'consumption' in controller.controllers:
-        # Use the first two subtypes to set source and target (valid for all sessions).
-        new_src = controller.subtypes[0]
-        new_tgt = controller.subtypes[1]
-        controller.consumption.source_subtype = new_src
-        controller.consumption.target_subtype = new_tgt
-        controller.step()
-        assert controller.consumption.source_subtype == new_src
-        assert controller.consumption.target_subtype == new_tgt
-
-    if 'spawn' in controller.controllers:
-        new_spawn = controller.subtypes[0]
-        controller.spawn.subtype = new_spawn
-        controller.step()
-        assert controller.spawn.subtype == new_spawn   
 
 
 # =============================================================================
