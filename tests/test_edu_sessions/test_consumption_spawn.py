@@ -1,12 +1,5 @@
-"""Tests for consumption and spawn multi-slot configuration and has_consumed.
+"""Tests for consumption and spawn multi-slot configuration and has_consumed."""
 
-Note: SingleSpawnController.__getattr__ calls .item() on values that may be
-plain Python types (int/bool) when using the in-process Simulator (no gRPC).
-This is a pre-existing bug. Spawn property read tests that would hit this are
-marked xfail. The bug does not affect the gRPC path (notebooks/interface).
-"""
-
-import pytest
 import numpy as np
 
 
@@ -75,11 +68,6 @@ def test_spawn_slot_subtype_read_write(controller):
     assert slot.subtype == 'subtype_5'
 
 
-@pytest.mark.xfail(
-    reason="SingleSpawnController.__getattr__ calls .item() on plain int "
-           "(in-process Simulator path). Works fine via gRPC.",
-    raises=AttributeError,
-)
 def test_spawn_slot_period_read(controller):
     """spawn.slot_1.period is readable."""
     slot = controller.spawn.slot_1
@@ -94,11 +82,6 @@ def test_spawn_slot_period_write(controller):
     controller.apply_changes()
 
 
-@pytest.mark.xfail(
-    reason="SingleSpawnController.__getattr__ calls .item() on plain bool "
-           "(in-process Simulator path). Works fine via gRPC.",
-    raises=AttributeError,
-)
 def test_spawn_slot_start_read_write(controller):
     """spawn.slot_1.start can be toggled on and off."""
     slot = controller.spawn.slot_1
@@ -111,11 +94,6 @@ def test_spawn_slot_start_read_write(controller):
     assert slot.start is False
 
 
-@pytest.mark.xfail(
-    reason="SingleSpawnController.__getattr__ calls .item() on plain list "
-           "(in-process Simulator path). Works fine via gRPC.",
-    raises=(AttributeError, TypeError),
-)
 def test_spawn_slot_position_range_read_write(controller):
     """spawn.slot_1.position_range is readable and writable."""
     slot = controller.spawn.slot_1

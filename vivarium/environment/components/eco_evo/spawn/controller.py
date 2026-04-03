@@ -1,6 +1,7 @@
 import numpy as np
 
 from .....controllers.controller import Controller
+from .....utils.dataclass_wrapper import Remote
 
 
 class SingleSpawnController:
@@ -16,6 +17,11 @@ class SingleSpawnController:
         value = getattr(self._remote.state, f'{self._global_controller_name}_state').__getattr__(attr)[self._idx]
         if attr == 'subtype':
             return self._subtype_labels[int(value)]
+        # Normalize: value may be a Remote proxy (wrapping JAX/numpy), a bare
+        # JAX array, or a plain Python type depending on the access path.
+        if isinstance(value, Remote):
+            value = value.obj()
+        value = np.asarray(value)
         if attr in ('position_range', 'orientation_range'):
             return tuple(value.tolist())
         return value.item()

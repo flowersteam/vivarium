@@ -793,14 +793,6 @@ A reference document or generated docs (Sphinx) covering the full public API. Tu
 
 _Bugs found during task execution that are outside the scope of the current task. Fix these when working on the relevant area, or as a standalone fix if blocking._
 
-**B.01 — `SingleSpawnController.__getattr__` crashes on plain Python types (in-process path)**
-- **Location:** `vivarium/environment/components/eco_evo/spawn/controller.py:21`
-- **Severity:** Low (only affects in-process Simulator usage, not the gRPC path used by notebooks/interface)
-- **Description:** The getter calls `.item()` on the return value, but when using the in-process Simulator (no gRPC), controller parameter values are plain Python types (`int`, `bool`) rather than JAX/numpy arrays. `.item()` fails with `AttributeError`. Affects reads of `period`, `start`, `position_range`, and `orientation_range`.
-- **Fix:** Guard `.item()` with a `hasattr` check, or use a try/except to return the value directly if it's already a Python scalar. But first consider if this could involve any slow down.
-- **Tests:** 3 xfail tests in `tests/test_edu_sessions/test_consumption_spawn.py` — remove xfail markers after fixing.
-- **Discovered in:** P2.02
-
 ---
 
 ## Completed
@@ -813,3 +805,6 @@ The reproduction fixture's consumption disablement (`range=0`) was insufficient 
 
 #### P2.02 — Write exhaustive feature tests for student-facing API
 Replaced `tests/test_edu_sessions.py` with `tests/test_edu_sessions/` package (9 test files + conftest). Complete feature inventory (13 categories) in conftest docstring. 101 tests total: 72 new covering entity access, properties, sensing, behaviors, routines, logger, consumption/spawn, internal state + 30 moved subtype_labels tests - 1 dropped (superseded). Discovered B.01 (SingleSpawnController `.item()` bug, 3 xfail tests). Updated P2.05 target structure. Full pytest green (262 passed, 3 xfailed).
+
+#### B.01 — Fix `SingleSpawnController.__getattr__` crash on in-process path
+`SingleSpawnController.__getattr__` assumed values were always numpy arrays (`.item()`, `.tolist()`), but the in-process Simulator returns JAX arrays or plain Python types wrapped in `Remote` proxies. Fixed by unwrapping `Remote` and normalizing to numpy via `np.asarray()` before calling array methods. Removed 3 xfail markers from `test_consumption_spawn.py`. Full pytest green (262 passed, 0 xfailed).
