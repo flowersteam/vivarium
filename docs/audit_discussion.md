@@ -27,6 +27,8 @@ _Sources: global CLAUDE.md §Cross-Package Issues #1, environment/CLAUDE.md §St
 3. Verify re-export shims are no longer needed and remove them
 4. Run tests to confirm nothing broke
 
+**Corresponding tasks in PLAN.md:** P2.10
+
 #### §1.2 Config–code structure mismatch
 
 _Sources: conf/CLAUDE.md §Config–Code Structure Mismatch, global CLAUDE.md §from_config Pattern, global CLAUDE.md §Cross-Package Issues #5_
@@ -44,6 +46,8 @@ _Sources: conf/CLAUDE.md §Config–Code Structure Mismatch, global CLAUDE.md §
 **Note from CMF, the developer:** We could try to write a full scene instantiation using only the main `__init__()` constructors for all classes, without any `from_config()` constructor (relates to the previous point, as this might be considered as the Research journey, but with controllers and interfaces in addition). If this is possible, using a more standard hydra initialize pattern when using configs might be a viable option. Potential prompt for Claude: *Write a script/notebook that instantiates the scene in `braitenberg.yaml` using only the main `__init__()` constructors, i.e. without referring to the yaml config. We must be able to start the server and interface and connect a jupyter notebook without using any yaml config file.*
 
 **Update (§3.1.1 discussion):** The `__init__`-only experiment has been completed — see `scripts/dev/config_free_braitenberg.py`. It works with the current codebase. The refactor-or-document decision is: **investigate config modernization** (custom resolvers, structural alignment between configs and `__init__` signatures) via a focused spike on `braitenberg.yaml` before finalizing Phase 2 tasks. See §3.1.1 for the full plan, including prerequisites and timing.
+
+**Corresponding tasks in PLAN.md:** P2.16
 
 #### §1.3 Streaming and real-time update system
 
@@ -73,6 +77,8 @@ _Sources: interface/CLAUDE.md §Known Issues #2-3, simulator/CLAUDE.md §Structu
 **Keep as-is:**
 - `StreamState` RPC, `start_state_stream()`/`stop_state_stream()`, `_start_streaming()`/`_stop_streaming()`
 - `is_streaming` conditional in `apply_changes()` / `set_changes()`
+
+**Corresponding tasks in PLAN.md:** P2.12
 
 #### §1.4a `utils/` reorganization and `vivarium/runtime/` package
 
@@ -120,6 +126,8 @@ vivarium/utils/
 **Note from the developer:**
 It might be more efficient to leverage the refactoring functionalities of VSCode to move modules and functions. VSCode should adapt the imports automatically. This can only be done by human though (I think).
 
+**Corresponding tasks in PLAN.md:** P2.13
+
 #### §1.4b `panel_app.py` monolith split
 
 _Sources: global CLAUDE.md §Cross-Package Issues #2, global CLAUDE.md §Audience Journey Readiness #3, interface/CLAUDE.md §Known Issues #1 and §Refactoring Opportunities and §Structural Questions #3_
@@ -141,6 +149,8 @@ vivarium/interface/
   parameterized.py      # (unchanged)
   utils.py              # (unchanged)
 ```
+
+**Corresponding tasks in PLAN.md:** P2.14
 
 #### §1.5 Dynamic dataclass patterns
 
@@ -176,6 +186,8 @@ _Sources: global CLAUDE.md §Cross-Package Issues #3, simulator/CLAUDE.md §Know
 - `StateAndControllerParameters` dual definition — low risk, defer
 - Dynamic Param field cleanup in `interface/utils.py` — low risk if no new entity types added
 
+**Corresponding tasks in PLAN.md:** P2.11 (ghost attribute fixes), D.14 (StateAndControllerParameters dual definition), D.15 (dynamic Param field cleanup)
+
 #### §1.6 Script entry points: redundancy and cleanup
 
 _Sources: scripts/CLAUDE.md §Known Issues #3 #5, utils/CLAUDE.md §Known Issues #2_
@@ -187,6 +199,8 @@ _Sources: scripts/CLAUDE.md §Known Issues #3 #5, utils/CLAUDE.md §Known Issues
 - Not used programmatically — `handle_server_interface.py` spawns `run_server.py` and `run_interface.py` directly.
 - No test coverage. The 4 layers of PyInstaller guards (spawn counter, env vars, child process detection) are dead code since it's never bundled.
 - Removes the inconsistent scene argument style issue (positional arg vs Hydra override).
+
+**Corresponding tasks in PLAN.md:** P2.03
 
 ### Layer 2 — Per-Package Cleanup
 
@@ -213,6 +227,8 @@ _Sources: global CLAUDE.md §Dead Code to Remove, per-package CLAUDE.md files_
 - Commented-out config_update logic (panel_app.py:993-994, 999)
 - `kill_session()` in controllers/utils.py
 - `set_nested_attr` from controllers `__init__.py` exports (no consumer)
+
+**Corresponding tasks in PLAN.md:** P2.06
 
 #### §2.1a Rigid body removal
 
@@ -286,6 +302,8 @@ The `unified_*` accessors exist solely for the RigidBody abstraction. For point 
 - Sandbox notebook — not in release scope
 - Outdated notebooks referencing RigidBody — handled separately in §3.2
 
+**Corresponding tasks in PLAN.md:** P2.07
+
 #### §2.2 Bugs to fix
 
 _Sources: environment/CLAUDE.md §Known Issues #2 #4, interface/CLAUDE.md §Known Issues #4 #6, global CLAUDE.md §Patterns to Fix #6 #7, simulator/CLAUDE.md §Known Issues #6 #7, utils/CLAUDE.md §Known Issues #2, conf/CLAUDE.md §Known Issues #2 #3 #5_
@@ -312,6 +330,8 @@ _Sources: environment/CLAUDE.md §Known Issues #2 #4, interface/CLAUDE.md §Know
 
 **Skipped:**
 - `start_server_and_interface()` missing function — only used by outdated notebooks being rewritten/removed in §3.2
+
+**Corresponding tasks in PLAN.md:** P2.09
 
 #### §2.3 Test suite cleanup and gaps
 
@@ -407,6 +427,8 @@ tests/
 - Stub files for untested modules (makes gaps visible in file tree)
 - Directory-level markers (use per-file markers first)
 
+**Corresponding tasks in PLAN.md:** P2.01 (item 5 — test_reproduction fix), P2.02 (item 11 — exhaustive feature tests), P2.04 (items 1-4, 6-8 — test quality fixes), P2.05 (item 10 — test directory restructuring), D.16 (coverage gaps deferred), D.17 (structural improvements deferred)
+
 ### Layer 3 — Documentation & Feature Scope
 
 #### §3.1 Audience readiness and documentation plan
@@ -453,6 +475,8 @@ Rather than just documenting the config conventions, investigate whether configs
 - `scripts/dev/config_free_braitenberg.py` serves as a reference for the `__init__`-only path.
 - Explain how to install with extra for GPU support (see cuda-related extras in `setup.py`). Either in the main README or in a research-oriented README.
 
+**Corresponding tasks in PLAN.md:** P2.15 (transmit controller_cls), P2.16 (config experiment), P3.01 (researcher tutorial), P3.02 (YAML scene creation tutorial), P3.03 (archive server-side notebooks)
+
 ##### 3.1.2 CS student journey (programmatic control) — AGREED
 
 **Context:** Sessions 1-4 are excellent and well-tested (31 tests in `test_edu_sessions.py`). `miniproject_template.ipynb` and `reactive_rl.ipynb` are functional. Sessions target interdisciplinary Master students with limited programming background.
@@ -478,6 +502,8 @@ Rather than just documenting the config conventions, investigate whether configs
 **Deferred post-release:**
 - Standalone API reference documentation.
 
+**Corresponding tasks in PLAN.md:** P2.03 (notebook deletions), P3.04 (main CS tutorial), D.18 (standalone API reference deferred)
+
 ##### 3.1.3 Web interface journey (non-programmers) — AGREED
 
 **Context:** The Panel UI works (scene selection, Bokeh visualization, drag-drop, config tabs, start/stop). Only documentation is `web_interface_tutorial.md` (81 lines, current). `sessions/README.md` covers the PyInstaller binary workflow. The UI will change internally during Phase 2 (§1.4b monolith split, §1.3 streaming cleanup) but user-facing behavior should remain the same. This journey is interactive — students use the UI directly, not code.
@@ -498,6 +524,8 @@ Rather than just documenting the config conventions, investigate whether configs
 
 **No validation script** — this journey is interactive by nature.
 
+**Corresponding tasks in PLAN.md:** P3.05
+
 ##### 3.1.4 Developer journey (extending the code) — AGREED
 
 **Context:** No documentation exists for developers who want to extend vivarium. A "how to add a component" guide is critical for an incoming Master's student (mentioned in PLAN.md Phase 3).
@@ -515,6 +543,8 @@ Rather than just documenting the config conventions, investigate whether configs
 
 **Timing:** One of the last Phase 3 tasks — requires stable component architecture (after §1.1 component move, §1.2 config experiment, §2.1a rigid body removal).
 
+**Corresponding tasks in PLAN.md:** P3.06
+
 ##### 3.1.5 Cross-cutting documentation decisions — AGREED
 
 **A. Docstring format:**
@@ -527,13 +557,19 @@ Codebase uses mixed formats (~150 Google-style, ~172 reST/Sphinx). ~29% coverage
 - **Mass-convert existing reST docstrings** as a Phase 2 task (or early Phase 3). Use automated tools (`pyment` or `docconvert`) + review.
 - **Priority for new docstrings:** Core abstractions first (`Environment`, `Component`, `Simulator`, `VivariumController`), then student-facing APIs.
 
+**Corresponding tasks in PLAN.md (§3.1.5A):** P2.17 (format conversion), P3.10 (new docstrings and type hints)
+
 **B. Documentation website:**
 
 **Decision: Defer post-release.** Tutorials (notebooks) + README + docstrings are sufficient for a "clean and usable" release.
 
+**Corresponding tasks in PLAN.md (§3.1.5B):** D.18
+
 **C. Main README revision:**
 
 **Decision: Revise in Phase 3.** Make the audience journeys explicit. Structure: project description → the four journeys with links to their respective tutorials → installation → development setup.
+
+**Corresponding tasks in PLAN.md (§3.1.5C):** P3.07
 
 **D. Local READMEs and install documentation:**
 
@@ -547,6 +583,9 @@ Codebase uses mixed formats (~150 Google-style, ~172 reST/Sphinx). ~29% coverage
 
 - **Google Colab** (`google_colab.ipynb` / `google_colab.md`): Keep, fix hardcoded branch reference and TODOs. Decide on final location in Phase 3.
 - **Troubleshooting**: Need to document common issues (e.g. server/client disconnection). Decide in Phase 3 whether to include inline in tutorials or as a dedicated document.
+
+**Corresponding tasks in PLAN.md (§3.1.5D):** P3.08
+**Corresponding tasks in PLAN.md (§3.1.5E):** P3.09
 
 **F. Journey naming:**
 
@@ -566,6 +605,8 @@ Additionally, a journey is needed for practical session students (interdisciplin
 To decide when we start writing the README/tutorials.
 
 **Timing for renaming:** Decide final journey names at the start of Phase 3, before writing the README and tutorials. Names don't affect code, configs, or tests — no reason to rename earlier.
+
+**Corresponding tasks in PLAN.md (§3.1.5F):** P3.00
 
 #### §3.2 Notebook decisions
 
@@ -594,78 +635,312 @@ Most items already resolved by §3.1 decisions. Remaining items:
 
 **`sandbox.ipynb` — handled by developer.** Clear outputs and add to `.gitignore` (not currently gitignored).
 
----
+**Corresponding tasks in PLAN.md:** P2.02 (exhaustive feature tests), P2.03 (notebook deletions, sandbox cleanup)
 
-## Currently Discussing
-
-_(see next item below)_
-
----
-
-## Remaining to Discuss
-
-Topics are ordered by layer (architectural first, then cleanup, then docs/features) and within each layer by importance. Issues that are symptoms of the same root cause are grouped together.
-
----
-
-### Layer 3 — Documentation & Feature Scope
-
-#### 3.3 Feature fixes (Phase 4 scope)
+#### §3.3 Feature fixes (Phase 4 scope)
 
 _Sources: PLAN.md §Phase 4, global CLAUDE.md §Cross-Package Issues #9, environment/CLAUDE.md §Known Issues #2 #6 and §Structural Questions #2, simulator/CLAUDE.md §Known Issues #8, tests/CLAUDE.md §Known Issues #5, interface/CLAUDE.md §Structural Questions #1, conf/CLAUDE.md §Known Issues #5, controllers/CLAUDE.md §Test Coverage (Logger)_
 
-From PLAN.md Phase 4 rough scope, informed by audit findings:
+##### §3.3.1 Reproduction component — AGREED
 
-- **Reproduction component:** Has a pre-existing test failure. Complex state-dependent birth/death logic with no dedicated tests. Fix and test, or mark as experimental?
-- **Consumption component:** Untested in isolation. Feeding matrix computation may have edge cases.
-- **Recording feature:** Currently marked broken in simulator. Remove entirely (simplest), or fix and test?
-- **`render.py`:** Has bugs (double-indexing, xlim/ylim). Fix the bugs, or replace with something better? The Bokeh renderers in the Panel UI already know how to visualize entities — could potentially be used headlessly to replace matplotlib-based `render.py`, but launching Bokeh headlessly is non-trivial (interface/CLAUDE.md §Structural Questions #1, environment/CLAUDE.md §Structural Questions #2).
-- **Braitenberg sensing/motor extensions:** Mentioned in PLAN.md but not elaborated. What specifically?
-- **Headless logging:** No logging infrastructure for headless simulation (researchers need this). `Logger` in controllers is client-side only.
-- **`MaskFunction` extensibility:** Currently only supports `'exists'` label, hardcoded in `environment.py`. Works for current use cases but limits future flexibility (environment/CLAUDE.md §Known Issues #6).
-- **Config validation:** No validation that scene-defined entity subtypes match `subtype_labels` — UI controllers may fail silently (conf/CLAUDE.md §Known Issues #5).
-- Use boolean instead of int for `state.entity_state.exists`.
+**Decision: Fix the index bug (Phase 2, already agreed in §2.3 item 5). Add targeted tests. Mark as "functional but lightly tested" in docs. No heavy investment.**
 
-**To discuss:** Which of these are realistic for this release? Which should be explicitly deferred?
+- **Root cause of test failure:** Index mismatch in `reproduction/component.py` — `entity_type_energy` is built by selecting only entities of the target type, but the code indexes into it using global entity indices (`entity_type_idx`) instead of component-specific indices. Same issue for `recover_time`. Fix at ~4 locations.
+- **Add 4 targeted tests:** (1) birth triggers when energy exceeds threshold, (2) death triggers when energy drops below threshold, (3) recovery time prevents immediate re-reproduction, (4) non-existing entities don't reproduce.
+- Once the bug is fixed, the component logic (birth/death by energy thresholds) is straightforward. The exhaustive feature tests (§2.3 item 11) will also exercise reproduction indirectly if any session uses it.
+- Heavy investment (fuzzing edge cases, multi-type reproduction) has poor ROI for this release.
 
-#### 3.4 Minor cleanup items
+**Corresponding tasks in PLAN.md:** P2.01 (fix + tests), P3.01 (document as "functional but lightly tested")
+
+##### §3.3.2 Consumption component — AGREED
+
+**Decision: No Phase 4 action. Keep as-is, document as "functional, tested indirectly."**
+
+- No known bugs or test failures.
+- Exercised indirectly by integration tests (`test_environments.py` runs fishing and non_transitive scenes which include consumption).
+- The exhaustive feature tests (§2.3 item 11) will add coverage if sessions use consumption settings.
+- Isolated unit testing (crafting spatial configurations, verifying matrix values) is high effort, low return given no reported issues.
+- "Feeding matrix computation may have edge cases" was a generic audit concern, not a concrete bug.
+- Defer isolated testing post-release.
+
+**Corresponding tasks in PLAN.md:** No action needed
+
+##### §3.3.3 Server-side recording — AGREED
+
+**Decision: Remove broken code in Phase 2 (§2.1, already agreed). Design and implement a proper server-side recording mechanism in Phase 4.**
+
+- The broken recording code (`record`, `start_recording`, `stop_recording`, `save_records`, `load` in `simulator.py`) is removed as dead code in §2.1.
+- **Replacement:** A proper server-side recording component that records data into a dedicated JAX state field. This serves both the "recording" need (state capture over time for analysis/replay) and the "headless logging" need (§3.3.6) — researchers running headless simulations get their data from the JAX state.
+- The component-based approach is a promising direction but needs a dedicated design discussion before implementation, at the start of Phase 4 work on this item — by then the codebase will be stabilized (component move, rigid body removal, etc.).
+- Client-side `Logger` (in controllers) stays as-is for the notebook/programmatic use case.
+
+**Corresponding tasks in PLAN.md:** P2.06 (remove broken recording code), P4.00 (server-side recording component)
+
+##### §3.3.4 `render.py` — AGREED
+
+**Decision: Fix bugs in Phase 2 (§2.2, already agreed). Defer "render from recorded data" capability to Phase 4 as part of §3.3.3 recording component scope.**
+
+- Two rendering implementations exist: Bokeh (real-time in Panel UI) and matplotlib (`render.py`). Different libraries but similar logic (plotting entities in 2D).
+- "Launching Bokeh headlessly" was imprecise — the actual need is rendering recorded data a posteriori (e.g. producing videos from headless simulation recordings).
+- This depends on what the recording component (§3.3.3) stores, so rendering-from-recording should be designed alongside recording, not independently.
+- `render.py` stays as a quick matplotlib tool for visual checks in notebooks/scripts. The proper video pipeline comes with the recording feature in Phase 4.
+
+**Corresponding tasks in PLAN.md:** P2.09 (render.py bug fixes), P4.01 (render from recorded data)
+
+##### §3.3.5 Braitenberg sensing/motor extensions — AGREED
+
+**Decision: Phase 4, time permitting. Two concrete extensions identified. Not blocking for release.**
+
+- **N evenly-spaced sensor cones:** Generalize proximeters from 2 fixed sensors (left/right) to an arbitrary number of regularly spaced sensor cones. Touches `sensorimotor.py` (sensor geometry, motor mapping) and likely the behavior system (behavior functions currently assume 2 inputs). Bounded but non-trivial.
+- **Non-occluding proximeters:** Currently, a proximeter senses the closest entity in its cone regardless of subtype — non-target entities can shadow target entities. Add a non-occluding mode where the proximeter senses the closest entity of the target subtype, ignoring non-target entities in the way.
+- The current 2-proximeter occluding setup works and is well-exercised by sessions 1-4 and tests. No audience journey is blocked.
+- The original PLAN.md bullet "extend Braitenberg sensing/motor abilities" is narrowed to these two items.
+
+**Corresponding tasks in PLAN.md:** P4.03
+
+##### §3.3.6 Headless logging — merged into §3.3.3
+
+**Corresponding tasks in PLAN.md:** P4.00 (via §3.3.3)
+
+##### §3.3.7 `MaskFunction` extensibility — AGREED
+
+**Decision: Defer to post-release. No action for this release.**
+
+- Only one consumer (`BraitenbergComponent`), only one label (`'exists'`). Current behavior is correct for all scenes.
+- Making it extensible is a design question tied to future use cases that don't exist yet.
+- If §3.3.5 extensions (N sensors, non-occluding proximeters) need richer masking, that's the right time to generalize — design for the concrete need, not speculatively.
+
+**Corresponding tasks in PLAN.md:** D.11
+
+##### §3.3.8 Config validation — AGREED
+
+**Decision: Defer to post-release. No action for this release.**
+
+- Developer-facing guardrail, not a user-facing bug. Scene configs are written by developers, not end users.
+- All current scenes have correct `subtype_labels` — no active failure.
+- The developer tutorial (§3.1.4) will document the `subtype_labels` requirement, which is the more impactful fix for this release.
+
+**Corresponding tasks in PLAN.md:** D.12
+
+##### §3.3.9 Boolean `exists` field — AGREED
+
+**Decision: Phase 2 task. Change `state.entity_state.exists` from int (0/1) to boolean.**
+
+- Current int representation is confusing and adds unnecessary complexity (e.g. `exists == 1` instead of just `exists`).
+- Preliminary scan shows ~15-20 locations across environment code, tests, and configs, but **this is not exhaustive** — a careful full-codebase analysis is required before making the changes.
+- Common patterns include (maybe not exhaustive): `exists == 1` → `exists`, `exists == 0` → `~exists`, `.at[idx].set(1)` → `.at[idx].set(True)`, `dtype=int` → `dtype=bool`. No `exists * value` arithmetic patterns found in preliminary scan, but this must be verified.
+- **Timing:** To decide, but potentially after rigid body removal (§2.1a), before exhaustive feature tests (§2.3 item 11), so tests are written against the clean API.
+
+**Corresponding tasks in PLAN.md:** P2.08
+
+---
+
+#### §3.4 Minor cleanup items
 
 _Sources: environment/CLAUDE.md §Known Issues #7 #9 and §Structural Questions #3, controllers/CLAUDE.md §Known Issues #4 #6 and §Known Issues Medium #3 #4 #5 and §Refactoring, interface/CLAUDE.md §Known Issues #7 #8 #9 #10 #11, simulator/CLAUDE.md §Known Issues #8 #9, utils/CLAUDE.md §Known Issues #3 #6 #7 #8 and §Refactoring, scripts/CLAUDE.md §Known Issues #4 #6 #7, conf/CLAUDE.md §Known Issues #4, notebooks/CLAUDE.md §Known Issues #9, global CLAUDE.md §Cross-Package Issues #4_
 
 Lower-priority items that could be batched into a single cleanup pass:
 
 **Code quality:**
-- Missing `__all__` in several `__init__.py` files (environment/CLAUDE.md §Known Issues #9, interface/CLAUDE.md §Known Issues #9)
-- Missing docstrings on base class methods: `Controller.to_deal_with()`, `Controller.remote_to_ctrl()`, etc. (controllers/CLAUDE.md §Known Issues #6); `WindowManager.__init__()`, `create_interfaces()`, `ParameterizedData` methods (interface/CLAUDE.md §Known Issues #10); helper functions `_get_ssl_context`, `_version_is_newer`, `_build_defaults_manifest` (utils/CLAUDE.md §Known Issues #8)
-- Missing type hints on `Controller`, `RoutineHandler`, `BehaviorHandler` (controllers/CLAUDE.md §Refactoring), `handle_server_interface.py` (utils/CLAUDE.md §Refactoring)
-- `parameterized.py` has a TODO to rename the file (interface/CLAUDE.md §Known Issues #11)
-- Controller/interface code is repetitive across entity types — could benefit from declarative field mapping (environment/CLAUDE.md §Known Issues #7)
-- "Component" naming ambiguity — means both the full triad (JAX + controller + interface) and just `component.py`. A documentation concern, deferred to Phase 3 (environment/CLAUDE.md §Structural Questions #3)
+
+##### §3.4.1 Missing `__all__` — AGREED
+
+**Decision: Defer to post-release. No impact on functionality or user journeys.**
+
+**Corresponding tasks in PLAN.md:** D.01
+
+##### §3.4.2 Missing docstrings — AGREED
+
+**Decision: Add docstrings to main public classes/methods in Phase 3 (alongside documentation). Internal helpers deferred — may be done before release, to decide later.**
+
+- Main public classes/methods: `Controller.to_deal_with()`, `Controller.remote_to_ctrl()`, etc. (controllers/CLAUDE.md §Known Issues #6); `WindowManager.__init__()`, `create_interfaces()`, `ParameterizedData` methods (interface/CLAUDE.md §Known Issues #10)
+- Internal helpers (deferred): `_get_ssl_context`, `_version_is_newer`, `_build_defaults_manifest` (utils/CLAUDE.md §Known Issues #8)
+
+**Corresponding tasks in PLAN.md:** P3.10
+
+##### §3.4.3 Missing type hints — AGREED
+
+**Decision: Same as §3.4.2 — add type hints to main public classes in Phase 3, internal code deferred. May do before release, to decide later.**
+
+- Main public classes: `Controller`, `RoutineHandler`, `BehaviorHandler` (controllers/CLAUDE.md §Refactoring)
+- Internal code (deferred): `handle_server_interface.py` (utils/CLAUDE.md §Refactoring)
+
+**Corresponding tasks in PLAN.md:** P3.10
+
+##### §3.4.4 `parameterized.py` rename — RESOLVED
+
+**Already done. TODO removed by developer.**
+
+**Corresponding tasks in PLAN.md:** No action (already resolved)
+
+##### §3.4.5 Repetitive controller/interface code — AGREED
+
+**Decision: Defer to post-release. Works, just verbose. Abstraction design has regression risk.**
+
+- Each entity controller maps user-facing property names (e.g. `left_motor`, `x_position`, `subtype`) to state paths via `__getattr__`/`__setattr__`. The routing logic branches on whether the field is in `entity_state`, a component-specific field, a controller parameter, or a split attribute (e.g. `left_motor` → `motor[0]`).
+- This logic is spread across `EntityWrapper`, `EntityController`, `AgentController`, `WallController`, each adding its own layer. `AttributeMapping` exists as a helper but doesn't eliminate the routing complexity.
+- A declarative field registry could reduce duplication, but designing it properly (handling all branch cases) is non-trivial and risks regressions. No user is affected by the current verbosity.
+
+**Corresponding tasks in PLAN.md:** D.02
+
+##### §3.4.6 "Component" naming ambiguity — AGREED
+
+**Decision: No rename. Clarify in developer tutorial (§3.1.4).**
+
+- A component is defined by its `Component` subclass (JAX step function). It optionally has a `Controller` (client-side API) and `Interface` (Panel UI). Simpler components (reset, friction, energy) have only the `Component` class.
+- This is consistent with the current naming and code structure. The developer tutorial should explain this clearly.
+
+**Corresponding tasks in PLAN.md:** P3.06 (documented in developer tutorial)
 
 **Design smells:**
-- `apply_changes()` has a TODO questioning ownership — duplicates logic from `SimulatorGRPCClient.set_changes()` (controllers/CLAUDE.md §Known Issues #4)
-- `RoutineHandler` and `BehaviorHandler` are similar but separate — could share a base class (controllers/CLAUDE.md §Known Issues Medium #3)
-- Step routing logic is implicit: whether this client drives stepping depends on `simulator.run_from == client.name` — not documented (controllers/CLAUDE.md §Known Issues Medium #4)
-- `BehaviorHandler.behave()` assumes agent is an `EntityController` with `__setattr__` recording — tight coupling, undocumented contract (controllers/CLAUDE.md §Known Issues Medium #5)
-- `scene_name` property setter raises `AttributeError` unconventionally (simulator/CLAUDE.md §Known Issues #8)
-- `load()` should be a standalone function, not a Simulator method (simulator/CLAUDE.md §Known Issues #9)
-- Platform-specific PID functions should be internal (`_`-prefixed) (utils/CLAUDE.md §Known Issues #6)
-- Thread safety concerns in Panel update loop (interface/CLAUDE.md §Known Issues #7)
-- Scene enumeration is hardcoded in `get_available_scenes()` — uses string matching, new scene types require code changes (utils/CLAUDE.md §Known Issues #3)
-- Implicit client inclusion: `clients/collision.yaml` is included via `base_physics.yaml` but never directly referenced by scene files (conf/CLAUDE.md §Known Issues #4)
-- Global state in `run_interface.py` (`_cleanup_done`, `_window_manager`) — works but inelegant (scripts/CLAUDE.md §Known Issues #7)
-- No notebook execution order enforcement — students could run session 3 before session 1 (notebooks/CLAUDE.md §Known Issues #9)
+
+##### §3.4.7 `apply_changes()` ownership — AGREED
+
+**Decision: No refactoring needed. Remove the misleading TODO. Current separation is correct.**
+
+- The TODO suggests duplication, but the three layers have distinct responsibilities:
+  1. `VivariumController.apply_changes()` — collects pending changes from the `Remote` proxy, delegates to client, handles `close` signal.
+  2. `SimulatorGRPCClient.set_changes()` — network layer: serializes to protobuf, sends over gRPC, optionally fetches back updated state.
+  3. `Simulator.set_changes()` — server-side: applies changes to dataclass, syncs simulator attributes, manages run/stop state.
+- The only minor smell is the streaming check (`hasattr(self.client, 'is_streaming')`) in `apply_changes()`, which is a leaky abstraction — but not worth refactoring for this release.
+
+**Corresponding tasks in PLAN.md:** P2.03 (remove misleading TODO)
+
+##### §3.4.8 `RoutineHandler`/`BehaviorHandler` similarity — AGREED
+
+**Decision: Defer base class extraction to post-release. Rename `utils.py` → `handlers.py` in Phase 2 (after `kill_session` removal in §2.1).**
+
+- ~80% of code is duplicated (registry pattern: attach/detach/start/stop/print, two-dict pattern, threading lock, name resolution). Only `behave()` (weighted motor blending) and `routine_step()` (direct call + error auto-removal) differ.
+- A base class would be clean but is low priority — internal code, works correctly, no divergence risk.
+- The module name `utils.py` is misleading — it contains specific, well-defined classes (`Logger`, `RoutineHandler`, `BehaviorHandler`), not generic utilities. Rename to `handlers.py` after `kill_session` removal leaves only these three classes.
+
+**Corresponding tasks in PLAN.md:** P2.06 (rename utils.py → handlers.py), D.03 (base class extraction deferred)
+
+##### §3.4.9 Implicit step routing — AGREED
+
+**Decision: Document in Phase 3. No code change needed.** The mechanism works correctly — the main tutorial and developer guide should clarify the multi-client stepping model (controllers/CLAUDE.md §Known Issues Medium #4).
+
+**Corresponding tasks in PLAN.md:** P3.04 (documented in main CS tutorial)
+
+##### §3.4.10 `BehaviorHandler.behave()` tight coupling — AGREED
+
+**Decision: Document in Phase 3. No code change.** The coupling is intentional — behaviors set motor values on agents. `BehaviorHandler` is only ever used with `AgentController` (controllers/CLAUDE.md §Known Issues Medium #5).
+
+**Corresponding tasks in PLAN.md:** P3.04 (documented in main CS tutorial)
+
+##### §3.4.11 `scene_name` setter convention — AGREED
+
+**Decision: Quick fix in Phase 2 — remove the setter, let Python's default behavior raise `AttributeError`.** Trivial one-liner (simulator/CLAUDE.md §Known Issues #8).
+
+**Corresponding tasks in PLAN.md:** P2.03
+
+##### §3.4.12 `load()` as standalone function — RESOLVED
+
+**Already covered: `load()` is part of the broken recording code being removed in §2.1.** (simulator/CLAUDE.md §Known Issues #9)
+
+**Corresponding tasks in PLAN.md:** No action (covered by P2.06)
+
+##### §3.4.13 Platform PID functions visibility — AGREED
+
+**Decision: Defer to post-release. Purely cosmetic — no external consumers.** The module name (`handle_server_interface.py`) is also vague, but renaming it now doesn't help — it will be addressed naturally if/when the module is split (utils/CLAUDE.md §Known Issues #6).
+
+**Corresponding tasks in PLAN.md:** D.04
+
+##### §3.4.14 Thread safety in Panel update loop — AGREED
+
+**Decision: No locking changes for this release. Add explanatory comments in Phase 2 documenting the threading risk.**
+
+- `update_plot_cb()` reads `controller.client.state` with no locking while gRPC callbacks update it from another thread. CPython's GIL makes individual attribute assignments atomic, so torn reads are unlikely. But `set_changes()` updates `state` and `controller_parameters` in two separate assignments — the update callback could read between them, causing brief visual inconsistencies (new positions, old colors).
+- This may have caused rendering inconsistencies observed in the past. Adding comments near `update_plot_cb()` and the gRPC client state assignment will help future debugging.
+- Proper fix (locking or atomic state+params swap) risks introducing deadlocks — defer to post-release (interface/CLAUDE.md §Known Issues #7).
+
+**Corresponding tasks in PLAN.md:** P2.03 (explanatory comments), D.13 (proper fix deferred)
+
+##### §3.4.15 Hardcoded scene enumeration — AGREED
+
+**Decision: Defer to post-release.** Current scene set is stable for the release.
+
+- `get_available_scenes()` categorizes scenes by name pattern (`startswith('session')`, etc.) with `research` as the catch-all default. Adding a new category or moving a scene requires editing the function. Brittle but functional (utils/CLAUDE.md §Known Issues #3).
+
+**Corresponding tasks in PLAN.md:** D.05
+
+##### §3.4.16 Implicit client inclusion — AGREED
+
+**Decision: Defer to post-release. Not a bug — discoverability concern addressed by developer tutorial (§3.1.4) explaining the config inheritance chain** (conf/CLAUDE.md §Known Issues #4).
+
+**Corresponding tasks in PLAN.md:** D.06
+
+##### §3.4.17 Global state in `run_interface.py` — AGREED
+
+**Decision: Defer to post-release.** Script entry point, not a library module — global state is acceptable here (scripts/CLAUDE.md §Known Issues #7).
+
+**Corresponding tasks in PLAN.md:** D.07
+
+##### §3.4.18 Notebook execution order — AGREED
+
+**Decision: Defer to post-release.** Pedagogical concern, not technical. Sessions are numbered, explicitly reference previous sessions when a concept was introduced earlier, and the tutorial (§3.1.2) will explain the progression. Code-level enforcement would be fragile and over-engineered (notebooks/CLAUDE.md §Known Issues #9).
+
+**Corresponding tasks in PLAN.md:** D.08
 
 **Hardcoded values:**
-- Jupyter port 8889 hardcoded in multiple places (interface/CLAUDE.md §Known Issues #8, utils/CLAUDE.md §Known Issues #7)
+
+##### §3.4.19 Hardcoded Jupyter port — AGREED
+
+**Decision: Quick fix in Phase 2. Extract a named constant, replace ~7 occurrences.**
+
+- `8889` appears as default parameter in 6 function signatures and one fallback assignment in `panel_app.py:729` (which is already overridden by config if `interface.notebook.jupyter_port` is set).
+- All functions already accept port as a parameter — no config threading needed. Just extract `DEFAULT_JUPYTER_PORT = 8889` in one place (e.g. `runtime.py`) and import it elsewhere (interface/CLAUDE.md §Known Issues #8, utils/CLAUDE.md §Known Issues #7).
+
+**Corresponding tasks in PLAN.md:** P2.13
 
 **File locations:**
-- `rthook_jupyter_matplotlib.py` should live in a `pyinstaller_hooks/` directory per convention, not in `scripts/` (scripts/CLAUDE.md §Known Issues #4)
-- Consider extracting ngrok to optional submodule (utils/CLAUDE.md §Refactoring)
+
+##### §3.4.20 `rthook_jupyter_matplotlib.py` location — AGREED
+
+**Decision: Move into `vivarium/runtime/` during §1.4a refactoring. No separate action needed.**
+
+- It's a PyInstaller runtime hook (executed via `exec()` at startup), not a user-facing entry point — `scripts/` is the wrong semantic home. `vivarium/runtime/` (the PyInstaller/deployment package created in §1.4a) is the natural location (scripts/CLAUDE.md §Known Issues #4).
+
+**Corresponding tasks in PLAN.md:** P2.13
+
+##### §3.4.21 Ngrok extraction — AGREED
+
+**Decision: No action needed. Already optional.**
+
+- `pyngrok` is in `extras_require["colab"]` in `setup.py`, not in `install_requires`. Code imports lazily with a clear error message if not installed. When §1.4a splits `handle_server_interface.py`, ngrok functions will naturally become their own module in `vivarium/runtime/` (utils/CLAUDE.md §Refactoring).
+
+**Corresponding tasks in PLAN.md:** No action (already optional, handled naturally by P2.13)
 
 **Nice-to-have features:**
-- No `--version` flag on any script (scripts/CLAUDE.md §Known Issues #6)
-- No checksum validation for downloaded updates in `updater.py` (utils/CLAUDE.md §Known Issues #5)
 
-**Already resolved (no action needed for release):**
+##### §3.4.22 `--version` flag — AGREED
+
+**Decision: Defer to post-release.** `get_version()` exists in `runtime.py` — adding the flag is trivial but not needed for any audience journey (scripts/CLAUDE.md §Known Issues #6).
+
+**Corresponding tasks in PLAN.md:** D.09
+
+##### §3.4.23 Checksum validation — AGREED
+
+**Decision: Defer to post-release.** PyInstaller-specific, requires server-side changes too (utils/CLAUDE.md §Known Issues #5).
+
+**Corresponding tasks in PLAN.md:** D.10
+
+**Already resolved:**
+
+##### §3.4.24 RigidBody — already resolved
+
 - ~~RigidBody support is live but dormant~~ — **Reversed: removing entirely (see §2.1a)**
+
+**Corresponding tasks in PLAN.md:** No action (reversed — P2.07 removes entirely)
+
+---
+
+## Currently Discussing
+
+_(All topics discussed.)_
+
+---
+
+## Remaining to Discuss
+
+_(None — all topics have been discussed and agreed.)_
