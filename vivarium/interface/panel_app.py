@@ -979,7 +979,14 @@ class WindowManager(Parameterized):
             self.streaming_toggle.name = "Use Streaming"
 
     def update_plot_cb(self):
-        """Periodic callback for the plot update"""
+        """Periodic callback for the plot update.
+
+        Threading note: state and controller_parameters are updated in separate
+        assignments by the gRPC client (in set_changes or the streaming thread).
+        This callback could read between the two, causing a brief visual
+        inconsistency (e.g. new positions with stale config). CPython's GIL
+        prevents torn reads of individual attributes.
+        """
         # Guard against being called when not connected
         if self.controller is None:
             return

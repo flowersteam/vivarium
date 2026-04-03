@@ -469,7 +469,7 @@ class VivariumController:
     def fetch_changes(self):
         return self.client.remote.fetch_changes()
 
-    def apply_changes(self, changes=None, close_if_requested=True): # TODO: should this be in SimulatorClient instead?
+    def apply_changes(self, changes=None, close_if_requested=True):
         changes = changes or self.fetch_changes()
         # Use set_changes when streaming is active to avoid redundant state fetch
         update_from_server = not (hasattr(self.client, 'is_streaming') and self.client.is_streaming)

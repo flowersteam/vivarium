@@ -62,42 +62,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-#### P2.02 — Write exhaustive feature tests for student-facing API
-- **Status:** [x]
-- **Dependencies:** P2.01 (green baseline)
-- **Key files:** `tests/test_edu_sessions.py`, `notebooks/sessions/session_1.ipynb`, `notebooks/sessions/session_2.ipynb`, `notebooks/sessions/session_3.ipynb`, `notebooks/sessions/session_4.ipynb`, `notebooks/sessions/miniproject_template.ipynb`
-- **CLAUDE.md updates:** none
-
-Exhaustively list all features demonstrated in sessions 1-4 and the miniproject notebook, then write tests covering all of them in `test_edu_sessions.py`. This serves two purposes: (a) safety net against regressions during the major refactors ahead, and (b) the feature inventory serves as the basis for the main tutorial in Phase 3.
-
-Features to cover include (non-exhaustive — the task starts by building the complete inventory): Logger (`agent.logger.add/get`), routines (`attach_routine/detach_routine`), multiple behaviors with weights, entity property access (energy, exists, position read/write), selective sensing, consumption/spawning settings, scene customization via Hydra overrides.
-
-The feature inventory should be recorded as a comment or docstring in `test_edu_sessions.py` for later reference when writing the Phase 3 tutorial.
-
-#### P2.03 — Early cleanup batch (workflow shakedown)
-- **Status:** [ ]
-- **Dependencies:** P2.01 (green baseline)
-- **Key files:** `scripts/run_vivarium.py`, `vivarium/controllers/vivarium_controller.py`, `vivarium/simulator/simulator.py`, `notebooks/sessions/session_5_logging.ipynb`, `notebooks/sessions/session_6_bonus.ipynb`, `notebooks/tutorials/quickstart_tutorial.ipynb`, `notebooks/sandbox.ipynb`, `.gitignore`
-- **CLAUDE.md updates:** none
-
-Batch of small, independent changes. Also serves to validate the task workflow before major refactors.
-
-**Delete files:**
-- `scripts/run_vivarium.py` — redundant combined launcher. `run_interface.py` already handles the full workflow (scene selection → server startup → interface) with proper cleanup.
-- `notebooks/sessions/session_5_logging.ipynb` — content integrated into miniproject notebook.
-- `notebooks/sessions/session_6_bonus.ipynb` — uses deprecated API (`kill_session()`), content covered by miniproject.
-- `notebooks/tutorials/quickstart_tutorial.ipynb` — outdated (uses `NotebookController`). Session 1 serves as the entry point for sessions, and a new main tutorial will be written in Phase 3.
-
-**Small code fixes:**
-- Remove the misleading TODO comment in `vivarium/controllers/vivarium_controller.py` near `apply_changes()` — the three-layer separation (VivariumController → SimulatorGRPCClient → Simulator) is correct, not duplicated. Each layer has distinct responsibilities.
-- Remove the `scene_name` setter in `vivarium/simulator/simulator.py` — let Python's default `AttributeError` handle writes to the read-only property.
-- Clear outputs in `notebooks/sandbox.ipynb` and add `notebooks/sandbox.ipynb` to `.gitignore`.
-
-**Thread safety comments:**
-- Add explanatory comments near `update_plot_cb()` in `vivarium/interface/panel_app.py` and near the state assignment in the gRPC client, documenting that: (a) `state` and `controller_parameters` are updated in two separate assignments from the streaming thread, (b) the update callback could read between them causing brief visual inconsistencies, (c) CPython's GIL makes individual attribute assignments atomic so torn reads are unlikely.
-
-Discuss each item briefly before making changes.
-
 #### P2.04 — Test suite quality fixes
 - **Status:** [ ]
 - **Dependencies:** P2.01 (green baseline)
@@ -805,6 +769,9 @@ The reproduction fixture's consumption disablement (`range=0`) was insufficient 
 
 #### P2.02 — Write exhaustive feature tests for student-facing API
 Replaced `tests/test_edu_sessions.py` with `tests/test_edu_sessions/` package (9 test files + conftest). Complete feature inventory (13 categories) in conftest docstring. 101 tests total: 72 new covering entity access, properties, sensing, behaviors, routines, logger, consumption/spawn, internal state + 30 moved subtype_labels tests - 1 dropped (superseded). Discovered B.01 (SingleSpawnController `.item()` bug, 3 xfail tests). Updated P2.05 target structure. Full pytest green (262 passed, 3 xfailed).
+
+#### P2.03 — Early cleanup batch (workflow shakedown)
+Deleted 4 redundant/outdated files (`scripts/run_vivarium.py`, `session_5_logging.ipynb`, `session_6_bonus.ipynb`, `quickstart_tutorial.ipynb`). Removed misleading TODO on `apply_changes()`, removed explicit `scene_name` setter (Python's default `AttributeError` suffices) and added a read-only test. Added `notebooks/sandbox.ipynb` to `.gitignore`. Added threading note to `update_plot_cb()` docstring in `panel_app.py`.
 
 #### B.01 — Fix `SingleSpawnController.__getattr__` crash on in-process path
 `SingleSpawnController.__getattr__` assumed values were always numpy arrays (`.item()`, `.tolist()`), but the in-process Simulator returns JAX arrays or plain Python types wrapped in `Remote` proxies. Fixed by unwrapping `Remote` and normalizing to numpy via `np.asarray()` before calling array methods. Removed 3 xfail markers from `test_consumption_spawn.py`. Full pytest green (262 passed, 0 xfailed).

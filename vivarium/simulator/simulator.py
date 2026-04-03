@@ -128,10 +128,6 @@ class Simulator:
     def scene_name(self):
         return self.controller_parameters.simulator.scene_name
 
-    @scene_name.setter
-    def scene_name(self, value):
-        raise AttributeError("scene_name is read-only and cannot be modified directly.")
-
     @property
     def freq(self):
         return self._freq

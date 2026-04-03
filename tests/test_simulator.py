@@ -38,3 +38,9 @@ def test_load_save_simulator_config(scene_config):
     # assert hasattr(new_simulator.controller_parameters, 'agents') # TODO: to fix
 
     pass
+
+
+def test_scene_name_read_only(simulator_from_config):
+    simulator = simulator_from_config('braitenberg')
+    with pytest.raises(AttributeError):
+        simulator.scene_name = "other"
