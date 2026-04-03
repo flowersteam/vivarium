@@ -1,6 +1,4 @@
-# vivarium/environment/ — Package Audit
-
-_Audited: 2026-03-10 | Status: Phase 1 Step 1_
+# vivarium/environment/
 
 ## Purpose
 
@@ -33,7 +31,7 @@ vivarium/environment/
     │   ├── friction/        # FrictionComponent (precedence 3)
     │   └── step/            # StepComponent (Verlet integration, precedence 1000)
     ├── eco_evo/
-    │   ├── component.py     # *** EMPTY FILE — dead code ***
+    │   ├── component.py     # Empty placeholder
     │   ├── utils.py         # spawn_entity, non_existing, sample_true_index
     │   ├── spawn/           # SpawnComponent (multi-spawn, precedence 20)
     │   ├── consumption/     # ConsumptionComponent (feeding matrix, precedence 40)
@@ -103,32 +101,6 @@ Not all components have all three files — simpler ones (reset, friction, energ
 - `BraitenbergComponent`, `ObjectComponent` — used by tests and configs
 - `SpawnComponent`, `ConsumptionComponent` — used by tests
 
-## Known Issues
-
-### Should Fix
-
-1. **`eco_evo/component.py` is an empty file.** Dead code — delete it.
-
-2. **`render.py` has double-indexing bugs.** Line 18: `diameter[idx][exists][exists]` applies `[exists]` twice — second indexing is wrong. Same pattern on lines 41-42 for orientation. These functions produce incorrect output for scenes with non-existing entities.
-
-3. **`render.py` has duplicate axis call.** Line 67: `plt.xlim(0, box_size)` is called twice (should be `xlim` then `ylim`).
-
-4. **Typo: `udpate_other_interfaces`** in `components/interface.py:65`. Should be `update_other_interfaces`. It's a no-op base method so no runtime impact, but confusing.
-
-5. **`is_entity_component` flag is set but never read.** Both `component.py:13` and `entities/component.py:29` set it with the comment "No longer needed?". Confirmed unused — remove it.
-
-### Medium Severity
-
-6. **`MaskFunction` only supports `'exists'` label.** Hardcoded in `environment.py`. No extensibility for custom predicates. Works for current use cases but limits future flexibility.
-
-7. **Controller/interface code is repetitive.** Each entity type duplicates similar patterns for mapping state fields to controller properties. Could benefit from a declarative approach, but works as-is.
-
-### Low Severity
-
-8. **`utils.py:50` has a deprecated function.** `rigid_body_to_point_particle()` is marked "Deprecated?" — verify if still used, remove if not.
-
-9. **No `__all__` in `__init__.py`.** Public API is implicit.
-
 ## Test Coverage
 
 | Area | Test File | What's Tested | Gaps |
@@ -150,22 +122,3 @@ Not all components have all three files — simpler ones (reset, friction, energ
 - ProximityMapComponent — exercised via conftest fixture but no dedicated tests
 - Braitenberg sensorimotor in isolation — untested
 
-## Refactoring Opportunities
-
-| Priority | Opportunity |
-|----------|-------------|
-| High | Delete empty `eco_evo/component.py` |
-| High | Fix `render.py` double-indexing and xlim/ylim bugs |
-| High | Remove unused `is_entity_component` flag from both `component.py` files |
-| Medium | Fix typo `udpate_other_interfaces` → `update_other_interfaces` |
-| Medium | Verify and remove deprecated `rigid_body_to_point_particle()` if unused |
-| Low | Add `__all__` to `__init__.py` |
-| Low | Reduce controller/interface boilerplate (declarative field mapping) |
-
-## Structural Questions (resolved in Phase 1 Step 2)
-
-1. **Rigid body support.** Resolved: **live but dormant.** All physics components, entity controllers, and state code have conditional rigid body paths. Currently no scene uses rigid bodies (all tests assert `not is_rigid_body()`). The code is maintained and correct — keep it, but don't invest in testing it for this release.
-
-2. **`render.py` location.** Resolved: **keep in environment for now.** `interface/` is the Panel/Bokeh UI layer. `render.py` is matplotlib-based and used for quick testing/notebooks. Moving it to `interface/` would add a dependency direction that doesn't exist today (interface → matplotlib). Could revisit if Bokeh headless rendering replaces it, but not worth moving for this release.
-
-3. **"Component" naming ambiguity.** Deferred to Phase 3 (documentation). Not a code issue — a teaching/documentation concern. "Component" means both the full triad (JAX + controller + interface) and just the JAX `component.py` file.

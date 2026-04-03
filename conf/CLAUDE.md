@@ -1,6 +1,4 @@
-# conf/ — Package Audit
-
-_Audited: 2026-03-10 | Status: Phase 1 Step 1_
+# conf/
 
 ## Purpose
 
@@ -76,7 +74,7 @@ defaults:
 | `session_4` | Educational | Yes | Solid | Alternate subtype design |
 | `miniproject` | Educational | Indirect | Solid | Student template; fixture only |
 | `reactive_rl` | Educational | Indirect | Solid | Single agent RL; fixture only |
-| `session_6` | Educational | No | **Dead** | Outdated; doesn't set scene_name |
+| `session_6` | Educational | No | Outdated | Doesn't set scene_name |
 
 ## Component Precedence Order
 
@@ -91,22 +89,6 @@ defaults:
 | 80 | Reproduction | Birth/death via energy thresholds |
 | 1000 | Step | Euler integration (last) |
 
-## Known Issues
-
-### Should Fix
-
-1. **`session_6.yaml` is dead.** Doesn't set `scene_name`, excluded from all tests, no active references. Delete it.
-
-2. **`braitenberg.yaml` and `particle_lenia.yaml` missing `_self_` in defaults list.** Causes Hydra UserWarning during tests. Add `_self_` to both.
-
-3. **`demo.yaml` has 60+ lines of commented-out code.** Old multi-subtype variants. Clean up.
-
-### Minor
-
-4. **Implicit client inclusion.** `clients/collision.yaml` is included via `base_physics.yaml` but never directly referenced by scene files. Works correctly but not obvious to maintainers.
-
-5. **No config validation.** If a scene defines entity subtypes but doesn't list them in `subtype_labels`, UI controllers may fail silently. Currently caught manually.
-
 ## Test Coverage
 
 | Config Group | Test File | What's Tested | Gaps |
@@ -117,48 +99,3 @@ defaults:
 
 **Gaps**: 3 research scenes (`demo`, `excretion`, `boyds`) have no automated test coverage. Adding them to `test_environments.py` parametrize would be low effort and could catch config errors.
 
-## Refactoring Opportunities
-
-| Priority | Opportunity |
-|----------|-------------|
-| High | Delete `session_6.yaml` |
-| High | Add `_self_` to `braitenberg.yaml` and `particle_lenia.yaml` |
-| Medium | Clean commented code in `demo.yaml` |
-| Medium | Add test coverage for `demo`, `excretion`, `boyds`, `miniproject`, `reactive_rl` |
-| Low | Document implicit client inclusion pattern |
-| Low | Consider renaming `clients/` to `controllers/` (high cost, low value — skip for now) |
-
-## Config–Code Structure Mismatch
-
-Hydra's [recommended pattern](https://hydra.cc/docs/advanced/instantiate_objects/config_files/) is: config structure mirrors `__init__` signatures, so `hydra.utils.instantiate(config)` directly constructs objects. Component configs currently mix three concerns in the same YAML node:
-
-1. **Constructor args** (`precedence`, `epsilon`, `alpha`, …) — consumed by `Component.__init__`
-2. **Client metadata** (`client:` block with `controller_cls`, `interface_cls`, `controller_kwargs`) — not consumed by the component, filtered out by `Component.get_kwargs()`
-3. **Template directives** (`_all_values_`, `_range_`, `_random_`, `by_indices`) — expanded by `EntityComponent.from_config()` before `__init__`
-
-This means `hydra.utils.instantiate()` cannot replace `from_config()` for most classes.
-
-**Example of the problem** — a collision component config node contains both its constructor args and unrelated client metadata:
-
-```yaml
-collision:
-  _target_: ...CollisionComponent
-  name: collision
-  precedence: 2          # ← constructor arg
-  epsilon: 0.01          # ← constructor arg
-  client:                # ← NOT a constructor arg — filtered by get_kwargs()
-    controller_cls: ...CollisionController
-    controller_kwargs: {collision_alpha: 100.0}
-```
-
-**Partial separation already exists:** `clients/*.yaml` files are composed separately via scene defaults lists (e.g., `clients/collision@environment.components.component_list.collision.client`). But they merge *into* the component config node, so the component still sees the `client` key and must filter it.
-
-**Most actionable improvement:** If `client` configs were composed into a parallel structure (e.g., a top-level `clients:` dict) instead of nesting inside component configs, `Component.get_kwargs()` would no longer need to filter, and simple components could use `instantiate()` directly. Entity components would still need `from_config` for template expansion. See also global CLAUDE.md "from_config Pattern" section.
-
-## Structural Questions (resolved in Phase 1 Step 2)
-
-1. **Everything lives under `scene/`.** Resolved: **keep as-is.** Simulator and interface configs are consumed via Hydra composition — they're always loaded as part of a scene. Moving them to `conf/simulator/` would break the composition pattern without benefit. Both `vivarium/simulator/` and `vivarium/interface/` receive their config through the scene's composed config tree, not by loading independent config groups.
-
-2. **Inconsistent naming for "base" configs.** Resolved: **the distinction is intentional.** `default.yaml` files are leaf defaults (used as-is by Hydra's default list mechanism). `base_*.yaml` files are inheritance anchors (meant to be extended by scenes). This is a Hydra convention worth preserving. Document it but don't rename.
-
-3. **Component config organization.** Resolved: **keep current layout.** Current layout (`entities/`, `reset/`, `spawn/` + separate `clients/`) mirrors the code structure in `vivarium/environment/components/`. Regrouping by component name would diverge from code layout for marginal benefit. Not worth the churn.

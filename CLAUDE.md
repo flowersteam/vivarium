@@ -30,7 +30,7 @@ vivarium/interface/      ← Panel web UI (depends on controllers, simulator, en
 scripts/                 ← entry points (depends on all packages)
 ```
 
-**No circular imports**, but a **design flaw** in the dependency directions: component controllers and interfaces are defined inside `vivarium/environment/components/` yet they are client-side code that imports base classes from `vivarium/controllers/` and `vivarium/interface/`. This means environment — which should be a pure simulation engine — depends upward on packages that are supposed to abstract over it. See "Cross-Package Issues" below and controllers/CLAUDE.md for analysis and a proposed fix.
+**No circular imports.** Note that component controllers and interfaces are currently defined inside `vivarium/environment/components/` even though they are client-side code that imports base classes from `vivarium/controllers/` and `vivarium/interface/`. `environment.py` resolves component classes dynamically via Hydra (`hydra.utils.get_class(_target_)`), so there are no static cross-package imports.
 
 ### Data Flow
 
@@ -125,7 +125,7 @@ All major classes use `@classmethod from_config(config)` for Hydra-driven constr
 
 All classes can be instantiated via `__init__` without Hydra, but you must replicate the preprocessing that `from_config` does. `hydra.utils.get_class(_target_).from_config(config)` is the universal instantiation pattern.
 
-The config structure does not follow [Hydra's recommended pattern](https://hydra.cc/docs/advanced/instantiate_objects/config_files/) where configs mirror `__init__` signatures. See "Cross-Package Issues → Config–code structure mismatch" for analysis.
+The config structure does not follow [Hydra's recommended pattern](https://hydra.cc/docs/advanced/instantiate_objects/config_files/) where configs mirror `__init__` signatures. Component configs mix constructor args, client-side metadata (`client:` block), and template directives (`_all_values_`, `by_indices`) in the same YAML node, which prevents using `hydra.utils.instantiate()` directly.
 
 ### Usage by Mode
 
@@ -180,124 +180,21 @@ python scripts/run_interface.py  # starts gRPC server + Panel web UI, opens brow
 
 ---
 
-## Local Audit Files
+## Per-Package Documentation
 
-Each package has a detailed `CLAUDE.md` with purpose, API, known issues, test coverage, and refactoring opportunities:
+Each package has a `CLAUDE.md` with purpose, structure, API, dependencies, and test coverage:
 
-| Package | Audit File | Status |
+| Package | CLAUDE.md | Description |
 |---------|-----------|--------|
-| `vivarium/environment/` | [CLAUDE.md](vivarium/environment/CLAUDE.md) | Core simulation — solid, ~56 files |
-| `vivarium/simulator/` | [CLAUDE.md](vivarium/simulator/CLAUDE.md) | gRPC bridge — solid with dead code |
-| `vivarium/controllers/` | [CLAUDE.md](vivarium/controllers/CLAUDE.md) | User API — solid |
-| `vivarium/interface/` | [CLAUDE.md](vivarium/interface/CLAUDE.md) | Panel UI — brittle monolith |
-| `vivarium/utils/` | [CLAUDE.md](vivarium/utils/CLAUDE.md) | Utilities — solid foundation |
-| `conf/` | [CLAUDE.md](conf/CLAUDE.md) | Hydra configs — 48 YAML files |
-| `scripts/` | [CLAUDE.md](scripts/CLAUDE.md) | Entry points — mostly solid |
-| `tests/` | [CLAUDE.md](tests/CLAUDE.md) | 17 test files, ~98 tests |
-| `notebooks/` | [CLAUDE.md](notebooks/CLAUDE.md) | Sessions 1-4 active, rest outdated |
-
----
-
-## Cross-Package Issues
-
-### Architectural
-
-1. **Component controllers and interfaces live in the wrong package.** They are defined in `environment/components/*/controller.py` and `interface.py`, yet they are client-side code that imports base classes from `controllers/` and `interface/`. This inverts the intended dependency direction: the environment (simulation engine) depends upward on the packages that are supposed to abstract over it. **Proposed fix:** move `vivarium/environment/components/` to `vivarium/components/` as a top-level package. This works because `environment.py` resolves component classes dynamically via Hydra (`hydra.utils.get_class(_target_)`) — no static imports. See [controllers/CLAUDE.md](vivarium/controllers/CLAUDE.md) for full analysis.
-
-2. **Two monoliths need splitting:**
-   - `interface/panel_app.py` (1410 LOC) — god-object `WindowManager` handles scene selection, simulation UI, updates, Jupyter, all callbacks. See [interface/CLAUDE.md](vivarium/interface/CLAUDE.md).
-   - `utils/handle_server_interface.py` (881 LOC) — mixes process management, server lifecycle, Jupyter, ngrok. See [utils/CLAUDE.md](vivarium/utils/CLAUDE.md).
-
-3. **Dynamic dataclass in Simulator** (`create_dataclass_from_dict('ControllerParameters', ...)`) creates runtime structures with no type safety. Field names come from config, not from code declarations. See [simulator/CLAUDE.md](vivarium/simulator/CLAUDE.md).
-
-4. **RigidBody support is live but dormant.** `state.py`, physics components, and entity controllers all have conditional rigid body paths. Currently no scene uses rigid bodies (all tests assert `not is_rigid_body()`). The code is maintained but untested in rigid body mode. See [environment/CLAUDE.md](vivarium/environment/CLAUDE.md).
-
-5. **Config–code structure mismatch.** Component configs mix constructor args, client-side metadata (`client:` block), and template directives (`_all_values_`, `by_indices`) in the same YAML node. This prevents using Hydra's `instantiate()` and forces every class to have a `from_config` classmethod that filters/transforms before calling `__init__`. The most actionable fix is separating `client` configs from component configs. See [conf/CLAUDE.md](conf/CLAUDE.md) "Config–Code Structure Mismatch" for full analysis and per-class feasibility.
-
-### Patterns to Fix
-
-6. **Typo `udpate_other_interfaces`** appears in both `environment/components/interface.py:65` and `interface/panel_app.py:645`. Same typo, two packages. See [environment/CLAUDE.md](vivarium/environment/CLAUDE.md) and [interface/CLAUDE.md](vivarium/interface/CLAUDE.md).
-
-7. **Bare `except:` in `utils/handle_server_interface.py:469`** — catches everything including KeyboardInterrupt. Should be `except Exception:`. See [utils/CLAUDE.md](vivarium/utils/CLAUDE.md).
-
-8. **State streaming is ineffective in Panel UI.** `_on_state_stream_update()` sets a threading.Event flag, but `update_plot_cb()` never checks it. The periodic callback polls at 33ms regardless. May actually work via a different path (direct state assignment) — needs investigation before removing. See [interface/CLAUDE.md](vivarium/interface/CLAUDE.md).
-
-9. **Recording feature is broken.** `simulator.py` has `start_recording()`/`stop_recording()`/`record()` methods marked "probably broken for now". Dead code in `step()` checks `self.recording`. Either remove or fix. See [simulator/CLAUDE.md](vivarium/simulator/CLAUDE.md).
-
----
-
-## Dead Code to Remove
-
-### Files
-
-| File | Reason |
-|------|--------|
-| `vivarium/environment/components/eco_evo/component.py` | Empty file (0 bytes) |
-| `scripts/print_config.py` | Unused utility, never invoked |
-| `conf/scene/session_6.yaml` | Outdated, no `scene_name`, untested |
-| `notebooks/sessions/session_5_logging copy.ipynb` | Duplicate backup (290KB) |
-
-### Code Artifacts
-
-| Location | What | Reason |
-|----------|------|--------|
-| `environment/components/component.py:13` + `entities/component.py:29` | `is_entity_component` flag | Set but never read |
-| `simulator/simulator.py:36-43` | `nested_fields_to_access` dict | Marked "Now unused?" — confirmed dead |
-| `simulator/grpc_server/simulator_client.py:24` | Commented-out decorator reference | Related to above dict |
-| `simulator/grpc_server/simulator_server.py:112-118` | `SetState` RPC handler | Calls non-existent `simulator.set_state()` |
-| `simulator/simulator.py` | Recording feature (`record`, `start_recording`, `stop_recording`, `save_records`, `load`) | Marked broken, untested |
-| `interface/panel_app.py:687` | `streaming_toggle` widget | Created but never displayed |
-| `interface/panel_app.py:972` | `streaming_toggle_cb()` callback | Defined but never registered |
-| `interface/panel_app.py:84` | `self.notebook_mode` | Set but never read |
-| `controllers/utils.py` | `kill_session()` | Only used in outdated `session_6_bonus.ipynb` |
-| `environment/utils.py:50-91` | `rigid_body_to_point_particle()` | Marked deprecated, only referenced in sandbox notebook |
-| `scripts/profiling.py` | Entire file | Uses non-existent `SceneConfiguration` import |
-| `simulator/grpc_server/simulator_client.py` | `bidirectional_step_sync()` + related | Implemented but no active code path uses it; `use_streaming` flag is vestigial |
-| `conf/scene/interface/base_interface.yaml` | `use_streaming: true` | Read by Panel app but never consumed |
-
----
-
-## Audience Journey Readiness
-
-### 1. Headless JAX Simulation (Researchers)
-
-**Status: Blocked by documentation.**
-
-- **What works:** `Environment` and `Simulator` APIs are solid. `Simulator.from_config()` creates a working simulation. JAX step functions are JIT-compatible.
-- **What's missing:** No current documentation. Server-side notebooks (`notebooks/server_side/`) all use obsolete import paths (`vivarium.environments.braitenberg.simple.simple_env`). No tutorial showing the headless workflow with current API.
-- **Blocking:** Need a new tutorial showing: load config → create Environment → step in pure JAX loop → extract data. Or: create Simulator → step without gRPC.
-
-### 2. Programmatic Python Control (CS Students)
-
-**Status: Mostly ready, some gaps.**
-
-- **What works:** Sessions 1-4 are active, pedagogically excellent, and use current API (`VivariumController.start_session()`). `miniproject_template.ipynb` and `reactive_rl.ipynb` are functional. Test coverage is good (`test_edu_sessions.py` — 31 tests).
-- **What's incomplete:**
-  - Session 5 (logging) marked "still has to be updated"
-  - Session 6 (eco-evo) uses deprecated API (`kill_session()`, old patterns) — needs full rewrite
-  - `quickstart_tutorial.ipynb` is outdated (uses `NotebookController`)
-  - No standalone API reference tutorial (sessions are progressive, not reference)
-- **Not blocking but would improve:** A quickstart tutorial rewritten for current API.
-
-### 3. Web Interface (Younger Students)
-
-**Status: Functional but poorly documented and brittle.**
-
-- **What works:** Panel app launches, renders entities, supports drag-drop, component config tabs, start/stop. `web_interface_tutorial.md` exists as a markdown guide.
-- **What's brittle:** `WindowManager` is a 1410-line monolith with minimal test coverage (1 test). Update system, Jupyter integration, and streaming are all untested.
-- **What's missing:** No end-to-end tutorial beyond the markdown file. No testing of the interactive features.
-
----
-
-## Test Suite Overview
-
-17 test files, ~98 tests. Mix of unit (~60%) and integration (~40%). Fixture architecture in `conftest.py` supports both in-process gRPC (fast) and subprocess (slow) server modes.
-
-**Well-tested:** VivariumController (42 tests across 2 files), utils/runtime (24 tests), utils/updater (13 tests), gRPC serialization (7 tests), multi-spawn (13 tests), dataclass wrapper (6 tests).
-
-**Not tested:** Individual physics components, braitenberg sensorimotor, entity interfaces, Logger, recording feature, `render.py` (has known bugs), most interactive Panel features.
-
-**Known issues:** `test_reproduction` has a pre-existing failure. Duplicate `test_remote()` function names in `test_dataclass_api.py`. Several no-op tests (`pass` only).
+| `vivarium/environment/` | [CLAUDE.md](vivarium/environment/CLAUDE.md) | Core simulation engine |
+| `vivarium/simulator/` | [CLAUDE.md](vivarium/simulator/CLAUDE.md) | State management, gRPC bridge |
+| `vivarium/controllers/` | [CLAUDE.md](vivarium/controllers/CLAUDE.md) | User-facing Python API |
+| `vivarium/interface/` | [CLAUDE.md](vivarium/interface/CLAUDE.md) | Panel web UI |
+| `vivarium/utils/` | [CLAUDE.md](vivarium/utils/CLAUDE.md) | Shared utilities |
+| `conf/` | [CLAUDE.md](conf/CLAUDE.md) | Hydra configs |
+| `scripts/` | [CLAUDE.md](scripts/CLAUDE.md) | Entry points |
+| `tests/` | [CLAUDE.md](tests/CLAUDE.md) | Test suite |
+| `notebooks/` | [CLAUDE.md](notebooks/CLAUDE.md) | Jupyter notebooks |
 
 ---
 
