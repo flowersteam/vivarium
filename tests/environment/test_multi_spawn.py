@@ -64,14 +64,6 @@ class TestSpawnComponentInit:
 
 class TestSpawnStateShape:
 
-    def _make_state(self, comp, environment_and_state):
-        from conftest import remove_duplicates
-        from vivarium.environment.components.physics.step.component import StepComponent
-        from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
-        from vivarium.environment import MaskFunction
-        # Use environment_and_state fixture via indirect call
-        return comp
-
     def test_single_config_state_shape(self, environment_and_state, spawn):
         """Single spawn config produces SpawnState with shape [1, ...]."""
         spawn_comp = spawn[-1]  # last element from conftest spawn fixture

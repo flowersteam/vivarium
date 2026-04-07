@@ -1,7 +1,7 @@
 # Vivarium Release Plan
 
 _Living document — updated at the end of every working session._
-_Last updated: 2026-04-03_
+_Last updated: 2026-04-07_
 
 ---
 
@@ -48,6 +48,9 @@ _These apply to every task below._
 - Full review of all CLAUDE.md files against actual codebase
 - No dangling dependencies or TBD items in Phase 3
 
+**Test directory structure:**
+The `tests/` directory mirrors the source package structure (`tests/environment/`, `tests/simulator/`, `tests/controllers/`, `tests/interface/`, `tests/utils/`, `tests/scripts/`). When adding new tests or moving source files, keep the test directory mirroring the source packages.
+
 **In general**
 Before running the full test suite, first carefully consider if this is necessary or if it is sufficient to run a subset. The full suite takes quite a long time to execute. If you have a doubt, just ask.
 
@@ -62,67 +65,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-
-#### P2.05 — Test directory restructuring
-- **Status:** [ ]
-- **Dependencies:** P2.01 (green baseline), P2.02 (feature tests written — so they land in the right place), P2.04 (test quality fixes — so renames are done before moving)
-- **Key files:** `tests/` (all files), `tests/conftest.py`
-- **CLAUDE.md updates:** `tests/CLAUDE.md` — update file table and structure section to reflect new layout.
-
-Restructure `tests/` to mirror source package structure. This must happen before P2.10 (component package move) so new tests land in the right place.
-
-**Target structure:**
-```
-tests/
-  conftest.py                    # root: shared fixtures (scene_config, server lifecycle, cleanup)
-  __init__.py
-  environment/
-    __init__.py
-    conftest.py                  # component fixture chain (step → braitenberg → ...)
-    test_environment.py          # was test_environments.py
-    test_state.py
-    test_components.py
-    test_multi_spawn.py
-  simulator/
-    __init__.py
-    test_simulator.py
-    test_grpc.py
-  controllers/
-    __init__.py
-    test_vivarium_controller.py
-    test_edu_sessions/             # already a directory (from P2.02)
-      __init__.py
-      conftest.py
-      test_subtype_labels.py
-      test_entity_access.py
-      test_properties.py
-      test_sensing.py
-      test_behaviors.py
-      test_routines.py
-      test_logger.py
-      test_consumption_spawn.py
-      test_internal_state.py
-  interface/
-    __init__.py
-    test_panel_app.py
-    test_param.py
-  utils/
-    __init__.py
-    test_runtime.py
-    test_version.py
-    test_scene_config.py
-    test_updater.py              # was test_update_check.py
-    test_dataclass_wrapper.py    # was test_dataclass_api.py
-  scripts/
-    __init__.py
-    test_start_stop_scripts.py
-```
-
-**Conftest split:** Root conftest keeps widely-used fixtures: session cleanup, `scene_config`, `simulator_from_config`, `grpc_server`/`grpc_client`, `vivarium_controller*`, server subprocess fixtures. Component fixture chain (step, braitenberg, spawn, proximity_map, consumption, energy, reproduction, environment, environment_and_state) moves to `environment/conftest.py`.
-
-**Known issue:** `test_multi_spawn.py` has `from conftest import remove_duplicates` — inline the function (5 lines) into the test file before moving it.
-
-**Verification:** Run `pytest --collect-only` before and after — same test count, no collection errors. Then full `pytest` — all green.
 
 #### P2.06 — Dead code removal
 - **Status:** [ ]
@@ -205,12 +147,12 @@ Remove all rigid body support. No scene uses rigid bodies, no tests exercise rig
 
 **Update consumers of RigidBody-style accessors:**
 - `render.py`: `position_center` → `position`, `position_orientation` → `orientation`
-- `test_components.py`: `position_center` → `position`
-- `test_param.py`: `position_center` → `position`, `position_orientation` → `orientation`
-- `test_vivarium_controller.py`: `position_center` → `position`
-- `test_grpc.py`: `position_center` → `position`
-- `test_dataclass_api.py`: remove `get_rigid_body_state` fixture, RigidBody parametrization, and RigidBody-specific tests. Both `test_remote()` functions switch to point-particle fixture only.
-- `test_environments.py`: remove `assert not state.entity_state.is_rigid_body()`
+- `tests/environment/test_components.py`: `position_center` → `position`
+- `tests/interface/test_param.py`: `position_center` → `position`, `position_orientation` → `orientation`
+- `tests/controllers/test_vivarium_controller.py`: `position_center` → `position`
+- `tests/simulator/test_grpc.py`: `position_center` → `position`
+- `tests/utils/test_dataclass_wrapper.py`: remove `get_rigid_body_state` fixture, RigidBody parametrization, and RigidBody-specific tests. Both `test_remote()` functions switch to point-particle fixture only.
+- `tests/environment/test_environment.py`: remove `assert not state.entity_state.is_rigid_body()`
 
 **Keep untouched:**
 - `scripts/patch_jax_md.py` — patches jax_md's own `rigid_body.py` for JAX compatibility, unrelated to vivarium's RigidBody usage
@@ -509,13 +451,13 @@ All server-side notebooks use obsolete import paths (`vivarium.environments.brai
 
 #### P3.04 — Main CS tutorial notebook
 - **Status:** [ ]
-- **Dependencies:** P3.00 (journey names), P2.02 (feature inventory recorded in `test_edu_sessions.py`), P2.17 (all Phase 2 done)
-- **Key files:** `tests/test_edu_sessions.py` (feature inventory), `notebooks/sessions/miniproject_template.ipynb` (starting basis), `notebooks/sessions/session_1.ipynb` through `session_4.ipynb`
+- **Dependencies:** P3.00 (journey names), P2.02 (feature inventory recorded in `tests/controllers/test_edu_sessions/`), P2.17 (all Phase 2 done)
+- **Key files:** `tests/controllers/test_edu_sessions/` (feature inventory), `notebooks/sessions/miniproject_template.ipynb` (starting basis), `notebooks/sessions/session_1.ipynb` through `session_4.ipynb`
 - **CLAUDE.md updates:** `notebooks/CLAUDE.md` — add new notebook to file table.
 
 Write a new main tutorial notebook (e.g. `notebooks/tutorials/main_tutorial.ipynb` — name TBD per P3.00) for CS students comfortable with standard Python. Covers all key concepts from sessions 1-4 and the miniproject in compact form — behaviors as functions, selective sensing, routines, logging, custom configs, etc. — without the verbose explanations needed for non-programmers.
 
-Starting basis: the miniproject notebook's Recap section + features introduced in the miniproject itself. Use the feature inventory from P2.02 (recorded in `test_edu_sessions.py`) to ensure completeness. **Note:** after P2.05, this file moves to `tests/controllers/test_edu_sessions.py`.
+Starting basis: the miniproject notebook's Recap section + features introduced in the miniproject itself. Use the feature inventory from P2.02 (recorded in `tests/controllers/test_edu_sessions/conftest.py`) to ensure completeness.
 
 Document the following concepts within the tutorial:
 - Implicit step routing: how multiple controllers share a single simulation loop, which client triggers the step, and how changes propagate.
@@ -735,6 +677,7 @@ In particular that both `self.neighbor_manager.reallocate_if_overflow` and `neig
 ---
 
 ## Completed
+_In chronological order_
 
 #### P2.00 — Strip CLAUDE.md files to descriptive content
 Removed diagnostic sections (Known Issues, Refactoring Opportunities, Structural Questions, Cross-Package Issues, Dead Code to Remove, Audience Journey Readiness) from all 10 CLAUDE.md files. Removed LOC/Size columns, audit-related titles, and fixed dangling references.
@@ -756,3 +699,6 @@ Added assertions to no-op tests (`test_instantiate`, `test_braitenberg`). Rename
 
 #### B0.3 — Fix routine test assertions and underlying VivariumController bugs
 Investigation of loose routine test assertions (`>= 3` instead of `== 3`, getting 5) revealed three bugs in `VivariumController`: (1) `start_session` started an unintended background controller thread by not passing `start_controller_thread=False` to the constructor, (2) `step()` didn't increment `self.time`, breaking interval-based routines when stepping manually, (3) `start_session` returned with stale local state (`simulation_running`, `run_from`) because deferred changes weren't flushed. Fixed all three and tightened test assertions to exact counts. Full pytest green (262 passed).
+
+#### P2.05 — Test directory restructuring
+Restructured `tests/` to mirror source package structure: `environment/`, `simulator/`, `controllers/`, `interface/`, `utils/`, `scripts/`. Split root `conftest.py` — component fixture chain moved to `environment/conftest.py`. Renamed files: `test_environments.py` → `test_environment.py`, `test_update_check.py` → `test_updater.py`, `test_dataclass_api.py` → `test_dataclass_wrapper.py`. Moved `test_edu_sessions/` under `controllers/`. Removed dead `_make_state` method from `test_multi_spawn.py` (contained unused `from conftest import remove_duplicates`). Added test directory mirroring guideline to General Guidelines. Full pytest green (271 passed).
