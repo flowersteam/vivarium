@@ -171,3 +171,6 @@ test.py
 Results/
 
 */*/frames_*/
+
+# Sandbox notebooks
+notebooks/sandbox.ipynb
