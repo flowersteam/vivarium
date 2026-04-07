@@ -32,7 +32,7 @@ def test_agent_routine_fires_on_step(running_controller):
     ag.attach_routine(track_step)
     for _ in range(3):
         controller.step()
-    assert len(call_log) >= 3
+    assert len(call_log) == 3
 
 
 @pytest.mark.slow
@@ -53,7 +53,9 @@ def test_agent_routine_with_interval(running_controller):
     ag.attach_routine(track_interval, interval=3)
     for _ in range(6):
         controller.step()
-    assert len(call_log_interval) < len(call_log_every)
+    assert len(call_log_every) == 6
+    assert len(call_log_interval) == 2
+    assert len(call_log_every) == 3 * len(call_log_interval)
 
 
 def test_detach_agent_routine(controller):
@@ -111,7 +113,7 @@ def test_controller_routine_fires_on_step(running_controller):
     controller.attach_routine(ctrl_track)
     for _ in range(3):
         controller.step()
-    assert len(call_log) >= 3
+    assert len(call_log) == 3
 
 
 @pytest.mark.slow
@@ -131,7 +133,9 @@ def test_controller_routine_with_interval(running_controller):
     controller.attach_routine(ctrl_interval, interval=3)
     for _ in range(6):
         controller.step()
-    assert len(call_log_interval) < len(call_log_every)
+    assert len(call_log_every) == 6
+    assert len(call_log_interval) == 2
+    assert len(call_log_every) == 3 * len(call_log_interval)
 
 
 @pytest.mark.slow

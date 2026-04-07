@@ -38,7 +38,7 @@ _These apply to every task below._
 
 **Completing a task:**
 9. In parallel: (a) ask the user if `pytest` should be run, and (b) update affected CLAUDE.md files as specified in the task.
-10. Remove the task in `PLAN.md` and add a summary the Completed section.
+10. Remove the task in `PLAN.md` and add a summary at the end of the Completed section. 
 11. Propose a commit message (unsigned).
 12. The user reviews, commits, and handles the merge to `dev`.
 
@@ -726,10 +726,7 @@ _Bugs found during task execution that are outside the scope of the current task
 
 #### B0.2 - Some tests marked as `@pytest.mark.slow` (i.e. using subprocess and/or grpc) might be as useful using an in-process `Simulator` instance
 For instance `test_proximeters_selective_filters_by_subtype` or `TestSpawnController` (but to see). More generally, we should decide for general rules enabling to decide if a test should be "fast" or "slow", then check if every existing test are consistent with these rules. For now, the decision looks relatively arbitrary. We both want to minimize the amount of slow tests, yet use grpc whenever it is relevant for a giving test. Need a discussion on what the rules should be. 
-
-#### B0.3 - In `test_agent_routine_fires_on_step`, the final assertion might be wrong
-The assertion is `len(call_log) >= 3`. Why not `len(call_log) == 3`? But at the end of the test we actually have `len(call_log) == 5`, which might be a bug.
-Also have a look at `test_agent_routine_with_interval`, why not testing that one result in exactly 3 times the other?
+Another related discussion to have: instead of `@pytest.mark.slow` (or in addition to), shall we have a ``@pytest.mark.grpc` for tests that involve a client-server grpc connection? This could be useful when we make changes that can only break under this use case. But we might also need a marker for a client-server setup with in-process simulator.
 
 #### B0.4 - Check the logic of Environment.step()
 In particular that both `self.neighbor_manager.reallocate_if_overflow` and `neighbors.did_buffer_overflow` are called (only in debug mode though, so maybe not a big deal)
@@ -756,3 +753,6 @@ Deleted 4 redundant/outdated files (`scripts/run_vivarium.py`, `session_5_loggin
 
 #### P2.04 — Test suite quality fixes
 Added assertions to no-op tests (`test_instantiate`, `test_braitenberg`). Renamed shadowed duplicate `test_remote` → `test_remote_fetch_and_update` / `test_remote_apply`. Uncommented and fixed `test_is_connected_verify_detects_no_server` with mock gRPC client. Removed `# assert False` in `test_panel_app.py`. Replaced silent NaN revert in `test_environments.py` with assertion. Added `boyds` to scene parametrize. Registered `slow` marker in `.pytest.ini` and added `@pytest.mark.slow` to individual slow tests across 12 files. Added docstrings to 19 fixtures in `conftest.py`. Fixed `test_no_behavior_no_motion` → `test_no_behavior_zero_motors` (checks motors instead of position). Added motor assertions to `test_behavior_produces_motion`. Full pytest green.
+
+#### B0.3 — Fix routine test assertions and underlying VivariumController bugs
+Investigation of loose routine test assertions (`>= 3` instead of `== 3`, getting 5) revealed three bugs in `VivariumController`: (1) `start_session` started an unintended background controller thread by not passing `start_controller_thread=False` to the constructor, (2) `step()` didn't increment `self.time`, breaking interval-based routines when stepping manually, (3) `start_session` returned with stale local state (`simulation_running`, `run_from`) because deferred changes weren't flushed. Fixed all three and tightened test assertions to exact counts. Full pytest green (262 passed).

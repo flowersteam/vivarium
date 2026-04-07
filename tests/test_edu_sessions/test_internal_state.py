@@ -32,7 +32,7 @@ def test_internal_update_in_routine(running_controller):
     ag.attach_routine(drain_energy)
     for _ in range(5):
         controller.step()
-    assert ag.internal.energy_level < 1.0
+    assert ag.internal.energy_level == pytest.approx(0.5)
 
 
 def test_internal_independent_per_agent(controller):

@@ -55,7 +55,7 @@ def test_agent_logger_in_routine(running_controller):
     ag.attach_routine(log_position)
     for _ in range(3):
         controller.step()
-    assert len(ag.logger.get('x')) >= 3
+    assert len(ag.logger.get('x')) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ def test_controller_logger_in_routine(running_controller):
     controller.attach_routine(log_agent_count)
     for _ in range(3):
         controller.step()
-    assert len(controller.logger.get('n_agents')) >= 3
+    assert len(controller.logger.get('n_agents')) == 3
 
 
 # ---------------------------------------------------------------------------

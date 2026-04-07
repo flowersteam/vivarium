@@ -106,7 +106,7 @@ class VivariumController:
         """
         # Create controller - either with provided client or in disconnected state
         if client is not None:
-            controller = cls(client=client)
+            controller = cls(client=client, start_controller_thread=False)
         else:
             controller = cls()  # disconnected state
             controller.start_server_process(scene_name, timeout=server_timeout, start_controller_thread=start_controller_thread)
@@ -119,6 +119,7 @@ class VivariumController:
             controller.start_controller_thread()
         if run_simulation:
             controller.simulator.simulation_running = True
+        controller.apply_changes()
         lg.info(f"VivariumController session '{scene_name}' is started")
 
         # Print the URL the user should use
@@ -404,7 +405,6 @@ class VivariumController:
             while run_time < num_steps and not self._controller_thread_stop_event.is_set():
                 with sleep_timer(freq=self.controllers['simulator'].freq):
                     self.step(catch_errors=catch_errors)
-                    self.time += 1
                     run_time += 1
 
         # finally stop the simulation
@@ -460,6 +460,7 @@ class VivariumController:
         changed_applied = False
         if self.simulator.simulation_running:
             self.controller_step(catch_errors=catch_errors)
+            self.time += 1
             if self.simulator.run_from == self.client.name: # and self.simulator.simulation_running:
                 self.simulator_step()
                 changed_applied = True
