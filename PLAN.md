@@ -62,39 +62,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-#### P2.04 — Test suite quality fixes
-- **Status:** [ ]
-- **Dependencies:** P2.01 (green baseline)
-- **Key files:** `tests/test_components.py`, `tests/test_dataclass_api.py`, `tests/test_vivarium_controller.py`, `tests/test_simulator.py`, `tests/test_panel_app.py`, `tests/test_environments.py`, `tests/conftest.py`
-- **CLAUDE.md updates:** none
-
-Batch of small test quality improvements. Discuss each item briefly before making changes.
-
-**No-op tests — add minimal assertions:**
-- `test_instantiate()` in `test_components.py`: assert factory count > 0 and expected component names are present.
-- `test_braitenberg()` in `test_components.py`: assert no NaN in state and that state changed after stepping.
-
-**Duplicate test names:**
-- `test_dataclass_api.py` has two functions named `test_remote()` — the first is shadowed and never runs. Rename to `test_remote_fetch_and_update()` and `test_remote_apply()`.
-
-**Commented-out test:**
-- `test_vivarium_controller.py`: uncomment `test_is_connected_verify_detects_no_server` and fix. This tests stale connection detection — use monkeypatch approach to keep it fast.
-
-**Incomplete tests with TODOs:**
-- `test_simulator.py:38` (`# TODO: to fix`): leave the TODO as-is, revisit after P2.11 (dynamic dataclass fixes).
-- `test_panel_app.py:22` (`# assert False`): remove the comment. The test is functional (has real assertions).
-
-**NaN workaround:**
-- `test_environments.py`: remove the silent revert logic (lines 27-29) that reverts state when NaN is detected. Replace with `assert not jnp.isnan(state.entity_state.position).any()`. If specific scenes produce NaN, mark those with `@pytest.mark.xfail` rather than silently recovering.
-
-**Add scene configs to test coverage:**
-- Add `demo`, `excretion`, and `boyds` to the `test_environments.py` parametrize list (one-line change).
-
-**Test markers:**
-- Add `@pytest.mark.slow` to integration test files (~7 files that start a gRPC server or subprocess). Register the marker in pytest config.
-
-**Fixture docstrings:**
-- Add docstrings to each fixture in `conftest.py`. One-liner when sufficient.
 
 #### P2.05 — Test directory restructuring
 - **Status:** [ ]
@@ -757,6 +724,17 @@ A reference document or generated docs (Sphinx) covering the full public API. Tu
 
 _Bugs found during task execution that are outside the scope of the current task. Fix these when working on the relevant area, or as a standalone fix if blocking._
 
+#### B0.2 - Some tests marked as `@pytest.mark.slow` (i.e. using subprocess and/or grpc) might be as useful using an in-process `Simulator` instance
+For instance `test_proximeters_selective_filters_by_subtype` or `TestSpawnController` (but to see). More generally, we should decide for general rules enabling to decide if a test should be "fast" or "slow", then check if every existing test are consistent with these rules. For now, the decision looks relatively arbitrary. We both want to minimize the amount of slow tests, yet use grpc whenever it is relevant for a giving test. Need a discussion on what the rules should be. 
+
+#### B0.3 - In `test_agent_routine_fires_on_step`, the final assertion might be wrong
+The assertion is `len(call_log) >= 3`. Why not `len(call_log) == 3`? But at the end of the test we actually have `len(call_log) == 5`, which might be a bug.
+Also have a look at `test_agent_routine_with_interval`, why not testing that one result in exactly 3 times the other?
+
+#### B0.4 - Check the logic of Environment.step()
+In particular that both `self.neighbor_manager.reallocate_if_overflow` and `neighbors.did_buffer_overflow` are called (only in debug mode though, so maybe not a big deal)
+
+
 ---
 
 ## Completed
@@ -770,8 +748,11 @@ The reproduction fixture's consumption disablement (`range=0`) was insufficient 
 #### P2.02 — Write exhaustive feature tests for student-facing API
 Replaced `tests/test_edu_sessions.py` with `tests/test_edu_sessions/` package (9 test files + conftest). Complete feature inventory (13 categories) in conftest docstring. 101 tests total: 72 new covering entity access, properties, sensing, behaviors, routines, logger, consumption/spawn, internal state + 30 moved subtype_labels tests - 1 dropped (superseded). Discovered B.01 (SingleSpawnController `.item()` bug, 3 xfail tests). Updated P2.05 target structure. Full pytest green (262 passed, 3 xfailed).
 
+#### B.01 — Fix `SingleSpawnController.__getattr__` crash on in-process path
+`SingleSpawnController.__getattr__` assumed values were always numpy arrays (`.item()`, `.tolist()`), but the in-process Simulator returns JAX arrays or plain Python types wrapped in `Remote` proxies. Fixed by unwrapping `Remote` and normalizing to numpy via `np.asarray()` before calling array methods. Removed 3 xfail markers from `test_consumption_spawn.py`. Full pytest green (262 passed, 0 xfailed).
+
 #### P2.03 — Early cleanup batch (workflow shakedown)
 Deleted 4 redundant/outdated files (`scripts/run_vivarium.py`, `session_5_logging.ipynb`, `session_6_bonus.ipynb`, `quickstart_tutorial.ipynb`). Removed misleading TODO on `apply_changes()`, removed explicit `scene_name` setter (Python's default `AttributeError` suffices) and added a read-only test. Added `notebooks/sandbox.ipynb` to `.gitignore`. Added threading note to `update_plot_cb()` docstring in `panel_app.py`.
 
-#### B.01 — Fix `SingleSpawnController.__getattr__` crash on in-process path
-`SingleSpawnController.__getattr__` assumed values were always numpy arrays (`.item()`, `.tolist()`), but the in-process Simulator returns JAX arrays or plain Python types wrapped in `Remote` proxies. Fixed by unwrapping `Remote` and normalizing to numpy via `np.asarray()` before calling array methods. Removed 3 xfail markers from `test_consumption_spawn.py`. Full pytest green (262 passed, 0 xfailed).
+#### P2.04 — Test suite quality fixes
+Added assertions to no-op tests (`test_instantiate`, `test_braitenberg`). Renamed shadowed duplicate `test_remote` → `test_remote_fetch_and_update` / `test_remote_apply`. Uncommented and fixed `test_is_connected_verify_detects_no_server` with mock gRPC client. Removed `# assert False` in `test_panel_app.py`. Replaced silent NaN revert in `test_environments.py` with assertion. Added `boyds` to scene parametrize. Registered `slow` marker in `.pytest.ini` and added `@pytest.mark.slow` to individual slow tests across 12 files. Added docstrings to 19 fixtures in `conftest.py`. Fixed `test_no_behavior_no_motion` → `test_no_behavior_zero_motors` (checks motors instead of position). Added motor assertions to `test_behavior_produces_motion`. Full pytest green.

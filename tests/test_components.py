@@ -10,7 +10,10 @@ from vivarium.utils.scene_configs import component_factories_from_config
 def test_instantiate(scene_config):
     scene_config = scene_config('braitenberg')
     component_factories = component_factories_from_config(scene_config.environment.components)
-    pass
+    assert len(component_factories) > 0
+    factory_names = [f.name for f in component_factories]
+    assert 'agents' in factory_names
+    assert 'step' in factory_names
 
 
 def test_type_mask(environment_and_state, braitenberg):
@@ -286,4 +289,5 @@ def test_reproduction_nonexisting_entities_dont_reproduce(environment_and_state,
 def test_braitenberg(environment_and_state, braitenberg):
     env, state = environment_and_state(braitenberg)
     state = env.step(state)
-    pass
+    assert not jnp.isnan(state.entity_state.position).any()
+    assert state.entity_state.position.shape == (4, 2)

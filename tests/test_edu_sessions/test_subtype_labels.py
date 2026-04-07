@@ -286,6 +286,7 @@ def test_spawn_setter_rejects_old_label(scene_name, vivarium_controller_from_con
 # Integration: rename then run simulation
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 @pytest.mark.parametrize('scene_name', ['session_3'])
 def test_rename_then_run_simulation(scene_name, vivarium_controller_start_session):
     """After renaming, subtype-specific behaviors attach and run without errors."""
@@ -313,6 +314,7 @@ def test_rename_then_run_simulation(scene_name, vivarium_controller_start_sessio
 # Known limitations
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['grpc_client'])
 def test_simulator_subtype_labels_diverges_after_apply_changes(client_fixture, request):
     """Known limitation: controller.simulator.subtype_labels reads the freshly
@@ -340,6 +342,7 @@ def test_simulator_subtype_labels_diverges_after_apply_changes(client_fixture, r
     assert controller.simulator.subtype_labels == SESSION3_LABELS
 
 
+@pytest.mark.slow
 def test_two_controllers_have_independent_subtypes(grpc_server):
     """Known limitation: two VivariumController instances backed by different gRPC
     clients (the typical Panel UI + notebook scenario) have independent subtype

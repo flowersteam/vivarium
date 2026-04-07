@@ -109,6 +109,7 @@ def test_controller_parameters(simulator):
     assert cp.agents.color[1] == cp_2.agents.color[1]
 
 
+@pytest.mark.slow
 def test_bidirectional_streaming(grpc_client):
     """Test bidirectional streaming RPC."""
     client = grpc_client(scene_name)
@@ -132,6 +133,7 @@ def test_bidirectional_streaming(grpc_client):
         assert state_and_cp.controller_parameters is not None
     
 
+@pytest.mark.slow
 def test_set_changes(grpc_client):
     """Test RPC for streaming mode."""
     client = grpc_client(scene_name)

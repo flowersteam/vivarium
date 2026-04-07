@@ -3,6 +3,7 @@
 import pytest
 
 
+
 def test_proximeters_returns_two_values(controller):
     """agent.proximeters() returns a list of [left, right]."""
     ag = controller.agents[0]
@@ -19,6 +20,7 @@ def test_proximeters_values_are_numeric(controller):
     assert isinstance(float(right), float)
 
 
+@pytest.mark.slow
 def test_proximeters_selective_filters_by_subtype(running_controller):
     """Selective sensing produces different results than unfiltered sensing.
 

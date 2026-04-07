@@ -4,8 +4,9 @@ import jax.numpy as jnp
 from vivarium.interface.parameterized import ParamSimulator
 
 
-@pytest.mark.parametrize("client_fixture, scene_name, entity_type", 
-                         [('grpc_client', 'braitenberg', 'agents'), 
+@pytest.mark.slow
+@pytest.mark.parametrize("client_fixture, scene_name, entity_type",
+                         [('grpc_client', 'braitenberg', 'agents'),
                           ('simulator_from_config', 'braitenberg', 'objects'),
                           ('simulator_from_config', 'particle_lenia', 'particles')])
 @pytest.mark.parametrize("idx", [0, 2])

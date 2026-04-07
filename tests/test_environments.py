@@ -8,25 +8,20 @@ NUM_STEPS = 5
 
 
 @pytest.mark.parametrize("scene_name", [
-    "braitenberg", 
-    "particle_lenia", 
-    "lenia_braitenberg", 
-    "non_transitive", 
-    "fishing"])
+    "braitenberg",
+    "particle_lenia",
+    "lenia_braitenberg",
+    "non_transitive",
+    "fishing",
+    "boyds"])
 def test_env(scene_name, scene_config):
     """Test the stepping mechanism of the env with occlusion (default)"""
     config = scene_config(scene_name)
-    # config.environment.kwargs['to_jit'] = False
     env = Environment.from_config(config.environment)
     state = env.init_state()
-    previous_state = state
     for t in range(NUM_STEPS):
-        prev_prev = previous_state
-        previous_state = state
-        state = env.step(state) #, scan=False)
-        if jnp.isnan(state.entity_state.position).any():
-            print(f"NaN detected at step {t}")
-            state = prev_prev  # revert to previous state twice
+        state = env.step(state)
+        assert not jnp.isnan(state.entity_state.position).any(), f"NaN detected at step {t}"
 
     assert env
     assert state

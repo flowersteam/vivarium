@@ -178,6 +178,7 @@ def cleanup_parameterized_class_fixture(request):
 
 @pytest.fixture
 def scene_config():
+    """Factory: load a Hydra scene config by name."""
     def fn(scene_name, overrides=[]):
         return load_config('scene', scene_name, overrides=overrides)
     return fn
@@ -185,6 +186,7 @@ def scene_config():
 
 @pytest.fixture
 def environment_from_config(scene_config):
+    """Factory: create an Environment from a scene name."""
     def fn(scene_name):
         return Environment.from_config(scene_config(scene_name).environment)
     return fn
@@ -192,6 +194,7 @@ def environment_from_config(scene_config):
 
 @pytest.fixture
 def state_from_config(scene_config):
+    """Factory: create a state class from a scene name."""
     def fn(scene_name):
         config = scene_config(scene_name)
         base_state_cls = config.environment.base_state_cls
@@ -202,6 +205,7 @@ def state_from_config(scene_config):
 
 @pytest.fixture
 def simulator_from_config(scene_config):
+    """Factory: create an in-process Simulator from a scene name."""
     def fn(scene_name, overrides=[]):
         return Simulator.from_config(scene_config(scene_name, overrides=overrides).simulator)
     return fn
@@ -209,6 +213,7 @@ def simulator_from_config(scene_config):
 
 @pytest.fixture
 def vivarium_controller():
+    """Factory: wrap a client (Simulator or gRPC) in a VivariumController."""
     def fn(client):
         return VivariumController(client=client, start_controller_thread=False)
     return fn
@@ -216,6 +221,7 @@ def vivarium_controller():
 
 @pytest.fixture
 def vivarium_controller_from_config(simulator_from_config):
+    """Factory: create a VivariumController with in-process Simulator from a scene name."""
     def fn(scene_name, overrides=[]):
         client = simulator_from_config(scene_name, overrides=overrides)
         return VivariumController(client=client, start_controller_thread=False)
@@ -224,6 +230,7 @@ def vivarium_controller_from_config(simulator_from_config):
 
 @pytest.fixture
 def vivarium_controller_start_session(grpc_client):
+    """Factory: create a VivariumController via start_session with gRPC client. Closes on teardown."""
     controllers = []
     def fn(scene_name, overrides=[]):
         client = grpc_client(scene_name, overrides)
@@ -244,6 +251,7 @@ def vivarium_controller_start_session(grpc_client):
 
 @pytest.fixture
 def controller_and_interfaces_from_config(scene_config, vivarium_controller):
+    """Factory: create a VivariumController and corresponding Interface instances from a client."""
     def fn(client):
         controller = vivarium_controller(client)
         config = scene_config(controller.client.scene_name)
@@ -256,11 +264,11 @@ def controller_and_interfaces_from_config(scene_config, vivarium_controller):
     return fn
 
 
-@pytest.fixture#(scope="module")
+@pytest.fixture
 def grpc_server(simulator_from_config):
-    
+    """Factory: start an in-process gRPC server and return its address. Stops on teardown."""
     servers = []
-    
+
     def fn(scene_name, overrides=[]):
         simulator = simulator_from_config(scene_name, overrides=overrides)
         server, port = create_grpc_server(simulator, port=50051)
@@ -280,6 +288,7 @@ def grpc_server(simulator_from_config):
 
 @pytest.fixture
 def grpc_client(grpc_server):
+    """Factory: create a SimulatorGRPCClient connected to an in-process server. Closes on teardown."""
     clients = []
     def fn(scene_name, overrides=[]):
         client = SimulatorGRPCClient(server=grpc_server(scene_name, overrides))
@@ -305,11 +314,13 @@ def remove_duplicates(factories):
 
 @pytest.fixture
 def proximity_map(step, braitenberg):
+    """Component list: step + braitenberg + proximity map."""
     return [*step, *braitenberg, ProximityMapComponent('proximity_map', 0)]
 
 
 @pytest.fixture
 def spawn(braitenberg):
+    """Component list: braitenberg + spawn (period=1, subtype=0)."""
     spawn = SpawnComponent(
         name='spawn',
         precedence=1,
@@ -326,6 +337,7 @@ def spawn(braitenberg):
 
 @pytest.fixture
 def consumption(proximity_map):
+    """Component list: proximity_map + consumption (subtype 0 → 1)."""
     consumption = ConsumptionComponent(
         name='consumption', 
         precedence=1, 
@@ -342,6 +354,7 @@ def consumption(proximity_map):
 
 @pytest.fixture
 def energy(consumption):
+    """Component list: consumption + energy (agents, init=0.5, max=1)."""
     energy_component = EnergyComponent(
         name='energy',
         precedence=2,
@@ -356,6 +369,7 @@ def energy(consumption):
 
 @pytest.fixture
 def reproduction(energy):
+    """Component list: energy + reproduction (consumption disabled)."""
     # Disable the ConsumptionComponent for the reproduction test.
     energy[-2].consumption_params_dict['test_consumption']['start'] = False
     reproduction = ReproductionComponent(
@@ -374,6 +388,7 @@ def reproduction(energy):
 
 @pytest.fixture
 def braitenberg(step):
+    """Component list: step + braitenberg (4 agents, 2 subtypes)."""
     n_agents = 4
     braitenberg = BraitenbergComponent(
         name='braitenberg',
@@ -397,11 +412,13 @@ def braitenberg(step):
 
 @pytest.fixture
 def step():
+    """Component list: single StepComponent (Verlet integration)."""
     return [StepComponent('step', 10, 0.1, MaskFunction('exists'))]
 
 
 @pytest.fixture
 def environment():
+    """Factory: create an Environment from a list of component factories."""
     def fn(factories, debug_mode=False):
         nm = NeighborManager(box_size=100., neighbor_radius=150., dr_threshold=10.)
         env = Environment(
@@ -417,6 +434,7 @@ def environment():
 
 @pytest.fixture
 def environment_and_state(environment):
+    """Factory: create an Environment and its initial state from component factories."""
     def fn(factories, debug_mode=False):
         env = environment(factories, debug_mode=debug_mode)
         state = env.init_state()

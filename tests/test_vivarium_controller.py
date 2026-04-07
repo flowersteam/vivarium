@@ -14,6 +14,7 @@ from vivarium.utils.handle_server_interface import (
 NUM_STEPS = 10
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_load_viviarium_controller(client_fixture, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
@@ -91,6 +92,7 @@ def test_load_viviarium_controller(client_fixture, request):
     assert not controller.client.controller_parameters.objects.visible[2]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_controller_parameter_sync(client_fixture, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
@@ -131,6 +133,7 @@ def test_disconnected_controller_methods_raise():
         controller.start_controller_thread()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_constructor_with_client(client_fixture, request):
     """Test that passing client to constructor initializes properly."""
@@ -143,6 +146,7 @@ def test_constructor_with_client(client_fixture, request):
     assert hasattr(controller, 'agents')  # Controller loaded from config
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_is_connected(client_fixture, request):
     """Test is_connected() returns correct state."""
@@ -183,24 +187,30 @@ def test_is_connected_verify_false(client_fixture, request):
     assert controller.client is not None
 
 
-# def test_is_connected_verify_detects_no_server(caplog, monkeypatch):
-#     """Test is_connected(verify=True) detects when server is down."""
-#     from vivarium.controllers import vivarium_controller
-#     # Mock check_server_running to return False (simulate server down)
-#     monkeypatch.setattr(vivarium_controller, 'check_server_running', lambda *args, **kwargs: False)
+def test_is_connected_verify_detects_no_server(caplog, monkeypatch):
+    """Test is_connected(verify=True) detects when server is down."""
+    from vivarium.controllers import vivarium_controller
+    # Mock check_server_running to return False (simulate server down)
+    monkeypatch.setattr(vivarium_controller, 'check_server_running', lambda *args, **kwargs: False)
 
-#     # Create a controller with a fake client (simulating stale connection)
-#     controller = VivariumController()
-#     controller.client = "fake_client"  # Simulate having a client
-#     controller.controllers = {'simulator': 'fake'}
+    # Create a controller with a fake gRPC client (simulating stale connection)
+    controller = VivariumController()
+    fake_client = type('FakeClient', (), {
+        'is_grpc_client': True,
+        'server_host': 'localhost',
+        'server_port': 50051,
+    })()
+    controller.client = fake_client
+    controller.controllers = {'simulator': 'fake'}
 
-#     # With verify=True, it should detect no server and clean up
-#     assert controller.is_connected(verify=True) == False
-#     assert controller.client is None
-#     assert controller.controllers == {}
-#     assert "Server is no longer responding" in caplog.text
+    # With verify=True, it should detect no server and clean up
+    assert controller.is_connected(verify=True) == False
+    assert controller.client is None
+    assert controller.controllers == {}
+    assert "Server is no longer responding" in caplog.text
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['grpc_client'])
 def test_is_connected_verify_true_with_running_server(client_fixture, request):
     """Test is_connected(verify=True) returns True when server is running."""
@@ -214,6 +224,7 @@ def test_is_connected_verify_true_with_running_server(client_fixture, request):
     assert controller.client is not None
 
 
+@pytest.mark.slow
 def test_reconnect_after_external_server_restart(server_fixture):
     """Integration test: reconnect after server is stopped and restarted externally.
 
@@ -257,6 +268,7 @@ def test_reconnect_after_external_server_restart(server_fixture):
     assert 'simulator' in controller.controllers  # Controllers reinitialized
 
 
+@pytest.mark.slow
 def test_two_controllers_server_handoff(clean_server_state):
     """Integration test: two controllers with server lifecycle handoff.
 
@@ -328,6 +340,7 @@ def test_two_controllers_server_handoff(clean_server_state):
             vc1._server_process = None
 
 
+@pytest.mark.slow
 def test_start_server_scene_mismatch(caplog):
     """Test that starting a server with a different scene logs warning and doesn't connect."""
     # Ensure no server is running from previous tests

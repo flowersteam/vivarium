@@ -5,7 +5,11 @@ that the start/stop utilities work correctly. They also serve as smoke
 tests to ensure the server and interface can start and respond to requests.
 """
 
+import pytest
+
 from vivarium.utils.handle_server_interface import check_server_running, wait_for_http
+
+pytestmark = pytest.mark.slow
 
 
 def test_start_stop_server(server_fixture):

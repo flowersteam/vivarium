@@ -1,5 +1,7 @@
 """Tests for agent.internal namespace (client-side custom state)."""
 
+import pytest
+
 
 def test_internal_set_and_get(controller):
     """agent.internal.<attr> can be set and read back."""
@@ -17,6 +19,7 @@ def test_internal_arbitrary_attributes(controller):
     assert ag.internal.count == 42
 
 
+@pytest.mark.slow
 def test_internal_update_in_routine(running_controller):
     """A routine can read and update agent.internal state."""
     controller = running_controller

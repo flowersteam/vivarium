@@ -53,7 +53,7 @@ def generate_changes_and_expected(wheel_diameter_idx, wheel_diameter_value, exis
     (lambda agent_field: generate_changes_and_expected(0, 0, 7, 0, 6, 0, agent_field), "get_rigid_body_state"),
     (lambda agent_field: generate_changes_and_expected(1, 1, 8, 1, 7, 1, agent_field), "get_point_particle_state"),
 ])
-def test_remote(changes_and_expected, state, request):
+def test_remote_fetch_and_update(changes_and_expected, state, request):
     state = request.getfixturevalue(state)
 
     changes, expected = changes_and_expected('agents')
@@ -84,7 +84,7 @@ def test_remote(changes_and_expected, state, request):
             assert (jnp.equal(getattr(getattr(state, entity), attr), expected_fn(state))).all()
 
 
-def test_remote(get_rigid_body_state):
+def test_remote_apply(get_rigid_body_state):
     state = get_rigid_body_state
     idx = 3
     val = [0.2, 0.3]

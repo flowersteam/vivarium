@@ -1,5 +1,7 @@
 """Tests for Logger: add, get, clear on agents and controller."""
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Agent logger
@@ -41,6 +43,7 @@ def test_agent_logger_clear_all(controller):
     assert ag.logger.get('y') == []
 
 
+@pytest.mark.slow
 def test_agent_logger_in_routine(running_controller):
     """A routine can log values via agent.logger.add."""
     controller = running_controller
@@ -66,6 +69,7 @@ def test_controller_logger_add_and_get(controller):
     assert controller.logger.get('count') == [10, 20]
 
 
+@pytest.mark.slow
 def test_controller_logger_in_routine(running_controller):
     """A controller routine can log values via controller.logger.add."""
     controller = running_controller

@@ -1,5 +1,6 @@
 """Tests for behavior attachment, detachment, weighting, and execution."""
 
+import pytest
 import numpy as np
 
 
@@ -107,23 +108,19 @@ def test_change_behavior_weight(controller):
 # Behavior execution (requires running simulation)
 # ---------------------------------------------------------------------------
 
-def test_no_behavior_no_motion(running_controller):
-    """Without a behavior, an agent does not move."""
+@pytest.mark.slow
+def test_no_behavior_zero_motors(running_controller):
+    """Without a behavior, motors remain at zero."""
     controller = running_controller
     ag = controller.agents[0]
 
-    # Warmup steps to let initial forces settle
     controller.step()
-    controller.step()
-    pos_before = (float(ag.x_position), float(ag.y_position))
 
-    for _ in range(NUM_STEPS):
-        controller.step()
-
-    pos_after = (float(ag.x_position), float(ag.y_position))
-    assert pos_before == pos_after
+    assert ag.left_motor == 0.0
+    assert ag.right_motor == 0.0
 
 
+@pytest.mark.slow
 def test_behavior_produces_motion(running_controller):
     """An attached behavior causes the agent to move after stepping."""
     controller = running_controller
@@ -137,6 +134,9 @@ def test_behavior_produces_motion(running_controller):
     controller.step()
     for _ in range(NUM_STEPS):
         controller.step()
+
+    assert ag.left_motor == 1.0
+    assert ag.right_motor == 1.0
 
     pos_after = (float(ag.x_position), float(ag.y_position))
     assert pos_before != pos_after

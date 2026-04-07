@@ -182,6 +182,7 @@ class TestSpawnSimulationStep:
 
 # ─── SpawnController Tests (via grpc_client) ──────────────────────────────────
 
+@pytest.mark.slow
 class TestSpawnController:
 
     def test_single_config_direct_access(self, vivarium_controller_start_session):
@@ -221,6 +222,7 @@ class TestSpawnController:
 
 class TestBackwardCompatibility:
 
+    @pytest.mark.slow
     def test_existing_scene_with_flat_spawn_loads(self, vivarium_controller_start_session):
         """Existing scenes with flat spawn params still load correctly."""
         # session_4 uses flat spawn params: subtype, period, start, position_range, orientation_range

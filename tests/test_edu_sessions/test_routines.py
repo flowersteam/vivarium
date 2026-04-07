@@ -1,5 +1,7 @@
 """Tests for agent-level and controller-level routines."""
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Agent routines
@@ -17,6 +19,7 @@ def test_attach_agent_routine(controller):
     assert 'my_routine' in [r for r in ag.routine_handler._routines]
 
 
+@pytest.mark.slow
 def test_agent_routine_fires_on_step(running_controller):
     """An agent routine fires when the simulation steps."""
     controller = running_controller
@@ -32,6 +35,7 @@ def test_agent_routine_fires_on_step(running_controller):
     assert len(call_log) >= 3
 
 
+@pytest.mark.slow
 def test_agent_routine_with_interval(running_controller):
     """An agent routine with interval=N fires less often than interval=1."""
     controller = running_controller
@@ -95,6 +99,7 @@ def test_attach_controller_routine(controller):
     assert 'my_ctrl_routine' in controller.routine_handler._routines
 
 
+@pytest.mark.slow
 def test_controller_routine_fires_on_step(running_controller):
     """A controller-level routine fires when the simulation steps."""
     controller = running_controller
@@ -109,6 +114,7 @@ def test_controller_routine_fires_on_step(running_controller):
     assert len(call_log) >= 3
 
 
+@pytest.mark.slow
 def test_controller_routine_with_interval(running_controller):
     """A controller routine with interval=N fires less often than interval=1."""
     controller = running_controller
@@ -128,6 +134,7 @@ def test_controller_routine_with_interval(running_controller):
     assert len(call_log_interval) < len(call_log_every)
 
 
+@pytest.mark.slow
 def test_controller_routine_accesses_agents(running_controller):
     """A controller routine can access and modify agents."""
     controller = running_controller

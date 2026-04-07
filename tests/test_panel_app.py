@@ -1,6 +1,7 @@
 import pytest
 from vivarium.interface.panel_app import WindowManager
 
+@pytest.mark.slow
 @pytest.mark.parametrize('client_fixture', ['simulator_from_config', 'grpc_client'])
 def test_window_manager(client_fixture, vivarium_controller, request):
     client = request.getfixturevalue(client_fixture)('braitenberg')
@@ -19,4 +20,3 @@ def test_window_manager(client_fixture, vivarium_controller, request):
     
     wm.update_plot_cb()
     
-    # assert False
