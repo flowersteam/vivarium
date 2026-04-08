@@ -68,11 +68,6 @@ class NeighborManager:
         return False
 
 
-nested_fields_to_access = {
-    'neighbor_manager': ['box_size', 'neighbor_radius'],
-}
-
-
 @access_nested_fields({'neighbor_manager': ['box_size', 'neighbor_radius', 'dr_threshold']})
 class Environment:
     def __init__(self,

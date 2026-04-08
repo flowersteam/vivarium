@@ -10,11 +10,10 @@ Entry points for the vivarium application. Three primary scripts (server, interf
 |------|--------|---------|
 | `run_server.py` | Solid | Start gRPC simulation server (Hydra config) |
 | `run_interface.py` | Solid | Start Panel web interface with cleanup handlers |
-| `run_vivarium.py` | Brittle | Combined server+interface launcher (PyInstaller main entry) |
 | `run_jupyter.py` | Solid | Dual-mode Jupyter launcher (server or kernel) for PyInstaller |
 | `patch_jax_md.py` | Solid | Patch jax_md for JAX 0.4.24+ compat (Intel Mac) |
 | `print_config.py` | Unused | Prints Hydra config |
-| `profiling.py` | Partial | JAX profiler — hardcoded scene, uses deprecated imports |
+| `profiling.py` | Solid | JAX profiler — profiles braitenberg scene step |
 | `rthook_jupyter_matplotlib.py` | Solid | PyInstaller runtime hook for matplotlib/ipykernel |
 | `dev/benchmark_grpc.py` | Solid | gRPC communication pattern benchmarks |
 | `dev/benchmark_streaming_real.py` | Solid | Real-world streaming benchmark with behaviors |
@@ -25,7 +24,6 @@ Entry points for the vivarium application. Three primary scripts (server, interf
 ```
 python scripts/run_server.py scene=<name>        # Start server
 python scripts/run_interface.py [--flags]          # Start web UI
-python scripts/run_vivarium.py [scene] [--no-browser]  # Combined
 python scripts/patch_jax_md.py                     # Post-install fix
 ```
 
@@ -49,7 +47,6 @@ All primary scripts depend on `vivarium.utils.runtime` for frozen/dev mode detec
 |--------|-----------|---------------|------|
 | `run_server.py` | `test_start_stop_scripts.py` | Server start/stop via `start_simulation_server()` | No direct invocation test; relies on `handle_server_interface` wrapper |
 | `run_interface.py` | `test_start_stop_scripts.py` | Server+interface start/stop together | Cleanup handlers, signal handling untested |
-| `run_vivarium.py` | — | — | No tests. PyInstaller guards, spawn counter, combined launch flow all untested |
 | `run_jupyter.py` | — | — | No tests. Dual-mode detection untested |
 | `patch_jax_md.py` | — | — | No tests (acceptable — manual post-install tool) |
 | `print_config.py` | — | — | No tests |

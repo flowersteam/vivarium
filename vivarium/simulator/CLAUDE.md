@@ -53,8 +53,6 @@ SimulatorGRPCClient                      Simulator
 
 **Streaming:** `StreamState` (server→client push), `BidirectionalStep` (two-way synchronized stepping)
 
-**Unused:** `SetState` — handler exists but no client calls it.
-
 ### Controller Parameters
 
 Built in `Simulator.from_config()` by collecting `controller_kwargs` from simulator config and each component's client config. Result: `ControllerParameters(simulator=..., agents=..., walls=..., ...)`.
@@ -66,7 +64,7 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 ### Simulator (server-side)
 - `Simulator.from_config(config)` — create from Hydra config
 - `step(changes=None)` — one JAX step, optionally apply changes first
-- `run(threaded, num_steps, save)` — run loop (blocking or threaded)
+- `run(threaded, num_steps)` — run loop (blocking or threaded)
 - `stop()`, `is_running()`
 - `get_state()`, `get_controller_parameters()`, `get_state_and_controller_parameters()`
 - `set_changes(changes)` — apply changes to state/params
@@ -105,9 +103,7 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 | Bidirectional streaming | `test_grpc.py` | Covered |
 | `set_changes()` with update | `test_grpc.py` | Covered |
 | Multi-client registration | `test_edu_sessions.py` | Covered |
-| Recording (`start/stop/record/load`) | — | **Not tested** |
-| `SetState` RPC | — | **Not tested** |
 | Streaming rate limiting | — | Not tested |
 
-**Summary**: ~70% of live code is tested. Recording and SetState are untested.
+**Summary**: Core flows well-tested. Streaming rate limiting untested.
 

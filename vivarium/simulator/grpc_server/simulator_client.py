@@ -21,7 +21,6 @@ Empty = simulator_pb2.google_dot_protobuf_dot_empty__pb2.Empty
 lg = logging.getLogger(__name__)
 
 
-# @access_nested_fields(nested_fields_to_access)
 class SimulatorGRPCClient:
     """A client for the simulator server that uses gRPC.
     """

@@ -1,7 +1,7 @@
 # Vivarium Release Plan
 
 _Living document — updated at the end of every working session._
-_Last updated: 2026-04-07_
+_Last updated: 2026-04-08_
 
 ---
 
@@ -65,31 +65,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-
-#### P2.06 — Dead code removal
-- **Status:** [ ]
-- **Dependencies:** P2.05 (test restructuring — so file paths are stable)
-- **Key files:** `vivarium/environment/components/eco_evo/component.py`, `notebooks/sessions/session_5_logging copy.ipynb`, `scripts/print_config.py`, `scripts/profiling.py`, `vivarium/simulator/simulator.py`, `vivarium/simulator/grpc_server/simulator_client.py`, `vivarium/simulator/grpc_server/simulator_server.py`, `vivarium/simulator/grpc_server/protos/simulator.proto`, `vivarium/interface/panel_app.py`, `vivarium/controllers/utils.py`, `vivarium/controllers/__init__.py`, `vivarium/environment/environment.py`
-- **CLAUDE.md updates:** `vivarium/simulator/CLAUDE.md` — update public API (remove recording methods, SetState RPC). `vivarium/controllers/CLAUDE.md` — update file table if utils.py renamed.
-
-**Delete files:**
-- `vivarium/environment/components/eco_evo/component.py` — empty file (0 bytes).
-- `notebooks/sessions/session_5_logging copy.ipynb` — older draft with defunct `logger.plot()` content.
-
-**Fix scripts:**
-- `scripts/print_config.py` — test if it still works, fix if needed.
-- `scripts/profiling.py` — adapt to current API (uses non-existent `SceneConfiguration` import).
-
-**Remove dead code:**
-- `nested_fields_to_access` dict (`simulator.py`) + commented-out decorator reference (`simulator_client.py`) + unused variable (`environment.py`). Keep `access_nested_fields` function and `@access_nested_fields(...)` decorator on `Environment` — they are actively used.
-- `SetState` RPC handler in `simulator_server.py` + proto definition — calls non-existent `simulator.set_state()`. Regenerate proto after removal.
-- Recording feature (`record`, `start_recording`, `stop_recording`, `save_records`, `load`) in `simulator.py`. A replacement recording mechanism will be designed in Phase 4.
-- `self.notebook_mode` parameter and assignment in `panel_app.py`.
-- Commented-out `config_update` logic in `panel_app.py`.
-- `kill_session()` in `controllers/utils.py`.
-- `set_nested_attr` from `controllers/__init__.py` exports (no consumer).
-
-**After kill_session removal:** Rename `vivarium/controllers/utils.py` → `vivarium/controllers/handlers.py`. The module contains `Logger`, `RoutineHandler`, and `BehaviorHandler` — the name `utils.py` is misleading. Update all imports.
 
 #### P2.07 — Rigid body removal
 - **Status:** [ ]
@@ -702,3 +677,6 @@ Investigation of loose routine test assertions (`>= 3` instead of `== 3`, gettin
 
 #### P2.05 — Test directory restructuring
 Restructured `tests/` to mirror source package structure: `environment/`, `simulator/`, `controllers/`, `interface/`, `utils/`, `scripts/`. Split root `conftest.py` — component fixture chain moved to `environment/conftest.py`. Renamed files: `test_environments.py` → `test_environment.py`, `test_update_check.py` → `test_updater.py`, `test_dataclass_api.py` → `test_dataclass_wrapper.py`. Moved `test_edu_sessions/` under `controllers/`. Removed dead `_make_state` method from `test_multi_spawn.py` (contained unused `from conftest import remove_duplicates`). Added test directory mirroring guideline to General Guidelines. Full pytest green (271 passed).
+
+#### P2.06 — Dead code removal
+Deleted 2 files (`eco_evo/component.py` empty, `session_5_logging copy.ipynb` obsolete). Fixed `scripts/profiling.py` (broken `SceneConfiguration` import → current `load_scene_config` API). Removed recording feature from `simulator.py` (`start_recording`, `record`, `save_records`, `stop_recording`, `load`, plus `save`/`saving_name` params from `run()`/`_run()`). Removed `nested_fields_to_access` dicts from `simulator.py` and `environment.py`, commented decorator from `simulator_client.py`. Removed `SetState` handler from `simulator_server.py` (called non-existent method; proto definition was already gone). Removed `notebook_mode` from `panel_app.py`. Removed `kill_session()` from `controllers/utils.py` and `set_nested_attr` from `controllers/__init__.py` exports. Renamed `controllers/utils.py` → `controllers/handlers.py` (updated 3 import sites). Cleaned up unused imports (`proto_to_ndarray` in server, `Logger` in braitenberg controller). Simplified `tests/CLAUDE.md` coverage section (removed stale counts, corrected Logger test status). Updated CLAUDE.md files for simulator, controllers, scripts, and tests. Full pytest green (271 passed).

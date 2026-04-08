@@ -1,6 +1,6 @@
 import numpy as np
 
-from vivarium.controllers.utils import RoutineHandler, Logger
+from vivarium.controllers.handlers import RoutineHandler, Logger
 from ....controllers.controller import AttributeMapping
 
 class InternalData:

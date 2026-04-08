@@ -5,14 +5,13 @@ from concurrent import futures
 from contextlib import contextmanager
 
 
-from numproto.numproto import proto_to_ndarray
 from vivarium.simulator.grpc_server import simulator_pb2_grpc
 from vivarium.simulator.grpc_server import simulator_pb2
 import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 
-from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_dataclass, proto_to_changes
+from vivarium.simulator.grpc_server.converters import dataclass_to_proto, proto_to_changes
 
 
 lg = logging.getLogger(__name__)
@@ -107,15 +106,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
     def Stop(self, request, context):
         self.simulator.stop()
-        return Empty()
-
-    def SetState(self, request, context):
-        with self._lock:
-            ent_idx = request.ent_idx
-            col_idx = request.col_idx
-            self.simulator.set_state(
-                request.nested_field, ent_idx, col_idx, proto_to_ndarray(request.value)
-            )
         return Empty()
 
     # ============ Streaming RPCs ============

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Pytest test suite for the Vivarium project. Structure mirrors source packages. 271 tests across 17 test files. Mix of unit tests (~60%) and integration tests (~40%).
+Pytest test suite for the Vivarium project. Structure mirrors source packages.
 
 ## Structure
 
@@ -93,37 +93,14 @@ step → braitenberg → spawn
 - **Auto-cleanup**: Session-level process cleanup + per-test Param class cleanup
 - **`@pytest.mark.slow`**: Marks tests using subprocess or gRPC (registered in `.pytest.ini`)
 
-## Coverage Analysis
+## Coverage Gaps
 
-### Well-Tested
-
-| Module | Test File | Coverage |
-|--------|-----------|----------|
-| `vivarium/controllers/vivarium_controller.py` | `controllers/test_vivarium_controller.py`, `controllers/test_edu_sessions/` | Good (~110 tests) |
-| `vivarium/utils/runtime.py` | `utils/test_runtime.py`, `utils/test_version.py` | Good (26 tests) |
-| `vivarium/utils/updater.py` | `utils/test_updater.py` | Good (13 tests, mocked) |
-| `vivarium/utils/dataclass_wrapper.py` | `utils/test_dataclass_wrapper.py` | Good (6 tests) |
-| `vivarium/utils/scene_configs.py` | `utils/test_scene_config.py` | Good (6 tests) |
-| `vivarium/simulator/grpc_server/` | `simulator/test_grpc.py` | Good (7 tests) |
-| `vivarium/environment/components/eco_evo/spawn/` | `environment/test_multi_spawn.py` | Good (13 tests) |
-| `vivarium/interface/parameterized.py` | `interface/test_param.py` | Adequate (3 tests) |
-
-### Minimally Tested (indirect/smoke only)
-
-| Module | Coverage |
-|--------|----------|
-| `vivarium/environment/environment.py` | 2 tests (stepping only) |
-| `vivarium/environment/state.py` | 1 test |
-| `vivarium/simulator/simulator.py` | 3 tests (stepping only) |
-| `vivarium/interface/panel_app.py` | 1 test (init only) |
-| `vivarium/utils/handle_server_interface.py` | 2 tests (start/stop only) |
-
-### Not Tested
+Test directory mirrors source structure, so mapping is self-evident. Below lists modules with no or minimal dedicated tests:
 
 | Module | Notes |
 |--------|-------|
-| `vivarium/environment/render.py` | Has known bugs; no tests at all |
-| `vivarium/environment/components/entities/braitenberg/sensorimotor.py` | Core sensing/motor logic |
+| `vivarium/environment/render.py` | Has known bugs; no tests |
+| `vivarium/environment/components/entities/braitenberg/sensorimotor.py` | Core sensing/motor logic, no direct tests |
 | `vivarium/environment/components/entities/particle_lenia/` | Only via scene tests |
 | `vivarium/environment/components/entities/walls/` | No tests |
 | `vivarium/environment/components/physics/collision/` | No direct tests |
@@ -133,7 +110,7 @@ step → braitenberg → spawn
 | `vivarium/environment/components/eco_evo/energy/` | Indirect only |
 | `vivarium/environment/components/eco_evo/reproduction/` | Indirect only |
 | `vivarium/controllers/controller.py` | Base class, no direct tests |
-| `vivarium/controllers/utils.py` | Logger, RoutineHandler, BehaviorHandler untested |
+| `vivarium/controllers/handlers.py` | RoutineHandler, BehaviorHandler tested indirectly via test_routines.py / test_behaviors.py |
 | `vivarium/simulator/controller.py` | SimulatorController untested |
 | `vivarium/utils/converters.py` | No tests |
 | `vivarium/utils/jax_utils.py` | No tests |

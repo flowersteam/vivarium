@@ -66,7 +66,7 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
 
 class WindowManager(Parameterized):
 
-    def __init__(self, controller=None, apply_changes=True, notebook_mode=False, testing_mode=False, server_timeout=30.0, **kwargs):
+    def __init__(self, controller=None, apply_changes=True, testing_mode=False, server_timeout=30.0, **kwargs):
         super().__init__(**kwargs)
 
         # Basic state
@@ -79,9 +79,6 @@ class WindowManager(Parameterized):
 
         # Track whether we started the server (for UI logic, actual process is managed by controller)
         self._started_server = False
-
-        # TODO: Obsolete, to remove here and all other modules using it
-        self.notebook_mode = notebook_mode
 
         self.curdoc = curdoc()
 

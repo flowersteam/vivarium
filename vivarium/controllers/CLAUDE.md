@@ -8,10 +8,10 @@ Main user-facing API for programmatic control. `VivariumController` orchestrates
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `__init__.py` | Solid | Exports: `VivariumController`, `Controller`, `AttributeMapping`, `set_nested_attr`, `kill_session` |
+| `__init__.py` | Solid | Exports: `VivariumController`, `Controller`, `AttributeMapping` |
 | `vivarium_controller.py` | Solid | Main controller: connection, stepping, interface lifecycle, component routing |
 | `controller.py` | Solid | Base `Controller` class + `AttributeMapping` for remote attribute transforms |
-| `utils.py` | Solid | `Logger`, `RoutineHandler`, `BehaviorHandler`, `kill_session()` |
+| `handlers.py` | Solid | `Logger`, `RoutineHandler`, `BehaviorHandler` |
 | `components/__init__.py` | Solid | Re-exports all component controllers (for PyInstaller discovery) |
 | `components/entities/__init__.py` | Solid | Re-exports `EntityController`, `WallController`, `BraitenbergController` from environment |
 | `components/physics/__init__.py` | Solid | Re-exports `CollisionController` |
@@ -72,7 +72,6 @@ Controllers are instantiated dynamically from Hydra config via `hydra.utils.get_
 - `Logger` — simple dict-of-lists for recording data during simulation
 - `RoutineHandler` — attach/detach callback functions called each N steps
 - `BehaviorHandler` — like RoutineHandler but with weighted motor output blending (for Braitenberg agents)
-- `kill_session(global_vars)` — safely close controller and stop IPython kernel
 
 ## Who Imports From Controllers
 
@@ -97,9 +96,8 @@ Controllers are instantiated dynamically from Hydra config via `hydra.utils.get_
 | `set_subtype_labels()` | `test_edu_sessions.py` | Covered (7 tests) |
 | Component controller instantiation | `test_vivarium_controller.py` | Indirect |
 | Routines & behaviors | `test_edu_sessions.py` | Indirect |
-| `Logger` | — | **Not tested** |
-| `kill_session()` | — | **Not tested** |
+| `Logger` | `test_edu_sessions/test_logger.py` | Covered (8 tests) |
 | Error handling paths | — | **Not tested** |
 
-**Summary**: Main flows well-tested. Utility classes (`Logger`, `kill_session`) and error paths untested.
+**Summary**: Main flows well-tested. Error paths untested.
 

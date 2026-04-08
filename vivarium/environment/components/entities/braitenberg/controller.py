@@ -1,6 +1,6 @@
 import numpy as np
 
-from vivarium.controllers.utils import BehaviorHandler, Logger
+from vivarium.controllers.handlers import BehaviorHandler
 from vivarium.environment.components.entities.controller import EntityController
 from vivarium.environment.components.entities.controller import EntityListController
 from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params

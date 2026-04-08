@@ -46,7 +46,7 @@ converters.py, timer.py (standalone)
 
 ## Who Imports From Utils
 
-- **Scripts**: `run_server.py`, `run_interface.py`, `run_vivarium.py`
+- **Scripts**: `run_server.py`, `run_interface.py`
 - **Simulator**: `simulator.py`, `simulator_client.py`
 - **Controllers**: `vivarium_controller.py`, `controller.py`, `utils.py`
 - **Environment**: `environment.py`, `components/entities/component.py`

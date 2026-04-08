@@ -17,7 +17,7 @@ from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 from vivarium.simulator.controller import SimulatorController
 from vivarium.utils.scene_configs import load_scene_config
 from vivarium.utils.timer import sleep_timer
-from vivarium.controllers.utils import Logger, RoutineHandler
+from vivarium.controllers.handlers import Logger, RoutineHandler
 
 
 logging.basicConfig(level=logging.INFO)
