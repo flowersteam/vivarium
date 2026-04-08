@@ -52,7 +52,7 @@ def braitenberg(step):
         mass=jnp.array([1., 1., 1., 1.]),
         diameter=jnp.full((n_agents, ), 4.),
         friction=jnp.full((n_agents, ), 1.),
-        exists=jnp.full((n_agents,), 1, dtype=int),
+        exists=jnp.full((n_agents,), True, dtype=bool),
         n_behaviors=4,
         n_subtypes=2,
         wheel_diameter=1.0,

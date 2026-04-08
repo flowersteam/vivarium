@@ -83,7 +83,7 @@ class ReproductionComponent(Component):
             
             new_exists = jnp.where(
                 jnp.full(state.entity_state.exists.shape, False).at[idxs].set(death_mask),
-                0,
+                False,
                 state.entity_state.exists
             )
             

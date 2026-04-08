@@ -21,8 +21,8 @@ def single_consumption(d_r, neighbors_idx, neighbor_mask, exists, entity_subtype
 
     mask = neighbors_entity_mask(
         neighbors_idx=neighbors_idx,
-        source_mask=jnp.logical_and(exists == 1, entity_subtype == source_subtype),
-        target_mask=jnp.logical_and(exists == 1, entity_subtype == target_subtype),
+        source_mask=jnp.logical_and(exists, entity_subtype == source_subtype),
+        target_mask=jnp.logical_and(exists, entity_subtype == target_subtype),
         neighbor_mask=neighbor_mask
     )
     source_target_radius_sum = (jnp.tile(diameter[:, jnp.newaxis], (1, neighbors_idx.shape[1])) + diameter[neighbors_idx]) / 2

@@ -67,22 +67,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 
 
-#### P2.08 — Change `exists` field from int to boolean
-- **Status:** [ ]
-- **Dependencies:** P2.07 (rigid body removal — simplifies the codebase first)
-- **Key files:** `vivarium/environment/state.py`, `vivarium/environment/components/` (multiple), `conf/` (entity configs), `tests/` (multiple)
-- **CLAUDE.md updates:** none
-
-Change `state.entity_state.exists` from int (0/1) to boolean. The int representation is confusing and adds unnecessary complexity (e.g., `exists == 1` instead of just `exists`).
-
-**Important:** A preliminary scan identified ~15-20 locations, but this is not exhaustive. The first step of this task must be a careful full-codebase analysis of all `exists` usage before making any changes. Verify there are no `exists * value` arithmetic patterns (none found in preliminary scan, but must be confirmed — such patterns would break with boolean).
-
-**Common patterns to change (non-exhaustive):**
-- `exists == 1` → `exists`
-- `exists == 0` → `~exists`
-- `.at[idx].set(1)` → `.at[idx].set(True)`
-- `.at[idx].set(0)` → `.at[idx].set(False)`
-- `dtype=int` → `dtype=bool` (in state field definitions and config defaults)
 
 #### P2.09 — Bug fixes
 - **Status:** [ ]
@@ -618,3 +602,6 @@ Deleted 2 files (`eco_evo/component.py` empty, `session_5_logging copy.ipynb` ob
 
 #### P2.07 — Rigid body removal
 Removed all rigid body support across 19 source/test files. No scene used rigid bodies; the conditional branching added complexity throughout. Deleted: `to_rigid_body_state()`, `is_rigid_body()`, `unified_*` accessors, `BaseEntityState.__getattr__`, `handle_rigid_body` decorator, `to_rigid_body()`, `create_property()` + 8 class-level RigidBody properties in EntityWrapper, `rigid_body_to_point_particle()`, `RigidBody` proto message. Simplified `BaseState.__getattr__`, `sum_forces()`, `mask_momentum()`, `motor_force()`, `sum_force_to_entities()`, and force accumulation in collision/friction/reset/step components. Replaced `unified_*` → direct field access in environment.py, sensorimotor.py, friction, step. Replaced `position_center` → `position` and `position_orientation` → `orientation` in render.py and 5 test files. Regenerated proto files. Removed rigid body fixture/parametrization from test_dataclass_wrapper.py. Updated environment/CLAUDE.md. 60 targeted tests pass.
+
+#### P2.08 — Change `exists` field from int to boolean
+Changed `entity_state.exists` from int (0/1) to boolean across 12 files. Core: `dtype=int` → `dtype=bool` in environment.py. Simplified comparisons: `exists == 1` → `exists`, `exists == 0` → `~exists` in environment.py, utils.py, consumption, render.py. Fixed assignments: `.set(0)` → `.set(False)`, `.set(1)` → `.set(True)` in eco_evo/utils.py and reproduction. Removed `exists` entry from `get_entity_parameter_mapping` (default mapping handles bool natively). Removed redundant `bool()` wrappers in controller.py (print_infos), component.py (to_config), interface.py. Updated 4 test files. Full codebase audit confirmed no arithmetic patterns (`exists * value`) — only comparisons, masks, and `.sum()` (which works correctly with booleans). Full pytest green (271 passed).

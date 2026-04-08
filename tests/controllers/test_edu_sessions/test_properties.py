@@ -128,7 +128,7 @@ def test_object_friction_read_write(controller):
 def test_agent_exists_read(controller):
     """agent.exists is readable."""
     ag = controller.agents[0]
-    assert ag.exists in (True, False, 0, 1)
+    assert ag.exists in (True, False)
 
 
 def test_object_exists_write(controller):

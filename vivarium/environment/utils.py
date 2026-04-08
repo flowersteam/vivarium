@@ -144,7 +144,7 @@ def get_relative_displacement(all_positions, source_orientations, source_mask, n
     return dist, theta
 
 
-def type_mask(entity_state, exists=1, entity_type=-1, subtype=-1):
+def type_mask(entity_state, exists=True, entity_type=-1, subtype=-1):
     mask_entity_type = lax.cond(
         entity_type == -1,
         lambda: entity_state.exists == exists,

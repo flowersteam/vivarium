@@ -12,8 +12,8 @@ def plot_particles(ax, state, type, color, size_scale=30):
     entities = getattr(state, type)
     idx = entities.entity_idx
     
-    exists = state.entity_state.exists[idx]         
-    exists = jnp.where(exists != 0)
+    exists = state.entity_state.exists[idx]
+    exists = jnp.where(exists)
     pos = state.entity_state.position[idx][exists]
     diameter = state.entity_state.diameter[idx][exists][exists]
     x, y = pos[:, 0], pos[:, 1]
@@ -32,8 +32,8 @@ def plot_particles(ax, state, type, color, size_scale=30):
 def plot_orientation(ax, state, type, color, arrow_length):
     entities = getattr(state, type)
     idx = entities.entity_idx
-    exists = state.entity_state.exists[idx]         
-    exists = jnp.where(exists != 0)
+    exists = state.entity_state.exists[idx]
+    exists = jnp.where(exists)
 
     pos = state.entity_state.position[idx][exists]
     x, y = pos[:, 0], pos[:, 1]

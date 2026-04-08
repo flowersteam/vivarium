@@ -42,8 +42,8 @@ def generate_changes_and_expected(wheel_diameter_idx, wheel_diameter_value, exis
 
 
 @pytest.mark.parametrize("changes_and_expected", [
-    lambda agent_field: generate_changes_and_expected(0, 0, 7, 0, 6, 0, agent_field),
-    lambda agent_field: generate_changes_and_expected(1, 1, 8, 1, 7, 1, agent_field),
+    lambda agent_field: generate_changes_and_expected(0, 0, 7, False, 6, 0, agent_field),
+    lambda agent_field: generate_changes_and_expected(1, 1, 8, True, 7, 1, agent_field),
 ])
 def test_remote_fetch_and_update(changes_and_expected, init_state):
     state = init_state

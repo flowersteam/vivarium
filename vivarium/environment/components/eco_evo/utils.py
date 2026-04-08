@@ -18,7 +18,7 @@ def sample_true_index(key, x):
 
 def non_existing(key, entity_state, entity_type=-1, subtype=-1):
 
-    mask = type_mask(entity_state, exists=0, entity_type=entity_type, subtype=subtype)
+    mask = type_mask(entity_state, exists=False, entity_type=entity_type, subtype=subtype)
     return sample_true_index(key, mask)
 
 
@@ -53,7 +53,7 @@ def spawn_entity_at_idx(key, state, idx, position_range, orientation_range):
 
     key, key_pos, key_orientation = random.split(key, 3)
 
-    exists = state.entity_state.exists.at[idx].set(1)
+    exists = state.entity_state.exists.at[idx].set(True)
 
     fail, position = set_random_pos_at(
         key_pos,

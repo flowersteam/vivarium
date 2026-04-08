@@ -28,7 +28,7 @@ class MaskFunction:
 
     def __call__(self, state):
         if self.label == 'exists':
-            return state.entity_state.exists == 1
+            return state.entity_state.exists
 
 
 class NeighborManager:
@@ -140,7 +140,7 @@ class Environment:
         entity_state = entity_state_cls(
             entity_type=jnp.array([], dtype=int),
             entity_type_idx=jnp.array([], dtype=int),
-            exists=jnp.array([], dtype=int),
+            exists=jnp.array([], dtype=bool),
             position=jnp.empty((0, 2), dtype=float),
             orientation=jnp.array([], dtype=float),
             momentum=None,

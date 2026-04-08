@@ -43,7 +43,7 @@ class EntityComponent(Component):
 
         config.update({
             'n_max': state.exists(self.entity_type).shape[0],
-            'exists': [bool(e.item()) for e in state.exists(self.entity_type)],
+            'exists': [e.item() for e in state.exists(self.entity_type)],
             'mass': state.mass(self.entity_type)[:, 0].tolist(),
             'position': state.position(self.entity_type).tolist(),
             'orientation': state.orientation(self.entity_type).tolist(),

@@ -64,11 +64,6 @@ def get_entity_parameter_mapping(subtype_labels):
             remote_to_ctrl_fn=lambda x: x[0].item(),
             ctrl_to_remote_fn=lambda x: np.array([x])
         ),
-        'exists': AttributeMapping(
-            'exists',
-            remote_to_ctrl_fn=lambda x: bool(x.item()),
-            ctrl_to_remote_fn=lambda x: np.array(int(x))
-        ),
         'subtype': AttributeMapping(
             'entity_subtype',
             remote_to_ctrl_fn=lambda x: subtype_labels[x.item()],
@@ -153,7 +148,7 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         info_lines.append(f"Type: {self._entity_type}")
         info_lines.append(f"Subtype: {self._subtype_labels[self.entity_subtype]}")
         info_lines.append(f"Idx: {self._entity_type_idx}")
-        info_lines.append(f"Exists: {bool(self.exists)}")
+        info_lines.append(f"Exists: {self.exists}")
         info_lines.append(
             f"Position: x={self.x_position:.2f}, y={self.y_position:.2f}"
         )

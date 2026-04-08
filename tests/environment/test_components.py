@@ -19,32 +19,18 @@ def test_instantiate(scene_config):
 def test_type_mask(environment_and_state, braitenberg):
     _, state = environment_and_state(braitenberg)
     entity_state = state.entity_state
-    exists = jnp.zeros_like(entity_state.exists)
+    exists = jnp.full_like(entity_state.exists, False)
     idx = 3
-    exists = exists.at[idx].set(1)
+    exists = exists.at[idx].set(True)
     entity_state = entity_state.set(exists=exists)
-    exists = exists.at[idx + 2].set(1)
+    exists = exists.at[idx + 2].set(True)
     mask = type_mask(entity_state,
-                     exists=0,
+                     exists=False,
                      entity_type=entity_state.entity_type[idx],
                      subtype=entity_state.entity_subtype[idx])
-    assert jnp.equal(mask, 
+    assert jnp.equal(mask,
                      jnp.logical_and(
-                         entity_state.exists == 0,
-                         jnp.logical_and(
-                            entity_state.entity_type == entity_state.entity_type[idx],
-                            entity_state.entity_subtype == entity_state.entity_subtype[idx]
-                            )
-                        )
-                     ).all()
-    
-    mask = type_mask(entity_state,
-                     exists=1,
-                     entity_type=entity_state.entity_type[idx],
-                     subtype=entity_state.entity_subtype[idx])
-    assert jnp.equal(mask, 
-                     jnp.logical_and(
-                         entity_state.exists == 1,
+                         ~entity_state.exists,
                          jnp.logical_and(
                             entity_state.entity_type == entity_state.entity_type[idx],
                             entity_state.entity_subtype == entity_state.entity_subtype[idx]
@@ -53,22 +39,36 @@ def test_type_mask(environment_and_state, braitenberg):
                      ).all()
 
     mask = type_mask(entity_state,
-                     exists=0,
+                     exists=True,
+                     entity_type=entity_state.entity_type[idx],
+                     subtype=entity_state.entity_subtype[idx])
+    assert jnp.equal(mask,
+                     jnp.logical_and(
+                         entity_state.exists,
+                         jnp.logical_and(
+                            entity_state.entity_type == entity_state.entity_type[idx],
+                            entity_state.entity_subtype == entity_state.entity_subtype[idx]
+                            )
+                        )
+                     ).all()
+
+    mask = type_mask(entity_state,
+                     exists=False,
                      entity_type=entity_state.entity_type[idx]
                      )
-    assert jnp.equal(mask, 
+    assert jnp.equal(mask,
                      jnp.logical_and(
-                         entity_state.exists == 0,
+                         ~entity_state.exists,
                          entity_state.entity_type == entity_state.entity_type[idx]
                          )
                      ).all()
-    
+
     mask = type_mask(entity_state,
-                     exists=0,
+                     exists=False,
                      subtype=entity_state.entity_subtype[idx])
-    assert jnp.equal(mask, 
+    assert jnp.equal(mask,
                      jnp.logical_and(
-                         entity_state.exists == 0,
+                         ~entity_state.exists,
                          entity_state.entity_subtype == entity_state.entity_subtype[idx]
                          )
                      ).all()
@@ -88,7 +88,7 @@ def test_spawn(environment_and_state, spawn):
         assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0]
         state  = state.set(
             entity_state=state.entity_state.set(
-                exists=state.entity_state.exists.at[0].set(0)
+                exists=state.entity_state.exists.at[0].set(False)
             )
         )
         assert state.entity_state.exists.sum() == state.entity_state.exists.shape[0] - 1
@@ -175,14 +175,14 @@ def test_death(environment_and_state, reproduction):
         )
     )
     state = env.step(state)
-    assert state.entity_state.exists[idx] == 1
+    assert state.entity_state.exists[idx]
     state = state.set(
         entity_state=state.entity_state.set(
             energy=state.entity_state.energy.at[etype_idx].set(0.),
         )
     )
     state = env.step(state)
-    assert state.entity_state.exists[idx] == 0
+    assert not state.entity_state.exists[idx]
 
 def test_reproduction(environment_and_state, reproduction):
     env, state = environment_and_state(reproduction, debug_mode=True)
@@ -190,7 +190,7 @@ def test_reproduction(environment_and_state, reproduction):
     etype_idx = state.entity_state.entity_type_idx[idx]
     state = state.set(
         entity_state=state.entity_state.set(
-            exists=state.entity_state.exists.at[idx+1].set(0),
+            exists=state.entity_state.exists.at[idx+1].set(False),
         )
     )
     n_exists = state.entity_state.exists.sum()
@@ -219,7 +219,7 @@ def test_reproduction_birth(environment_and_state, reproduction):
     # Free a slot for the offspring
     state = state.set(
         entity_state=state.entity_state.set(
-            exists=state.entity_state.exists.at[1].set(0),
+            exists=state.entity_state.exists.at[1].set(False),
         )
     )
     n_exists = state.entity_state.exists.sum()
@@ -245,7 +245,7 @@ def test_reproduction_recovery_time_prevents_birth(environment_and_state, reprod
     # Free a slot for potential offspring
     state = state.set(
         entity_state=state.entity_state.set(
-            exists=state.entity_state.exists.at[1].set(0),
+            exists=state.entity_state.exists.at[1].set(False),
         )
     )
     n_exists = state.entity_state.exists.sum()
@@ -267,7 +267,7 @@ def test_reproduction_nonexisting_entities_dont_reproduce(environment_and_state,
     # Make parent non-existing, and free another slot for potential offspring
     state = state.set(
         entity_state=state.entity_state.set(
-            exists=state.entity_state.exists.at[parent_idx].set(0).at[1].set(0),
+            exists=state.entity_state.exists.at[parent_idx].set(False).at[1].set(False),
         )
     )
     n_exists = state.entity_state.exists.sum()
