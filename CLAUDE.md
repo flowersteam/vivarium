@@ -21,6 +21,8 @@ vivarium/utils/          ← foundation (no vivarium deps)
   ↑
 vivarium/environment/    ← JAX simulation core (depends on utils)
   ↑
+vivarium/components/     ← component implementations (depends on environment, controllers, utils)
+  ↑
 vivarium/simulator/      ← state management, gRPC bridge (depends on environment, utils)
   ↑
 vivarium/controllers/    ← user-facing Python API (depends on simulator, environment, utils)
@@ -30,7 +32,7 @@ vivarium/interface/      ← Panel web UI (depends on controllers, simulator, en
 scripts/                 ← entry points (depends on all packages)
 ```
 
-**No circular imports.** Note that component controllers and interfaces are currently defined inside `vivarium/environment/components/` even though they are client-side code that imports base classes from `vivarium/controllers/` and `vivarium/interface/`. `environment.py` resolves component classes dynamically via Hydra (`hydra.utils.get_class(_target_)`), so there are no static cross-package imports.
+**No circular imports.** Components live in `vivarium/components/` as a top-level package. Component controllers and interfaces import base classes from `vivarium/controllers/` and `vivarium/interface/`. `environment.py` resolves component classes dynamically via Hydra (`hydra.utils.get_class(_target_)`), so there are no static cross-package imports.
 
 ### Data Flow
 
@@ -66,7 +68,7 @@ Each simulation feature is implemented as a `Component` subclass (defined in `co
 
 At runtime, `Environment.step()` calls these step functions in `precedence` order (lower first). Each function receives the full state and returns a new state — pure functional, no side effects, JIT-compatible.
 
-Components live in `vivarium/environment/components/` and follow a three-file pattern:
+Components live in `vivarium/components/` and follow a three-file pattern:
 
 ```
 component_name/
@@ -186,6 +188,7 @@ Each package has a `CLAUDE.md` with purpose, structure, API, dependencies, and t
 
 | Package | CLAUDE.md | Description |
 |---------|-----------|--------|
+| `vivarium/components/` | [CLAUDE.md](vivarium/components/CLAUDE.md) | Component implementations (entities, physics, eco-evo) |
 | `vivarium/environment/` | [CLAUDE.md](vivarium/environment/CLAUDE.md) | Core simulation engine |
 | `vivarium/simulator/` | [CLAUDE.md](vivarium/simulator/CLAUDE.md) | State management, gRPC bridge |
 | `vivarium/controllers/` | [CLAUDE.md](vivarium/controllers/CLAUDE.md) | User-facing Python API |

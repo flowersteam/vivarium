@@ -1,1 +1,0 @@
-from vivarium.environment.components.physics.collision.interface import CollisionInterface

@@ -12,10 +12,6 @@ Main user-facing API for programmatic control. `VivariumController` orchestrates
 | `vivarium_controller.py` | Solid | Main controller: connection, stepping, interface lifecycle, component routing |
 | `controller.py` | Solid | Base `Controller` class + `AttributeMapping` for remote attribute transforms |
 | `handlers.py` | Solid | `Logger`, `RoutineHandler`, `BehaviorHandler` |
-| `components/__init__.py` | Solid | Re-exports all component controllers (for PyInstaller discovery) |
-| `components/entities/__init__.py` | Solid | Re-exports `EntityController`, `WallController`, `BraitenbergController` from environment |
-| `components/physics/__init__.py` | Solid | Re-exports `CollisionController` |
-| `components/eco_evo/__init__.py` | Solid | Re-exports `SpawnController`, `ConsumptionController` |
 
 ## Architecture
 
@@ -26,10 +22,10 @@ VivariumController
   ├── client (Simulator or SimulatorGRPCClient — shared interface)
   ├── controllers = {
   │     'simulator':   SimulatorController         (from simulator/controller.py)
-  │     'agents':      EntityListController         (from environment/components/entities/)
+  │     'agents':      EntityListController         (from components/entities/)
   │     'objects':     EntityListController
-  │     'collision':   CollisionController          (from environment/components/physics/)
-  │     'spawn':      SpawnController               (from environment/components/eco_evo/)
+  │     'collision':   CollisionController          (from components/physics/)
+  │     'spawn':      SpawnController               (from components/eco_evo/)
   │     'consumption': ConsumptionController
   │     ...
   │   }
@@ -49,7 +45,7 @@ Controllers are instantiated dynamically from Hydra config via `hydra.utils.get_
 
 **Shared subtype labels:** A single list object is shared by reference across all controllers. `set_subtype_labels()` mutates it in-place so all controllers see the change immediately.
 
-**`components/` subpackages** are pure re-exports from `vivarium/environment/components/*/controller.py`. They exist for clean import paths and PyInstaller discovery.
+Component controllers live directly in `vivarium/components/*/controller.py`.
 
 ## Public API (key methods)
 
@@ -78,7 +74,7 @@ Controllers are instantiated dynamically from Hydra config via `hydra.utils.get_
 **Within vivarium:**
 - `vivarium/simulator/controller.py` — `SimulatorController` inherits from `Controller`
 - `vivarium/interface/panel_app.py` — creates `VivariumController`
-- `vivarium/environment/components/*/controller.py` — import `Controller`, `AttributeMapping`, `RoutineHandler`, `Logger`, `BehaviorHandler`
+- `vivarium/components/*/controller.py` — import `Controller`, `AttributeMapping`, `RoutineHandler`, `Logger`, `BehaviorHandler`
 
 **External:**
 - Tests: `test_vivarium_controller.py`, `test_edu_sessions.py`, `conftest.py`

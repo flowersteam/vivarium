@@ -3,7 +3,7 @@ from time import sleep
 
 import jax.numpy as jnp
 
-from vivarium.environment.components.entities.braitenberg.behaviors import Behaviors, behavior_params
+from vivarium.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 from vivarium.controllers.vivarium_controller import VivariumController
 from vivarium.utils.handle_server_interface import (
     check_server_running,

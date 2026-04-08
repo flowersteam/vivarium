@@ -1,5 +1,5 @@
-controller_cls: vivarium.environment.components.entities.controller.EntityListController
-interface_cls: vivarium.environment.components.entities.interface.EntityInterface
+controller_cls: vivarium.components.entities.controller.EntityListController
+interface_cls: vivarium.components.entities.interface.EntityInterface
 subtype_labels: ${..subtype_labels}
 controller_kwargs:
   color:

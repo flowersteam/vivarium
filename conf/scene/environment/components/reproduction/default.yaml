@@ -1,4 +1,4 @@
-_target_: vivarium.environment.components.eco_evo.ReproductionComponent
+_target_: vivarium.components.eco_evo.ReproductionComponent
 precedence: 80
 subtype: -1
 birth_energy_threshold: 2.0

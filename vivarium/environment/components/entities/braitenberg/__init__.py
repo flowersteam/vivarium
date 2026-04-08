@@ -1,1 +1,0 @@
-from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent

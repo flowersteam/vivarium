@@ -13,7 +13,6 @@ Panel web interface for the simulator. Provides a full UI with Bokeh visualizati
 | `utils.py` | Solid (fragile pattern) | `cleanup_parameterized_class()`: cleans dynamic Param fields between instances |
 | `jupyter_config_iframe.py` | Solid | Jupyter config for iframe embedding in Panel |
 | `__init__.py` | — | Empty |
-| `components/` | Solid | Re-export shims for PyInstaller discovery of environment component interfaces |
 
 ## Architecture
 
@@ -35,7 +34,7 @@ scripts/run_interface.py
 3. Calls `controller.apply_changes()` → sends UI changes to server
 4. ParamSimulator/ParamEnvironment handle slider↔controller sync via Param watchers
 
-**Component interfaces** are loaded dynamically via Hydra: `hydra.utils.get_class(config.client.interface_cls)`. The `components/` subpackage re-exports them for PyInstaller static analysis.
+**Component interfaces** are loaded dynamically via Hydra: `hydra.utils.get_class(config.client.interface_cls)`. Interface classes live in `vivarium/components/*/interface.py`.
 
 ## Public API
 

@@ -100,15 +100,15 @@ Test directory mirrors source structure, so mapping is self-evident. Below lists
 | Module | Notes |
 |--------|-------|
 | `vivarium/environment/render.py` | Has known bugs; no tests |
-| `vivarium/environment/components/entities/braitenberg/sensorimotor.py` | Core sensing/motor logic, no direct tests |
-| `vivarium/environment/components/entities/particle_lenia/` | Only via scene tests |
-| `vivarium/environment/components/entities/walls/` | No tests |
-| `vivarium/environment/components/physics/collision/` | No direct tests |
-| `vivarium/environment/components/physics/friction/` | No tests |
-| `vivarium/environment/components/physics/reset/` | No tests |
-| `vivarium/environment/components/eco_evo/consumption/` | Indirect only (via test_components.py) |
-| `vivarium/environment/components/eco_evo/energy/` | Indirect only |
-| `vivarium/environment/components/eco_evo/reproduction/` | Indirect only |
+| `vivarium/components/entities/braitenberg/sensorimotor.py` | Core sensing/motor logic, no direct tests |
+| `vivarium/components/entities/particle_lenia/` | Only via scene tests |
+| `vivarium/components/entities/walls/` | No tests |
+| `vivarium/components/physics/collision/` | No direct tests |
+| `vivarium/components/physics/friction/` | No tests |
+| `vivarium/components/physics/reset/` | No tests |
+| `vivarium/components/eco_evo/consumption/` | Indirect only (via test_components.py) |
+| `vivarium/components/eco_evo/energy/` | Indirect only |
+| `vivarium/components/eco_evo/reproduction/` | Indirect only |
 | `vivarium/controllers/controller.py` | Base class, no direct tests |
 | `vivarium/controllers/handlers.py` | RoutineHandler, BehaviorHandler tested indirectly via test_routines.py / test_behaviors.py |
 | `vivarium/simulator/controller.py` | SimulatorController untested |

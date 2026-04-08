@@ -65,24 +65,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-
-
-#### P2.10 — Component package move
-- **Status:** [ ]
-- **Dependencies:** P2.08 (boolean exists — all environment cleanup done before structural move)
-- **Key files:** `vivarium/environment/components/` (entire directory), `conf/` (all YAML files with `_target_` strings), `vivarium/controllers/components/`, `vivarium/interface/components/`
-- **CLAUDE.md updates:** `CLAUDE.md` (global) — update package dependency map and component architecture section. `vivarium/environment/CLAUDE.md` — update structure section (components no longer under environment). `vivarium/controllers/CLAUDE.md` — remove re-export shim references. `vivarium/interface/CLAUDE.md` — remove re-export shim references. `conf/CLAUDE.md` — update `_target_` path examples if present.
-
-Move `vivarium/environment/components/` → `vivarium/components/` (top-level package). This cleans up the dependency direction: `environment/` imports from `components/`, and `components/` imports from `controllers/`/`interface/`.
-
-**Workflow:**
-1. The user moves the directory using VSCode refactoring, which updates Python imports automatically. This is done by the user, not Claude Code.
-2. After the user commits the move, Claude updates all `_target_` strings in YAML configs (these are string references like `vivarium.environment.components.braitenberg.component.BraitenbergComponent` that need to become `vivarium.components.braitenberg.component.BraitenbergComponent`).
-3. Verify re-export shims in `vivarium/controllers/components/` and `vivarium/interface/components/` are no longer needed and remove them.
-4. Run tests to confirm nothing broke.
-
-**Note:** Step 1 is a manual user action. Claude Code handles steps 2-4.
-
 #### P2.11 — Dynamic dataclass fixes
 - **Status:** [ ]
 - **Dependencies:** P2.10 (component move — codebase structure stable)
@@ -588,3 +570,6 @@ Changed `entity_state.exists` from int (0/1) to boolean across 12 files. Core: `
 
 #### P2.09 — Bug fixes
 Fixed bugs across 10 source files + 12 config files. **render.py**: removed non-idiomatic `jnp.where(exists)` pattern (boolean mask suffices), fixed double `[exists]` indexing on diameter/orientation, fixed `plt.xlim` → `plt.ylim`, replaced fragile color count with `len(pos)`, removed unused `jax.numpy` import. **Typos/smells**: renamed `udpate_other_interfaces` → `update_other_interfaces` (interface.py + panel_app.py), `except:` → `except Exception:` (handle_server_interface.py), `lg.error` → `lg.exception` in `_start_server_cb` (panel_app.py). **Config**: added `- _self_` to defaults in all 12 scene configs that were missing it. **Simulator**: replaced hardcoded `../../conf/scene/simulator` path in `to_config()` with `runtime.get_config_dir()` + `hydra.initialize_config_dir()`. Added `grpc_error_handler` decorator to all 13 unary RPC handlers and try/except with `context.abort(INTERNAL)` in both streaming RPCs (simulator_server.py). Added `test_grpc_error_handler` test. Full pytest green.
+
+#### P2.10 — Component package move
+Moved `vivarium/environment/components/` → `vivarium/components/` (top-level package). Updated all Python imports (~40 files in components/, tests/, scripts/, interface/), all `_target_` and `*_cls` strings in YAML configs (~20 references), and `vivarium_multi.spec`. Removed re-export shim directories (`vivarium/controllers/components/` and `vivarium/interface/components/` — 8 `__init__.py` files, no longer needed). Fixed deep relative imports that broke after the move (5 files in components/ that used `....` / `.....` to reach `controllers/` — converted to absolute imports). Fixed `vivarium/environment/__init__.py` stale `from vivarium.environment import components`. Updated CLAUDE.md files (global, environment, controllers, interface, tests ; new components/CLAUDE.md). Full pytest green (272 passed).

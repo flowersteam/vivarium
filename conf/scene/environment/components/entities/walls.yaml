@@ -1,4 +1,4 @@
-_target_: vivarium.environment.components.entities.walls.WallComponent
+_target_: vivarium.components.entities.walls.WallComponent
 precedence: 10
 epsilon: 1.4
 alpha: 1.1

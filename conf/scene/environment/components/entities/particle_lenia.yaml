@@ -2,7 +2,7 @@ defaults:
   - base_entities
   - _self_
 
-_target_: vivarium.environment.components.entities.particle_lenia.ParticleLeniaComponent
+_target_: vivarium.components.entities.particle_lenia.ParticleLeniaComponent
 precedence: 10
 n_max: 400
 mass:

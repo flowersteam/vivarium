@@ -1,4 +1,4 @@
-_target_: vivarium.environment.components.eco_evo.EnergyComponent
+_target_: vivarium.components.eco_evo.EnergyComponent
 precedence: 60
 energy_init: 1.0
 energy_max: 4.0

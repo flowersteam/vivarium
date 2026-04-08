@@ -1,7 +1,7 @@
 defaults:
   - default_entity_client
 
-interface_cls: vivarium.environment.components.entities.particle_lenia.ParticleLeniaInterface
+interface_cls: vivarium.components.entities.particle_lenia.ParticleLeniaInterface
 
 controller_kwargs:
   color:

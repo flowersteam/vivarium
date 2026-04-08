@@ -2,7 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.utils.dataclass_wrapper import *
-from vivarium.environment.components.entities.controller import EntityList, EntityWrapper
+from vivarium.components.entities.controller import EntityList, EntityWrapper
 
 
 scene_name = 'braitenberg'

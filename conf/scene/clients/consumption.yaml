@@ -1,2 +1,2 @@
-controller_cls: vivarium.environment.components.eco_evo.consumption.controller.ConsumptionController
-interface_cls: vivarium.environment.components.eco_evo.consumption.interface.ConsumptionInterface
+controller_cls: vivarium.components.eco_evo.consumption.controller.ConsumptionController
+interface_cls: vivarium.components.eco_evo.consumption.interface.ConsumptionInterface

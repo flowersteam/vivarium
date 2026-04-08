@@ -83,15 +83,15 @@ server_analysis = Analysis(
     datas=[],  # conf is added at COLLECT stage for user-editability
     # CRITICAL: Hydra loads classes dynamically via _target_ in YAML configs
     # PyInstaller can't detect these, so we must explicitly collect submodules:
-    # - vivarium.environment.components: Server-side JAX components (entities, physics, etc.)
+    # - vivarium.components: Server-side JAX components (entities, physics, etc.)
     # Note: This discovers controller.py and interface.py files but doesn't include them
     # because vivarium.environment.__init__.py only imports components (not controllers/interfaces)
     hiddenimports=base_hidden_imports + [
         'vivarium.simulator',
         'vivarium.simulator.grpc_server',
         'vivarium.environment',
-        'vivarium.environment.components',
-    ] + collect_submodules('vivarium.environment.components'),
+        'vivarium.components',
+    ] + collect_submodules('vivarium.components'),
     hookspath=[],
     runtime_hooks=[],
     excludes=[
@@ -130,18 +130,15 @@ interface_analysis = Analysis(
     datas=panel_datas + bokeh_datas + jupyter_config,  # conf/notebooks added at COLLECT stage
     # CRITICAL: Hydra loads classes dynamically via _target_ and *_cls in YAML configs
     # PyInstaller can't detect these, so we must explicitly collect submodules:
-    # - vivarium.controllers.components: Client-side controller APIs (re-exported from vivarium.environment.components)
-    # - vivarium.interface.components: UI layer interfaces (re-exported from vivarium.environment.components)
+    # - vivarium.components: All components (server-side JAX, controllers, interfaces)
     hiddenimports=base_hidden_imports + [
         'panel', 'bokeh', 'param',
         'vivarium.interface',
-        'vivarium.interface.components',
         'vivarium.controllers',
-        'vivarium.controllers.components',
+        'vivarium.components',
     ] + collect_submodules('panel') \
       + collect_submodules('bokeh') \
-      + collect_submodules('vivarium.controllers.components') \
-      + collect_submodules('vivarium.interface.components'),
+      + collect_submodules('vivarium.components'),
     hookspath=[],
     runtime_hooks=[],
     excludes=[

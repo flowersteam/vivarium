@@ -10,8 +10,8 @@ Tests cover:
 
 import pytest
 
-from vivarium.environment.components.eco_evo.spawn.component import SpawnComponent, SpawnState
-from vivarium.environment.components.eco_evo import SpawnComponent as SpawnComponentFromInit
+from vivarium.components.eco_evo.spawn.component import SpawnComponent, SpawnState
+from vivarium.components.eco_evo import SpawnComponent as SpawnComponentFromInit
 
 
 # ─── SpawnComponent Unit Tests ────────────────────────────────────────────────

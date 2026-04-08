@@ -8,12 +8,12 @@ Then: environment(factories) → environment_and_state(factories)
 
 import jax.numpy as jnp
 
-from vivarium.environment.components.eco_evo import (
+from vivarium.components.eco_evo import (
     ReproductionComponent, ConsumptionComponent, SpawnComponent, EnergyComponent
 )
-from vivarium.environment.components.entities.braitenberg.component import BraitenbergComponent
-from vivarium.environment.components.proximity_map.component import ProximityMapComponent
-from vivarium.environment.components.physics.step.component import StepComponent
+from vivarium.components.entities.braitenberg.component import BraitenbergComponent
+from vivarium.components.proximity_map.component import ProximityMapComponent
+from vivarium.components.physics.step.component import StepComponent
 from vivarium.environment import Environment, NeighborManager, MaskFunction
 from vivarium.environment.state import BaseState
 

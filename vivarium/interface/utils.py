@@ -1,5 +1,5 @@
-from vivarium.environment.components.entities.braitenberg.interface import ParamAgent
-from vivarium.environment.components.entities.particle_lenia.interface import ParamParticleLenia
+from vivarium.components.entities.braitenberg.interface import ParamAgent
+from vivarium.components.entities.particle_lenia.interface import ParamParticleLenia
 
 
 param_fields_to_delete = {

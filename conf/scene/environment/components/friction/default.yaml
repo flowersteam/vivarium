@@ -1,4 +1,4 @@
-_target_: vivarium.environment.components.physics.FrictionComponent
+_target_: vivarium.components.physics.FrictionComponent
 precedence: 3
 mask_fn:
   _target_: vivarium.environment.environment.MaskFunction
