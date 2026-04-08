@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 from jax import lax, vmap, random
 
-from jax_md.dataclasses import dataclass as md_dataclass, fields
 from jax_md import space
 
 
@@ -44,51 +43,6 @@ def relative_position(displ, theta):
 
 
 proximity_map = vmap(vmap(relative_position, (0, None)), (0, 0))
-
-
-# Deprecated?
-def rigid_body_to_point_particle(module):
-
-    @md_dataclass
-    class EntityState(module.EntityState):
-        orientation: jnp.array
-
-    def convert(rigid_body_state, point_particle_field):
-        if point_particle_field in ['position', 'force', 'previous_force', 'mass']:
-            return getattr(rigid_body_state, point_particle_field).center
-        if point_particle_field == 'orientation':
-            return rigid_body_state.position.orientation
-        return getattr(rigid_body_state, point_particle_field)
-    
-    state_fields = [f.name for f in fields(module.State)]
-    entities_state_fields = [f.name for f in fields(EntityState)]
-
-    rigid_body_init_entities = module.init_entities
-    rigid_body_init_state = module.init_state
-
-
-    def init_entities_from_rigid_body(rigid_body_entity_state):
-        return EntityState(**{field: convert(rigid_body_entity_state, field) for field in entities_state_fields})
-
-    def init_entities(*args, **kwargs):
-        rigid_body_entity_state = rigid_body_init_entities(*args, **kwargs)
-
-        return init_entities_from_rigid_body(rigid_body_entity_state)
-
-
-    def init_state_from_rigid_body(rigid_body_state):
-
-        kwargs = {field: convert(rigid_body_state, field) for field in state_fields}
-        kwargs['entity_state'] = init_entities_from_rigid_body(rigid_body_state.entity_state)
-
-        return module.State(**kwargs)
-
-    def init_state(*args, **kwargs):
-        rigid_body_state = rigid_body_init_state(*args, **kwargs)
-
-        return init_state_from_rigid_body(rigid_body_state)
-
-    return init_state, init_entities
 
 
 def generate_random_positions(n, position_range, key=random.PRNGKey(0)):

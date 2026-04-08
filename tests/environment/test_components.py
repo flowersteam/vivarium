@@ -113,7 +113,7 @@ def test_consumption(environment_and_state, consumption):
     consumer_idx = 0
     consumee_idx = 3
 
-    pos_consumee = state.entity_state.position_center[consumer_idx] + jnp.ones(2)
+    pos_consumee = state.entity_state.position[consumer_idx] + jnp.ones(2)
     state = state.set(
         entity_state=state.entity_state.set(
             position=state.entity_state.position.at[consumee_idx].set(pos_consumee)

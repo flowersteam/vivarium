@@ -5,7 +5,7 @@ from jax_md.dataclasses import dataclass as md_dataclass
 
 from vivarium.environment.utils import neighbors_entity_mask
 from vivarium.environment.components.component import Component
-from vivarium.environment.components.utils import f32, handle_rigid_body
+from vivarium.environment.components.utils import f32
 
 
 def collision_force_fn(displacement, state_attr):
@@ -29,7 +29,6 @@ def collision_force_fn(displacement, state_attr):
             )
         )
 
-    @handle_rigid_body
     def force_fn(state, neighbor, exists_mask):
         """Returns the collision force function of the environment
 
@@ -113,11 +112,7 @@ class CollisionComponent(Component):
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
             force = coll_fn(state, neighbor, mask)
-            if state.entity_state.is_rigid_body():
-                force = force.set(center=state.entity_state.force.center + force.center,
-                                orientation=state.entity_state.force.orientation + force.orientation)
-            else:
-                force = state.entity_state.force + force
+            force = state.entity_state.force + force
             entity_state=state.entity_state.set(force=force)
             return state.set(entity_state=entity_state)
         return state_fn

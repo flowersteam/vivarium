@@ -20,11 +20,11 @@ def test_param_entity(client_fixture, scene_name, entity_type, idx, controller_a
     entity.selection = [idx]
     entity.update_from_server = True
 
-    assert entity.x_position == controller_entities[idx].position_center[0]
+    assert entity.x_position == controller_entities[idx].position[0]
     entity.x_position = 10
     assert entity.x_position == 10
     controller.apply_changes()
-    assert controller_entities[idx].position_center[0] == 10
+    assert controller_entities[idx].position[0] == 10
     entity.exists = False
     controller.apply_changes()
     assert not controller_entities[idx].exists
@@ -34,7 +34,7 @@ def test_param_entity(client_fixture, scene_name, entity_type, idx, controller_a
         controller.apply_changes()
         assert controller_entities[idx].motor[1] == 2.
 
-    controller_entities[idx].position_orientation = 1.
+    controller_entities[idx].orientation = 1.
     controller.apply_changes()
     entity.update_from_server = True
     assert entity.orientation == 1.

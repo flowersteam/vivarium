@@ -1,10 +1,9 @@
 import jax.numpy as jnp
 
 from vivarium.environment.components.component import Component
-from vivarium.environment.components.utils import SPACE_NDIMS, handle_rigid_body
+from vivarium.environment.components.utils import SPACE_NDIMS
 
 
-@handle_rigid_body
 def friction_force(state, neighbor, exists_mask):
     """Compute the friction force on the system
 
@@ -12,7 +11,7 @@ def friction_force(state, neighbor, exists_mask):
     :param exists_mask: mask to specify which particles exist
     :return: friction force on the system
     """
-    cur_vel = state.entity_state.unified_momentum / state.entity_state.unified_mass
+    cur_vel = state.entity_state.momentum / state.entity_state.mass
     # stack the mask to give it the same shape as cur_vel (that has 2 rows for forward and angular velocities)
     mask = jnp.stack([exists_mask] * 2, axis=1)
     cur_vel = jnp.where(mask, cur_vel, 0.0)
@@ -35,13 +34,7 @@ class FrictionComponent(Component):
         def state_fn(state, neighbor, key):
             mask = self.mask_fn(state)
             force = friction_force(state, neighbor, mask)
-            if state.entity_state.is_rigid_body():
-                force = force.set(
-                    center=state.entity_state.force.center + force.center,
-                    orientation=state.entity_state.force.orientation + force.orientation
-                )
-            else:
-                force = state.entity_state.force + force
+            force = state.entity_state.force + force
             entity_state=state.entity_state.set(force=force)
             return state.set(entity_state=entity_state)
         return state_fn

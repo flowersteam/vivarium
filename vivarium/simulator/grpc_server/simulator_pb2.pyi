@@ -171,14 +171,6 @@ class NDArray(_message.Message):
     ndarray: bytes
     def __init__(self, ndarray: _Optional[bytes] = ...) -> None: ...
 
-class RigidBody(_message.Message):
-    __slots__ = ("center", "orientation")
-    CENTER_FIELD_NUMBER: _ClassVar[int]
-    ORIENTATION_FIELD_NUMBER: _ClassVar[int]
-    center: NDArray
-    orientation: NDArray
-    def __init__(self, center: _Optional[_Union[NDArray, _Mapping]] = ..., orientation: _Optional[_Union[NDArray, _Mapping]] = ...) -> None: ...
-
 class IsRunningState(_message.Message):
     __slots__ = ("is_running",)
     IS_RUNNING_FIELD_NUMBER: _ClassVar[int]

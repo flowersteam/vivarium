@@ -13,45 +13,7 @@ def is_split_attribute(attr):
 
 def split(attr):
     prefix, suffix = attr.split('_', 1)
-    suffix = suffix + '_center' if suffix == 'position' else suffix
     return suffix, 0 if prefix == 'left' or prefix == 'x' else 1
-
-
-def create_property(field_name, rigid_body_field):
-    @property
-    def prop(self):
-        if self._is_rigid_body:
-            return getattr(getattr(self._state.entity_state, field_name), rigid_body_field)[self._entity_idx]
-        else:
-            if rigid_body_field == 'orientation':
-                if field_name == 'position':
-                    return self._remote.state.entity_state.orientation[self._entity_idx].obj()
-                else:
-                    return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
-            elif rigid_body_field == 'center':
-                return getattr(self._remote.state.entity_state, field_name)[self._entity_idx].obj()
-            else:
-                return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
-
-    @prop.setter
-    def prop(self, value, idx=None):
-        if len(idx) == 0:
-            idx = self._entity_idx
-        else:
-            idx = (self._entity_idx, idx)
-        if self._is_rigid_body:
-            getattr(getattr(self._remote.state.entity_state, field_name), rigid_body_field)[idx] = value
-        else:
-            if rigid_body_field == 'orientation':
-                if field_name == 'position':
-                    self._remote.state.entity_state.orientation[idx] = value
-                else:
-                    return AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
-            elif rigid_body_field == 'center':
-                getattr(self._remote.state.entity_state, field_name)[idx] = value
-            else:
-                raise AttributeError(f"'{type(self).__name__}' object has no attribute '{field_name}'")
-    return prop
 
 
 class EntityWrapper:
@@ -61,31 +23,13 @@ class EntityWrapper:
     that can be applied to the state later using the `apply_to_state` method. This is useful for batch updates
     during client-server interactions.
     """
-    position_center = create_property('position', 'center')
-    momentum_center = create_property('momentum', 'center')
-    force_center = create_property('force', 'center')
-    mass_center = create_property('mass', 'center')
-
-    position_orientation = create_property('position', 'orientation')
-    momentum_orientation = create_property('momentum', 'orientation')
-    force_orientation = create_property('force', 'orientation')
-    mass_orientation = create_property('mass', 'orientation')
-
     def __init__(self, remote, ent_idx, entity_type):
         object.__setattr__(self, '_remote', remote)
         object.__setattr__(self, '_entity_idx', ent_idx)
         object.__setattr__(self, '_entity_type_idx', remote.state.entity_state.entity_type_idx.obj()[ent_idx].item())
-        object.__setattr__(self, '_is_rigid_body', remote.state.entity_state.obj().is_rigid_body())
         object.__setattr__(self, '_entity_type', entity_type)
-        object.__setattr__(self, '_entity_fields', 
-                           list(remote.state.entity_state.obj().__dataclass_fields__.keys()) + \
-                               [
-                                   'position_center', 'position_orientation',
-                                   'momentum_center', 'momentum_orientation',
-                                   'force_center', 'force_orientation',
-                                   'mass_center', 'mass_orientation'
-                               ]
-                        )
+        object.__setattr__(self, '_entity_fields',
+                           list(remote.state.entity_state.obj().__dataclass_fields__.keys()))
         object.__setattr__(self, 'logger', Logger())
 
     def __getattr__(self, attr):
@@ -97,12 +41,7 @@ class EntityWrapper:
         entity_state_idx = self._entity_idx if len(idx) == 0 else (self._entity_idx, *idx)
         x_state_idx = self._remote.state.entity_state.entity_type_idx[self._entity_idx] if len(idx) == 0 else (self._remote.state.entity_state.entity_type_idx[self._entity_idx], *idx)
         if attr in self._entity_fields:
-            if attr.endswith('_center') or attr.endswith('_orientation'):
-                field_name, rigid_body_field = attr.split('_', 1)
-                p = create_property(field_name, rigid_body_field)
-                p.fset(self, value, idx)
-            else:
-                getattr(self._remote.state.entity_state, attr)[entity_state_idx] = value
+            getattr(self._remote.state.entity_state, attr)[entity_state_idx] = value
         else:
             getattr(getattr(self._remote.state, self._entity_type), attr)[x_state_idx] = value
 
@@ -155,8 +94,6 @@ class EntityController(EntityWrapper):  # TODO: How about merging the class and 
         if is_split_attribute(item):
             suffix, idx = split(item)
             field = getattr(self, suffix)
-            if suffix == 'position' and self._is_rigid_body:
-                field = field.center
             return field[idx]
         if item in self._controller_parameters_fields:
             return getattr(getattr(self._remote.controller_parameters, self._entity_type), item)[self._entity_type_idx]

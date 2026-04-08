@@ -15,7 +15,7 @@ vivarium/environment/
 ├── render.py                # Matplotlib visualization (testing/notebooks only)
 └── components/
     ├── component.py         # Base Component class (all components inherit from this)
-    ├── utils.py             # JAX-MD rigid body helpers, force summation
+    ├── utils.py             # Force summation, SPACE_NDIMS, count_masked_values
     ├── interface.py         # Abstract Renderer & Interface base classes (Panel UI)
     ├── entities/
     │   ├── component.py     # EntityComponent base (shared init for all entity types)

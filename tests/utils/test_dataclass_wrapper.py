@@ -2,7 +2,6 @@ import pytest
 import jax.numpy as jnp
 
 from vivarium.utils.dataclass_wrapper import *
-from vivarium.environment.state import to_rigid_body_state
 from vivarium.environment.components.entities.controller import EntityList, EntityWrapper
 
 
@@ -10,16 +9,9 @@ scene_name = 'braitenberg'
 
 
 @pytest.fixture
-def get_point_particle_state(environment_from_config):
+def init_state(environment_from_config):
     env = environment_from_config(scene_name)
     return env.init_state()
-
-
-@pytest.fixture
-def get_rigid_body_state(get_point_particle_state):
-    state = get_point_particle_state
-    state = state.set(entity_state=to_rigid_body_state(state.entity_state))
-    return state
 
 
 def generate_changes(wheel_diameter_idx, wheel_diameter_value, exists_idx, exists_value, friction_idx, friction_value, agent_field):
@@ -49,12 +41,12 @@ def generate_changes_and_expected(wheel_diameter_idx, wheel_diameter_value, exis
     return changes, expected
 
 
-@pytest.mark.parametrize("changes_and_expected, state", [
-    (lambda agent_field: generate_changes_and_expected(0, 0, 7, 0, 6, 0, agent_field), "get_rigid_body_state"),
-    (lambda agent_field: generate_changes_and_expected(1, 1, 8, 1, 7, 1, agent_field), "get_point_particle_state"),
+@pytest.mark.parametrize("changes_and_expected", [
+    lambda agent_field: generate_changes_and_expected(0, 0, 7, 0, 6, 0, agent_field),
+    lambda agent_field: generate_changes_and_expected(1, 1, 8, 1, 7, 1, agent_field),
 ])
-def test_remote_fetch_and_update(changes_and_expected, state, request):
-    state = request.getfixturevalue(state)
+def test_remote_fetch_and_update(changes_and_expected, init_state):
+    state = init_state
 
     changes, expected = changes_and_expected('agents')
 
@@ -84,8 +76,8 @@ def test_remote_fetch_and_update(changes_and_expected, state, request):
             assert (jnp.equal(getattr(getattr(state, entity), attr), expected_fn(state))).all()
 
 
-def test_remote_apply(get_rigid_body_state):
-    state = get_rigid_body_state
+def test_remote_apply(init_state):
+    state = init_state
     idx = 3
     val = [0.2, 0.3]
     cur_val = state.agents.motor[idx]
@@ -98,19 +90,19 @@ def test_remote_apply(get_rigid_body_state):
     assert (jnp.equal(jnp.array(state.agents.motor[idx]), jnp.array(val)).all())
 
 
-def test_remote_with_state(get_rigid_body_state):
-    state = get_rigid_body_state
+def test_remote_with_state(init_state):
+    state = init_state
     dw = Remote(state, set_obj=True)
-    
-    assert jnp.equal(state.entity_state.position.center, dw.entity_state.position.center.obj()).all()
+
+    assert jnp.equal(state.entity_state.position, dw.entity_state.position.obj()).all()
 
     dw.agents.motor = 100 * jnp.ones_like(state.agents.motor)
-    
+
     dw.apply()
 
-    assert jnp.equal(dw.agents.motor.obj(), 100 * jnp.ones_like(state.agents.motor)).all()  
-    
-    assert jnp.equal(state.entity_state.position.center[1, 2], dw.entity_state.position.center[1, 2]).all()
+    assert jnp.equal(dw.agents.motor.obj(), 100 * jnp.ones_like(state.agents.motor)).all()
+
+    assert jnp.equal(state.entity_state.position[1, 2], dw.entity_state.position[1, 2]).all()
 
 
 def test_on_simulator_instance(simulator_from_config):

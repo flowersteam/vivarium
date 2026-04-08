@@ -2,7 +2,6 @@ import numpy as np
 
 import jax.numpy as jnp
 
-from jax_md.rigid_body import RigidBody
 from jax_md.dataclasses import fields
 
 from vivarium.utils.dataclass_wrapper import create_dataclass_from_dict
@@ -241,11 +240,6 @@ def proto_to_dataclass(dataclass, dataclass_type=None):
         return list_behaviors
     elif dataclass.value.HasField('ndarray'):
         return proto_to_ndarray(dataclass.value.ndarray)
-    elif 'center' in dataclass.nested_fields and 'orientation' in dataclass.nested_fields:
-        return RigidBody(
-            center=proto_to_ndarray(dataclass.nested_fields['center'].array_data).astype(float),
-            orientation=proto_to_ndarray(dataclass.nested_fields['orientation'].array_data).astype(float),
-        )
 
 
 def dataclass_to_proto(dataclass):

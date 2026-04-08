@@ -66,71 +66,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 ### Phase 2 — Cleanup & Refactoring
 
 
-#### P2.07 — Rigid body removal
-- **Status:** [ ]
-- **Dependencies:** P2.06 (dead code removal done — cleaner baseline)
-- **Key files:** `vivarium/environment/state.py`, `vivarium/environment/components/utils.py`, `vivarium/environment/components/reset/component.py`, `vivarium/environment/components/collision/component.py`, `vivarium/environment/components/friction/component.py`, `vivarium/environment/components/step/component.py`, `vivarium/environment/components/braitenberg/sensorimotor.py`, `vivarium/environment/components/entities/controller.py`, `vivarium/environment/utils.py`, `vivarium/environment/environment.py`, `vivarium/environment/render.py`, `vivarium/simulator/grpc_server/protos/simulator.proto`, `vivarium/simulator/grpc_server/converters.py`
-- **CLAUDE.md updates:** `vivarium/environment/CLAUDE.md` — update architecture section (remove rigid body references from state system and component descriptions). `vivarium/simulator/CLAUDE.md` — update gRPC section (RigidBody proto message removed).
-
-Remove all rigid body support. No scene uses rigid bodies, no tests exercise rigid body paths, and the conditional branching adds complexity throughout the codebase.
-
-**State system — `state.py`:**
-- Remove `from jax_md.rigid_body import RigidBody` import
-- Remove `to_rigid_body_state()` function
-- Remove `is_rigid_body()` method on `BaseEntityState`
-- Remove `unified_*` accessors in `BaseEntityState.__getattr__` — replace all call sites with direct field access (see table below)
-- Remove RigidBody wrapping branch in `BaseState.__getattr__`
-
-**Physics components — 5 files:**
-- `components/utils.py`: remove `to_rigid_body()`, `@handle_rigid_body` decorator, RigidBody path in `sum_forces()`
-- `reset/component.py`: remove `if is_rigid_body()` branch
-- `collision/component.py`: remove `@handle_rigid_body` decorator + `if is_rigid_body()` force set
-- `friction/component.py`: remove `@handle_rigid_body` decorator + `if is_rigid_body()` force set
-- `step/component.py`: remove `is_rigid_body()` branch in `mask_momentum()`
-
-**Braitenberg sensorimotor — `sensorimotor.py`:**
-- Remove `is_rigid_body()` branches in `motor_force()` and `sum_force_to_entities()`
-
-**Entity controllers — `entities/controller.py`:**
-- Remove `create_property()` function entirely (exists only for RigidBody-style access)
-- Remove 8 class-level properties: `position_center`, `momentum_center`, `force_center`, `mass_center`, `position_orientation`, `momentum_orientation`, `force_orientation`, `mass_orientation`
-- Remove `self._is_rigid_body` flag
-- Remove 8 property names from `_entity_fields` list
-- Remove `_center`/`_orientation` suffix handling in `_setitem()`
-- Remove `is_rigid_body` check in `EntityController.__getattr__`
-- Clean `split()` helper: remove `+ '_center' if suffix == 'position' else suffix`
-
-**Deprecated utility — `environment/utils.py`:**
-- Remove `rigid_body_to_point_particle()` (marked deprecated, never called)
-
-**gRPC layer:**
-- Remove `RigidBody` message from `simulator.proto` + regenerate proto
-- Remove unused `RigidBody` import in `grpc_server/converters.py`
-
-**Replace `unified_*` accessors with direct field access:**
-
-| Accessor | File | Replace with |
-|----------|------|-------------|
-| `unified_position` | `environment.py` | `position` |
-| `unified_position` | `sensorimotor.py` | `position` |
-| `unified_orientation` | `sensorimotor.py` | `orientation` |
-| `unified_momentum` | `sensorimotor.py` | `momentum` |
-| `unified_mass` | `sensorimotor.py` | `mass` |
-| `unified_momentum` | `step/component.py` | `momentum` |
-| `unified_force` | `step/component.py` | `force` |
-| `unified_momentum`, `unified_mass` | `friction/component.py` | `momentum`, `mass` |
-
-**Update consumers of RigidBody-style accessors:**
-- `render.py`: `position_center` → `position`, `position_orientation` → `orientation`
-- `tests/environment/test_components.py`: `position_center` → `position`
-- `tests/interface/test_param.py`: `position_center` → `position`, `position_orientation` → `orientation`
-- `tests/controllers/test_vivarium_controller.py`: `position_center` → `position`
-- `tests/simulator/test_grpc.py`: `position_center` → `position`
-- `tests/utils/test_dataclass_wrapper.py`: remove `get_rigid_body_state` fixture, RigidBody parametrization, and RigidBody-specific tests. Both `test_remote()` functions switch to point-particle fixture only.
-- `tests/environment/test_environment.py`: remove `assert not state.entity_state.is_rigid_body()`
-
-**Keep untouched:**
-- `scripts/patch_jax_md.py` — patches jax_md's own `rigid_body.py` for JAX compatibility, unrelated to vivarium's RigidBody usage
 
 #### P2.08 — Change `exists` field from int to boolean
 - **Status:** [ ]
@@ -680,3 +615,6 @@ Restructured `tests/` to mirror source package structure: `environment/`, `simul
 
 #### P2.06 — Dead code removal
 Deleted 2 files (`eco_evo/component.py` empty, `session_5_logging copy.ipynb` obsolete). Fixed `scripts/profiling.py` (broken `SceneConfiguration` import → current `load_scene_config` API). Removed recording feature from `simulator.py` (`start_recording`, `record`, `save_records`, `stop_recording`, `load`, plus `save`/`saving_name` params from `run()`/`_run()`). Removed `nested_fields_to_access` dicts from `simulator.py` and `environment.py`, commented decorator from `simulator_client.py`. Removed `SetState` handler from `simulator_server.py` (called non-existent method; proto definition was already gone). Removed `notebook_mode` from `panel_app.py`. Removed `kill_session()` from `controllers/utils.py` and `set_nested_attr` from `controllers/__init__.py` exports. Renamed `controllers/utils.py` → `controllers/handlers.py` (updated 3 import sites). Cleaned up unused imports (`proto_to_ndarray` in server, `Logger` in braitenberg controller). Simplified `tests/CLAUDE.md` coverage section (removed stale counts, corrected Logger test status). Updated CLAUDE.md files for simulator, controllers, scripts, and tests. Full pytest green (271 passed).
+
+#### P2.07 — Rigid body removal
+Removed all rigid body support across 19 source/test files. No scene used rigid bodies; the conditional branching added complexity throughout. Deleted: `to_rigid_body_state()`, `is_rigid_body()`, `unified_*` accessors, `BaseEntityState.__getattr__`, `handle_rigid_body` decorator, `to_rigid_body()`, `create_property()` + 8 class-level RigidBody properties in EntityWrapper, `rigid_body_to_point_particle()`, `RigidBody` proto message. Simplified `BaseState.__getattr__`, `sum_forces()`, `mask_momentum()`, `motor_force()`, `sum_force_to_entities()`, and force accumulation in collision/friction/reset/step components. Replaced `unified_*` → direct field access in environment.py, sensorimotor.py, friction, step. Replaced `position_center` → `position` and `position_orientation` → `orientation` in render.py and 5 test files. Regenerated proto files. Removed rigid body fixture/parametrization from test_dataclass_wrapper.py. Updated environment/CLAUDE.md. 60 targeted tests pass.

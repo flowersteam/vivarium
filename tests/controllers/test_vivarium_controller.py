@@ -29,7 +29,7 @@ def test_load_viviarium_controller(client_fixture, request):
     pos = controller.client.state.entity_state.position[idx]
 
     ag = controllers['agents'][idx]
-    assert (jnp.equal(pos, ag.position_center).all())
+    assert (jnp.equal(pos, ag.position).all())
 
     ag.behaviors[1].label = Behaviors.LOVE
     controller.apply_changes()

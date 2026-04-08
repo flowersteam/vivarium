@@ -25,7 +25,7 @@ def simulator(simulator_from_config):
 def test_state_de_serialization(state):
     p_state = dataclass_to_proto(state)
     state_2 = proto_to_dataclass(p_state, state.__class__)
-    assert state.entity_state.position_center[0, 1] == state_2.entity_state.position_center[0, 1]
+    assert state.entity_state.position[0, 1] == state_2.entity_state.position[0, 1]
 
 
 def test_parameters_de_serialization(simulator_from_config):

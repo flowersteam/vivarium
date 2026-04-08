@@ -14,7 +14,7 @@ def plot_particles(ax, state, type, color, size_scale=30):
     
     exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
-    pos = state.entity_state.position_center[idx][exists]
+    pos = state.entity_state.position[idx][exists]
     diameter = state.entity_state.diameter[idx][exists][exists]
     x, y = pos[:, 0], pos[:, 1]
 
@@ -35,10 +35,10 @@ def plot_orientation(ax, state, type, color, arrow_length):
     exists = state.entity_state.exists[idx]         
     exists = jnp.where(exists != 0)
 
-    pos = state.entity_state.position_center[idx][exists]
+    pos = state.entity_state.position[idx][exists]
     x, y = pos[:, 0], pos[:, 1]
 
-    theta = state.entity_state.position_orientation[idx][exists][
+    theta = state.entity_state.orientation[idx][exists][
         exists
     ]
     n = normal(theta)

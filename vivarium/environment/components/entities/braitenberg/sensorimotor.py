@@ -3,7 +3,7 @@ import logging as lg
 import jax.numpy as jnp
 from jax import vmap
 
-from jax_md import partition, rigid_body
+from jax_md import partition
 
 from vivarium.environment.utils import normal
 from vivarium.environment.utils import neighbors_entity_mask
@@ -85,7 +85,7 @@ def motor_force(state, braitenberg_state, mask):
     """
     agent_idx = braitenberg_state.entity_idx
 
-    n = normal(state.entity_state.unified_orientation[agent_idx])
+    n = normal(state.entity_state.orientation[agent_idx])
 
     fwd, rot = motor_command(braitenberg_state.motor,
                              braitenberg_state.max_speed,
@@ -93,49 +93,30 @@ def motor_force(state, braitenberg_state, mask):
                              braitenberg_state.wheel_diameter)
 
     target_vel = n * jnp.tile(fwd, (SPACE_NDIMS, 1)).T
-    
-    
+
     cur_vel = (
-        state.entity_state.unified_momentum[agent_idx]
-        / state.entity_state.unified_mass[agent_idx]
+        state.entity_state.momentum[agent_idx]
+        / state.entity_state.mass[agent_idx]
     )
-    
+
     fwd_force = target_vel - cur_vel
 
-    center = (
-        jnp.zeros_like(state.entity_state.unified_position).at[agent_idx].set(fwd_force)
+    force = (
+        jnp.zeros_like(state.entity_state.position).at[agent_idx].set(fwd_force)
     )
 
-    # TODO CMF: if I get rid of RigidBody, do I also get rid of mass.orientation?
-    if state.entity_state.is_rigid_body():
-        cur_rot_vel = (
-            state.entity_state.momentum.orientation[agent_idx]
-            / state.entity_state.mass.orientation[agent_idx]
-        )
-        rot_delta = rot - cur_rot_vel
-        # In this case of a rigid body, `orientation` below will be summed to the current orientation force
-        # in `sum_force_to_entities`
-        orientation = jnp.zeros_like(state.entity_state.position.orientation).at[agent_idx].set(rot_delta / state.dt)        
-    else:
-        # rot is a rotation speed.
-        # In this case of a non-rigid body, `orientation` below will be summed to the current orientation
-        # in `sum_force_to_entities`
-        orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(rot * state.dt)
+    # rot is a rotation speed — summed to current orientation in `sum_force_to_entities`
+    orientation = jnp.zeros_like(state.entity_state.orientation).at[agent_idx].set(rot * state.dt)
 
     orientation = jnp.where(mask, orientation, 0.0)
     mask = jnp.stack([mask] * SPACE_NDIMS, axis=1)
-    center = jnp.where(mask, center, 0.0)
+    force = jnp.where(mask, force, 0.0)
 
-    return center, orientation
+    return force, orientation
 
 
-def sum_force_to_entities(entity_state, center, orientation=0.):
-    if not entity_state.is_rigid_body():
-        return entity_state.set(force=center + entity_state.force, orientation=orientation + entity_state.orientation)
-    else:
-        center += entity_state.force.center
-        orientation += entity_state.force.orientation         
-        return entity_state.set(force=rigid_body.RigidBody(center=center, orientation=orientation))
+def sum_force_to_entities(entity_state, force, orientation=0.):
+    return entity_state.set(force=force + entity_state.force, orientation=orientation + entity_state.orientation)
         
 
 def compute_motor(proxs, params, motors):
@@ -263,8 +244,8 @@ def braitenberg_state_fn(braitenberg_state_field, braitenberg_mask, displacement
         # # Update the entities and the state
         state = state.set(**{braitenberg_state_field: braitenberg_state})
 
-        center, orientation = motor_force(state, braitenberg_state, exists_mask)
+        force, orientation = motor_force(state, braitenberg_state, exists_mask)
 
-        return state.set(entity_state=sum_force_to_entities(state.entity_state, center, orientation))
+        return state.set(entity_state=sum_force_to_entities(state.entity_state, force, orientation))
     
     return state_fn

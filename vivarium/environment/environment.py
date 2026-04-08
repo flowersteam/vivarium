@@ -153,7 +153,7 @@ class Environment:
         )
         for factory in self.factories:
             entity_state = factory.init_base_entity(entity_state)
-        self.neighbor_manager.allocate(entity_state.unified_position)
+        self.neighbor_manager.allocate(entity_state.position)
         state = state_cls(time=0, entity_state=entity_state)
         for factory in self.factories:
             state = factory.init_state_fn(state, self.neighbor_manager, self.key)
@@ -205,7 +205,7 @@ class Environment:
                 self.key, sub_key = random.split(self.key)
                 new_state = fn(new_state, neighbors, sub_key)
             neighbors = self.neighbor_manager.update(new_state.entity_state.position)
-            if not self.neighbor_manager.reallocate_if_overflow(new_state.entity_state.unified_position):
+            if not self.neighbor_manager.reallocate_if_overflow(new_state.entity_state.position):
                 new_state = new_state.set(time=state.time + 1)
                 state = new_state
 

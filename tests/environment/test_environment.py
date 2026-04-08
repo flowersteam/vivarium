@@ -25,7 +25,7 @@ def test_env(scene_name, scene_config):
 
     assert env
     assert state
-    assert not state.entity_state.is_rigid_body()
+
 
 
 def test_load_save_env_config(scene_config):

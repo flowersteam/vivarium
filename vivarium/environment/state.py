@@ -1,24 +1,7 @@
 import jax.numpy as jnp
 
 from jax_md.dataclasses import dataclass as md_dataclass
-from jax_md.rigid_body import RigidBody
 from jax_md import simulate
-
-
-def to_rigid_body_state(entity_state):
-    for field in ['position', 'momentum', 'mass', 'force', 'previous_force']:
-        val = getattr(entity_state, field)
-        if val is None:
-            continue
-        if field == 'position':
-            orientation = getattr(entity_state, 'orientation')
-        else:
-            if field == 'mass':
-                orientation = jnp.ones(val.shape[0])
-            else:
-                orientation = jnp.zeros(val.shape[0])
-        entity_state = entity_state.set(**{field: RigidBody(center=val, orientation=orientation)})
-    return entity_state
 
 
 @md_dataclass
@@ -47,30 +30,9 @@ class BaseEntityState(simulate.NVEState):
             entity_type_idx = jnp.hstack([self.entity_type_idx, entity_type_idx])
         )
 
-    def is_rigid_body(self):
-        return hasattr(self.position, 'center')
-
     def count(self):
         return self.entity_type_idx.shape[0]
 
-    def __getattr__(self, name):
-        prefix, suffix = name.split('_', 1)
-        if prefix == "unified":
-            if suffix == 'orientation':
-                if self.is_rigid_body():
-                    return self.position.orientation
-                return self.orientation
-            if self.is_rigid_body():
-                return getattr(self, suffix).center
-            return getattr(self, suffix)
-        if suffix in ['center', 'orientation']:
-            if self.is_rigid_body():
-                return getattr(getattr(self, prefix), suffix)
-            if suffix == 'center':
-                return getattr(self, prefix)
-            else:  # Necessarily 'orientation'
-                return self.orientation if prefix == 'position' else jnp.zeros_like(self.orientation)
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
           
 
 @md_dataclass
@@ -135,14 +97,7 @@ class BaseState:
     def __getattr__(self, name):
         def wrapper(e_type):
             value = getattr(self.entity_state, name)
-            if isinstance(value, RigidBody):
-                return RigidBody(
-                    center=value.center[self.e_cond(e_type)],
-                    orientation=value.orientation[self.e_cond(e_type)],
-                )
-            else:
-                return value[self.e_cond(e_type)]
-
+            return value[self.e_cond(e_type)]
         return wrapper
 
 

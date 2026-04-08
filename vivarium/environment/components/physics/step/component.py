@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from jax_md import rigid_body, simulate
+from jax_md import simulate
 
 from vivarium.environment.components.component import Component
 from vivarium.environment.components.utils import SPACE_NDIMS
@@ -15,10 +15,7 @@ def mask_momentum(entity_state, exists_mask):
     """
 
     exists_mask_space = jnp.stack([exists_mask] * SPACE_NDIMS, axis=1)
-    momentum = jnp.where(exists_mask_space, entity_state.unified_momentum, 0)
-    if entity_state.is_rigid_body():
-        orientation = jnp.where(exists_mask, entity_state.momentum.orientation, 0)
-        momentum = rigid_body.RigidBody(center=momentum, orientation=orientation)
+    momentum = jnp.where(exists_mask_space, entity_state.momentum, 0)
     return entity_state.set(momentum=momentum)
 
 
@@ -27,9 +24,7 @@ def init_state_fn(key, kT=0.0):
     def fn(state):
         assert state.entity_state.momentum is None
         key, new_key = jax.random.split(key_cpy)
-        assert not jnp.any(state.entity_state.unified_force)
-        if state.entity_state.is_rigid_body():
-            assert not jnp.any(state.entity_state.force.orientation)
+        assert not jnp.any(state.entity_state.force)
         return state.set(entity_state=simulate.initialize_momenta(state.entity_state, new_key, kT))
 
     return fn

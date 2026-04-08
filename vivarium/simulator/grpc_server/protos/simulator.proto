@@ -148,11 +148,6 @@ message NDArray {
   bytes ndarray = 1;
 }
 
-message RigidBody {
-  NDArray center = 1;
-  NDArray orientation = 2;
-}
-
 message IsRunningState {
   bool is_running = 1;
 }
