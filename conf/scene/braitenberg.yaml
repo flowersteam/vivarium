@@ -1,5 +1,6 @@
 defaults:
   - braitenberg_defaults
+  - _self_
 
 scene_name: braitenberg
 

@@ -5,3 +5,4 @@ defaults:
   - environment/components/entities/objects@environment.components.component_list.objects
   - clients/braitenberg@environment.components.component_list.agents.client
   - clients/objects@environment.components.component_list.objects.client
+  - _self_

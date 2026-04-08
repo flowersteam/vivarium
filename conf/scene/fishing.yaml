@@ -12,6 +12,7 @@ defaults:
   - clients/spawn@environment.components.component_list.spawn.client  
   - environment/components/reproduction/default@environment.components.component_list.reproduction_agents
   - environment/components/reproduction/default@environment.components.component_list.reproduction_objects
+  - _self_
 
 scene_name: fishing
 

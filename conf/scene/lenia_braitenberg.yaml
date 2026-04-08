@@ -5,6 +5,7 @@ defaults:
   - environment/components/entities/particle_lenia@environment.components.component_list.particles
   - clients/braitenberg@environment.components.component_list.agents.client
   - clients/particle_lenia@environment.components.component_list.particles.client
+  - _self_
 
 scene_name: lenia_braitenberg
 

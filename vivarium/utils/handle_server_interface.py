@@ -466,7 +466,7 @@ def start_process_and_parse_url(process_command, show_output=True, timeout=10):
                     match = url_pattern.search(line)
                     if match:
                         url_found[0] = match.group(1)
-        except:
+        except Exception:
             pass
 
     # Start thread to read output

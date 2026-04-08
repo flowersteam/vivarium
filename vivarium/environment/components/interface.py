@@ -62,5 +62,5 @@ class Interface:
     def build_widget(self):
         self.widget = self.default_widget()
 
-    def udpate_other_interfaces(self, interfaces):
+    def update_other_interfaces(self, interfaces):
         pass

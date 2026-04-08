@@ -5,7 +5,8 @@ defaults:
   - environment/components/step/default@environment.components.component_list.step
   - environment/components/entities/particle_lenia@environment.components.component_list.particles
   - clients/particle_lenia@environment.components.component_list.particles.client
-  
+  - _self_
+
 scene_name: particle_lenia
 
 environment:

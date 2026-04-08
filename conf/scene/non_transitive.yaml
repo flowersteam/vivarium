@@ -7,6 +7,7 @@ defaults:
   - clients/consumption@environment.components.component_list.consumption.client
   - environment/components/energy/default@environment.components.component_list.energy
   - environment/components/reproduction/default@environment.components.component_list.reproduction
+  - _self_
 
 scene_name: non_transitive
 

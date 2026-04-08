@@ -1,3 +1,4 @@
+import os
 import time
 import math
 import hydra
@@ -15,6 +16,7 @@ from vivarium.utils.dataclass_wrapper import (
 from vivarium.utils.scene_configs import extend_controller_kwargs
 
 from vivarium.utils.timer import SleepTimer, sleep_timer
+from vivarium.utils.runtime import get_config_dir
 
 lg = logging.getLogger(__name__)
 # lg.setLevel(logging.DEBUG)
@@ -90,7 +92,8 @@ class Simulator:
     
     def to_config(self, state):
         
-        with hydra.initialize(config_path='../../conf/scene/simulator', version_base=None):
+        config_path = os.path.join(get_config_dir(), 'scene', 'simulator')
+        with hydra.initialize_config_dir(config_dir=config_path, version_base=None):
             cfg = hydra.compose(config_name="base_simulator")
             cfg = OmegaConf.merge(
                 cfg, 

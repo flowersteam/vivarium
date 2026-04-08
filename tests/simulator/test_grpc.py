@@ -1,7 +1,9 @@
 import pytest
 from typing import List
+from unittest import mock
 from dataclasses import dataclass
 
+import grpc
 import jax.numpy as jnp
 
 from vivarium.utils.dataclass_wrapper import Remote
@@ -153,4 +155,20 @@ def test_set_changes(grpc_client):
     # But with update_from_server=True should update it
     client.set_changes([], update_from_server=True)
     assert client.state is not initial_state
+
+
+@pytest.mark.slow
+def test_grpc_error_handler(grpc_client):
+    """Test that unhandled exceptions in RPC handlers return gRPC INTERNAL status."""
+    client = grpc_client(scene_name)
+    # Patch the converter called inside the RPC handler to simulate
+    # an unexpected error during response serialization
+    with mock.patch(
+        'vivarium.simulator.grpc_server.simulator_server.dataclass_to_proto',
+        side_effect=RuntimeError("test error")
+    ):
+        with pytest.raises(grpc.RpcError) as exc_info:
+            client.get_controller_parameters()
+        assert exc_info.value.code() == grpc.StatusCode.INTERNAL
+        assert "test error" in exc_info.value.details()
     

@@ -67,32 +67,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 
 
-
-#### P2.09 — Bug fixes
-- **Status:** [ ]
-- **Dependencies:** P2.07 (rigid body removal — render.py accessor renames done there)
-- **Key files:** `vivarium/environment/render.py`, `vivarium/environment/components/interface.py`, `vivarium/interface/panel_app.py`, `vivarium/utils/handle_server_interface.py`, `vivarium/simulator/simulator.py`, `vivarium/simulator/grpc_server/simulator_server.py`, `conf/scene/braitenberg.yaml`, `conf/scene/particle_lenia.yaml`, `conf/scene/demo.yaml`
-- **CLAUDE.md updates:** none
-
-Fix 10 bugs across the codebase. Discuss each item briefly before making changes.
-
-**Rendering (`render.py`):**
-- Remove double `[exists]` indexing on diameter and orientation (already filtered by `exists`, then indexed again).
-- Fix `plt.xlim` → `plt.ylim` on the y-axis call.
-
-**Typos and code smells:**
-- Rename `udpate_other_interfaces` → `update_other_interfaces` in `vivarium/environment/components/interface.py` and `vivarium/interface/panel_app.py`.
-- `except:` → `except Exception:` in `vivarium/utils/handle_server_interface.py` (bare except catches KeyboardInterrupt).
-- `lg.error(...)` → `lg.exception(...)` in `panel_app.py` `_start_server_cb` (preserves traceback).
-
-**Config:**
-- Add `- _self_` at end of defaults list in `braitenberg.yaml` and `particle_lenia.yaml` (Hydra best practice — ensures local keys override defaults).
-- Remove 60+ lines of commented-out code in `demo.yaml`.
-
-**Simulator:**
-- Replace hardcoded `'../../conf/scene/simulator'` in `to_config()` with a proper path using `runtime.get_config_dir()`. Note: the import path for `runtime` may change in P2.13 (runtime split); use the current import path for now.
-- Add gRPC error handling decorator to server RPC handlers: catch `Exception`, log with `lg.exception()`, set gRPC `INTERNAL` status with details. This prevents unhandled exceptions from silently killing RPC calls.
-
 #### P2.10 — Component package move
 - **Status:** [ ]
 - **Dependencies:** P2.08 (boolean exists — all environment cleanup done before structural move)
@@ -368,6 +342,8 @@ Revise `web_interface_tutorial.md` to be a proper standalone guide. Before writi
 2. Structure: explain all parts first then demo a use case, vs. use case as running example
 3. A concrete use case: setting up a relatively complex simulation using only the interface (no code)
 
+See also B0.5 below.
+
 The tutorial should demonstrate the concrete use case end-to-end.
 
 #### P3.06 — Developer tutorial notebook
@@ -567,6 +543,10 @@ Another related discussion to have: instead of `@pytest.mark.slow` (or in additi
 #### B0.4 - Check the logic of Environment.step()
 In particular that both `self.neighbor_manager.reallocate_if_overflow` and `neighbors.did_buffer_overflow` are called (only in debug mode though, so maybe not a big deal)
 
+#### B0.5 - Revise the `demo.yaml` scene
+Potential options:
+- A scene that serves to demonstrate how to configure a relatively large prey-predator simulation from the Panel UI (could be useful for the Web Interface journey).
+- A scene that directly configures a large prey-predator simulation (no need to configure anything from the interface or notebook, just play it)
 
 ---
 
@@ -605,3 +585,6 @@ Removed all rigid body support across 19 source/test files. No scene used rigid 
 
 #### P2.08 — Change `exists` field from int to boolean
 Changed `entity_state.exists` from int (0/1) to boolean across 12 files. Core: `dtype=int` → `dtype=bool` in environment.py. Simplified comparisons: `exists == 1` → `exists`, `exists == 0` → `~exists` in environment.py, utils.py, consumption, render.py. Fixed assignments: `.set(0)` → `.set(False)`, `.set(1)` → `.set(True)` in eco_evo/utils.py and reproduction. Removed `exists` entry from `get_entity_parameter_mapping` (default mapping handles bool natively). Removed redundant `bool()` wrappers in controller.py (print_infos), component.py (to_config), interface.py. Updated 4 test files. Full codebase audit confirmed no arithmetic patterns (`exists * value`) — only comparisons, masks, and `.sum()` (which works correctly with booleans). Full pytest green (271 passed).
+
+#### P2.09 — Bug fixes
+Fixed bugs across 10 source files + 12 config files. **render.py**: removed non-idiomatic `jnp.where(exists)` pattern (boolean mask suffices), fixed double `[exists]` indexing on diameter/orientation, fixed `plt.xlim` → `plt.ylim`, replaced fragile color count with `len(pos)`, removed unused `jax.numpy` import. **Typos/smells**: renamed `udpate_other_interfaces` → `update_other_interfaces` (interface.py + panel_app.py), `except:` → `except Exception:` (handle_server_interface.py), `lg.error` → `lg.exception` in `_start_server_cb` (panel_app.py). **Config**: added `- _self_` to defaults in all 12 scene configs that were missing it. **Simulator**: replaced hardcoded `../../conf/scene/simulator` path in `to_config()` with `runtime.get_config_dir()` + `hydra.initialize_config_dir()`. Added `grpc_error_handler` decorator to all 13 unary RPC handlers and try/except with `context.abort(INTERNAL)` in both streaming RPCs (simulator_server.py). Added `test_grpc_error_handler` test. Full pytest green.

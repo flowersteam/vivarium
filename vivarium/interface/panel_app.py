@@ -639,7 +639,7 @@ class WindowManager(Parameterized):
         )
 
         for name, interface in self.interfaces.items():
-            interface.udpate_other_interfaces(self.interfaces) #TODO: fix typo udpate->update
+            interface.update_other_interfaces(self.interfaces)
 
         # TODO: (2025-08-26) move this to a dedicated SimulatorInterface class?
         self.param_simulator = ParamSimulator(self.controller.controllers['simulator'])
@@ -846,7 +846,7 @@ class WindowManager(Parameterized):
             self._initialize_connected_ui(controller)
 
         except Exception as e:
-            lg.error(f"Failed to start server: {e}")
+            lg.exception(f"Failed to start server: {e}")
             self.server_status.object = f"### Error: {e}"
             self.start_server_btn.disabled = False
             self._started_server = False

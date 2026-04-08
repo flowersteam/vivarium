@@ -2,6 +2,7 @@ defaults:
   - particle_lenia
   - environment/components/entities/walls@environment.components.component_list.walls
   - clients/walls@environment.components.component_list.walls.client
+  - _self_
 
 scene_name: excretion
 
