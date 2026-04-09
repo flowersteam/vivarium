@@ -1,7 +1,7 @@
 # Vivarium Release Plan
 
 _Living document — updated at the end of every working session._
-_Last updated: 2026-04-08_
+_Last updated: 2026-04-09_
 
 ---
 
@@ -38,7 +38,7 @@ _These apply to every task below._
 
 **Completing a task:**
 9. In parallel: (a) ask the user if `pytest` should be run, and (b) update affected CLAUDE.md files as specified in the task.
-10. Remove the task in `PLAN.md` and add a summary at the end of the Completed section. 
+10. **Entirely remove** the task in `PLAN.md` and add a summary **at the end** of the Completed section. 
 11. Propose a commit message (unsigned).
 12. The user reviews, commits, and handles the merge to `dev`.
 
@@ -65,35 +65,7 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 ### Phase 2 — Cleanup & Refactoring
 
-#### P2.11 — Dynamic dataclass fixes
-- **Status:** [ ]
-- **Dependencies:** P2.10 (component move — codebase structure stable)
-- **Key files:** `vivarium/simulator/simulator.py`
-- **CLAUDE.md updates:** `vivarium/simulator/CLAUDE.md` — update architecture section (ghost attributes eliminated, default controller_parameters in __init__).
 
-Fix ghost attributes in `Simulator` by eliminating `update_from_dataclass()` and always accessing through `self.controller_parameters.simulator`. Build a default `controller_parameters` in `__init__` when none is provided.
-
-**Steps:**
-1. **Remove the `update_from_dataclass()` call** in `set_changes()` — this is what creates ghost attributes by copying `run_from`, `simulation_running`, and `freq` onto the Simulator instance.
-2. **Replace direct `self.X` accesses** with `self.controller_parameters.simulator.X` for `run_from` and `simulation_running` (3 locations in `set_changes()` and `run()`).
-3. **Fix `freq` aliasing** — `to_config()` uses `self.freq` but `__init__` stores `self._freq`. Change to access `self.controller_parameters.simulator.freq`.
-4. **Build default `controller_parameters` in `__init__`** when none is provided, so the headless path (`Simulator(env=env, freq=10)`) and the config path work identically:
-   ```python
-   if controller_parameters is None:
-       controller_parameters = create_dataclass_from_dict('ControllerParameters', {
-           'simulator': {'freq': freq, 'scene_name': scene_name,
-                        'run_from': 'server', 'simulation_running': False,
-                        'client_names': []}
-       })
-   ```
-5. **Remove `update_from_dataclass()` function** (top of simulator.py) — no longer needed.
-6. **Drop misleading `self = ` assignment** in `set_changes()` — `update_dataclass_from_change_list` mutates the Simulator in place via `setattr`, so the return value is the same object. Replace with a plain call + comment:
-   ```python
-   # Mutates self.state and/or self.controller_parameters in place
-   update_dataclass_from_change_list(self, changes)
-   ```
-
-Note: `nested_fields_to_access` dead code was already removed in P2.06.
 
 #### P2.12 — Streaming cleanup
 - **Status:** [ ]
@@ -573,3 +545,6 @@ Fixed bugs across 10 source files + 12 config files. **render.py**: removed non-
 
 #### P2.10 — Component package move
 Moved `vivarium/environment/components/` → `vivarium/components/` (top-level package). Updated all Python imports (~40 files in components/, tests/, scripts/, interface/), all `_target_` and `*_cls` strings in YAML configs (~20 references), and `vivarium_multi.spec`. Removed re-export shim directories (`vivarium/controllers/components/` and `vivarium/interface/components/` — 8 `__init__.py` files, no longer needed). Fixed deep relative imports that broke after the move (5 files in components/ that used `....` / `.....` to reach `controllers/` — converted to absolute imports). Fixed `vivarium/environment/__init__.py` stale `from vivarium.environment import components`. Updated CLAUDE.md files (global, environment, controllers, interface, tests ; new components/CLAUDE.md). Full pytest green (272 passed).
+
+#### P2.11 — Dynamic dataclass fixes
+Eliminated ghost attributes in `Simulator` by making `controller_parameters.simulator` the single source of truth. Removed `update_from_dataclass()` (blanket field copier that created ghost attrs like `self.freq`, `self.simulation_running`, `self.run_from`). Removed `_freq` backing store and `freq` property — freq now accessed as `controller_parameters.simulator.freq` everywhere. Added `__setattr__` safeguard blocking new instance attributes that shadow `controller_parameters.simulator` fields (allows existing attrs like `self.env` and properties like `scene_name`). Built default `controller_parameters` in `__init__` for the headless path. Rewrote `set_changes()` with explicit syncs: `sleep_timer.frequency` from freq, env config fields via `sync_dataclass_fields()`. Simplified `from_config()` — no separate freq/scene_name extraction. Updated `pause()`, `to_config()`, `_run()` to read from `controller_parameters.simulator`. Added `test_ghost_attribute_blocked`. Updated 3 test files. Updated `vivarium/simulator/CLAUDE.md`. Full pytest green.

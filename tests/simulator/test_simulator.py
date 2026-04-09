@@ -24,7 +24,7 @@ def test_load_save_simulator_config(scene_config):
     state = simulator.env.init_state()
     state = simulator.env.step(state)
 
-    simulator.freq = 42.
+    simulator.controller_parameters.simulator.freq = 42.
 
     updated_config = simulator.to_config(state)
 
@@ -32,7 +32,7 @@ def test_load_save_simulator_config(scene_config):
 
     new_simulator = Simulator.from_config(updated_config)
 
-    assert new_simulator.freq == 42.
+    assert new_simulator.controller_parameters.simulator.freq == 42.
     assert new_simulator
 
     # assert hasattr(new_simulator.controller_parameters, 'agents') # TODO: to fix
@@ -44,3 +44,11 @@ def test_scene_name_read_only(simulator_from_config):
     simulator = simulator_from_config('braitenberg')
     with pytest.raises(AttributeError):
         simulator.scene_name = "other"
+
+
+def test_ghost_attribute_blocked(simulator_from_config):
+    simulator = simulator_from_config('braitenberg')
+    with pytest.raises(AttributeError, match="Cannot set 'freq' directly"):
+        simulator.freq = 42
+    with pytest.raises(AttributeError, match="Cannot set 'simulation_running' directly"):
+        simulator.simulation_running = True

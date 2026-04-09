@@ -52,7 +52,7 @@ def test_simulator(scene_name, scene_config):
     config = scene_config(scene_name)
     simulator = Simulator.from_config(config.simulator)
     assert simulator.env.box_size == config.environment.kwargs.box_size
-    assert simulator.freq == config.simulator.client.controller_kwargs.freq
+    assert simulator.controller_parameters.simulator.freq == config.simulator.client.controller_kwargs.freq
 
 
 def test_controller_parameters(scene_config):

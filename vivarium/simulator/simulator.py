@@ -8,8 +8,6 @@ from functools import partial
 from omegaconf import OmegaConf
 from contextlib import contextmanager
 from dataclasses import dataclass, is_dataclass
-from omegaconf.errors import ConfigKeyError, ConfigAttributeError, InterpolationKeyError
-
 from vivarium.utils.dataclass_wrapper import (
     update_dataclass_from_change_list, create_dataclass_from_dict, Remote
 )
@@ -22,14 +20,32 @@ lg = logging.getLogger(__name__)
 # lg.setLevel(logging.DEBUG)
 
 
-def update_from_dataclass(obj, dataclass_instance, exclude_fields=[]):
-    for field in dataclass_instance.__dataclass_fields__.keys():
-        if field not in exclude_fields:
-            if is_dataclass(getattr(dataclass_instance, field)):
-                setattr(obj, field, update_from_dataclass(getattr(obj, field), getattr(dataclass_instance, field), exclude_fields))
+def sync_dataclass_fields(target, source, exclude_fields=()):
+    """Copy field values from a source dataclass onto a target object, recursively.
+
+    For each field in the source dataclass, sets the corresponding attribute on
+    the target. Nested dataclass fields are synced recursively rather than replaced.
+
+    Note:
+        Modifies target in place. The return value is the same object, provided
+        for convenience.
+
+    Args:
+        target: The object to update (does not need to be a dataclass).
+        source: A dataclass instance whose fields provide the new values.
+        exclude_fields: Field names to skip.
+
+    Returns:
+        The updated target object.
+    """
+    for field_name in source.__dataclass_fields__:
+        if field_name not in exclude_fields:
+            source_value = getattr(source, field_name)
+            if is_dataclass(source_value):
+                sync_dataclass_fields(getattr(target, field_name), source_value, exclude_fields)
             else:
-                setattr(obj, field, getattr(dataclass_instance, field))
-    return obj
+                setattr(target, field_name, source_value)
+    return target
 
 
 @dataclass
@@ -41,12 +57,17 @@ class StateAndControllerParameters:
 class Simulator:
     def __init__(self, env, state=None, controller_parameters=None, scene_name=None, freq=-1):
         self.env = env
+        if controller_parameters is None:
+            controller_parameters = create_dataclass_from_dict('ControllerParameters', {
+                'simulator': {'freq': freq, 'scene_name': scene_name,
+                             'run_from': 'server', 'simulation_running': False,
+                             'client_names': []}
+            })
         self.controller_parameters = controller_parameters
 
         self.state = state or env.init_state()
-        
-        self._freq = freq
-        self.sleep_timer = SleepTimer(freq)        
+
+        self.sleep_timer = SleepTimer(controller_parameters.simulator.freq)
         self._is_running = False
         self._to_stop = False
         self._was_running = False
@@ -54,9 +75,26 @@ class Simulator:
         self.remote = Remote(self)
 
         self.is_grpc_client = False
-        
+
         lg.info("Simulator initialized")
-        
+
+    def __setattr__(self, name, value):
+        # Let properties handle themselves via the descriptor protocol
+        if isinstance(getattr(type(self), name, None), property):
+            super().__setattr__(name, value)
+            return
+        # Block NEW ghost attributes that shadow controller_parameters.simulator.
+        # Attributes already in __dict__ (e.g. self.env) are legitimate instance
+        # attributes — allow updating them.
+        cp = self.__dict__.get('controller_parameters')
+        if (cp is not None and hasattr(cp, 'simulator')
+                and hasattr(cp.simulator, name) and name not in self.__dict__):
+            raise AttributeError(
+                f"Cannot set '{name}' directly on Simulator. "
+                f"Use self.controller_parameters.simulator.{name} instead."
+            )
+        super().__setattr__(name, value)
+
     @classmethod
     def from_config(cls, simulator_config):
         kwargs = {}
@@ -73,22 +111,8 @@ class Simulator:
 
         cp = create_dataclass_from_dict('ControllerParameters', kwargs)
 
-        try:
-            scene_name = simulator_config.client.controller_kwargs.scene_name
-        except (ConfigKeyError, ConfigAttributeError, InterpolationKeyError):
-            logging.warning("Scene name not found, Simulator.scene_name will be None.")
-            scene_name = None
-        
-        if 'client' in simulator_config and 'controller_kwargs' in simulator_config.client and 'freq' in simulator_config.client.controller_kwargs:
-            freq = simulator_config.client.controller_kwargs.freq 
-        else:
-            freq = -1
-        
         return cls(env=hydra.utils.get_class(simulator_config.env._target_).from_config(simulator_config.env),
-                   controller_parameters=cp,
-                   scene_name=scene_name,
-                   freq=freq
-                  )
+                   controller_parameters=cp)
     
     def to_config(self, state):
         
@@ -101,7 +125,7 @@ class Simulator:
                     {'client': {
                         'controller_kwargs': {
                             'subtype_labels': self.controller_parameters.simulator.subtype_labels,
-                            'freq': self.freq,
+                            'freq': self.controller_parameters.simulator.freq,
                             'scene_name': self.scene_name
                             }
                         },
@@ -113,15 +137,6 @@ class Simulator:
     @property
     def scene_name(self):
         return self.controller_parameters.simulator.scene_name
-
-    @property
-    def freq(self):
-        return self._freq
-    
-    @freq.setter
-    def freq(self, value):
-        self._freq = value
-        self.sleep_timer.frequency = value
 
     def _step(self, state):
         """Execute a step of the simulation.
@@ -172,6 +187,7 @@ class Simulator:
 
         # Update the simulation with step for num_steps
         while loop_count < num_steps:
+            self.sleep_timer.frequency = self.controller_parameters.simulator.freq
             with sleep_timer(timer=self.sleep_timer):
 
                 if self._to_stop:
@@ -190,16 +206,22 @@ class Simulator:
 
     def set_changes(self, changes, update_from_server=True):
         # update_from_server is only here to match the SimulatorGRPCClient interface
-        
+
         lg.debug("Applying changes to simulator")
         lg.debug(f"Changes: {changes}")
-        self = update_dataclass_from_change_list(self, changes)
+        update_dataclass_from_change_list(self, changes)
 
-        self = update_from_dataclass(self, self.controller_parameters.simulator, exclude_fields=['scene_name'])
-        
-        if self.run_from == self.name:
-            if self.is_running() != self.simulation_running:
-                if self.simulation_running:
+        # Sync sleep timer from source of truth
+        self.sleep_timer.frequency = self.controller_parameters.simulator.freq
+
+        # Sync env config values (box_size, num_scan_steps, …) to the actual Environment
+        sync_dataclass_fields(self.env, self.controller_parameters.simulator.env)
+
+        # Handle start/stop orchestration
+        sim_params = self.controller_parameters.simulator
+        if sim_params.run_from == self.name:
+            if self.is_running() != sim_params.simulation_running:
+                if sim_params.simulation_running:
                     lg.debug("Starting simulator from server apply_changes")
                     self.run(threaded=True)
                 else:
@@ -207,7 +229,7 @@ class Simulator:
                     self.stop()
         elif self.is_running():
             lg.debug("Stopping simulator from server apply_changes (2nd case)")
-            self.stop()                    
+            self.stop()
 
         return self.controller_parameters
 
@@ -265,8 +287,8 @@ class Simulator:
         try:
             yield self
         finally:
-            lg.debug(f"Resuming simulator: was_running={self._was_running}, simulation_running={self.simulation_running}, _is_running={self._is_running}")
-            if self._was_running and self.simulation_running and not self._is_running:
+            lg.debug(f"Resuming simulator: was_running={self._was_running}, simulation_running={self.controller_parameters.simulator.simulation_running}, _is_running={self._is_running}")
+            if self._was_running and self.controller_parameters.simulator.simulation_running and not self._is_running:
                 lg.debug("Running simulator from pause context manager")
                 self.run(threaded=True)
             self._was_running = False

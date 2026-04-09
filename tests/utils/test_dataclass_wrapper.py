@@ -108,9 +108,9 @@ def test_remote_with_state(init_state):
 def test_on_simulator_instance(simulator_from_config):
     simulator = simulator_from_config(scene_name)
     remote = Remote()
-    remote.freq = 42
+    remote.controller_parameters.simulator.freq = 42
     simulator = remote.apply(simulator)
-    assert simulator.freq == 42
+    assert simulator.controller_parameters.simulator.freq == 42
 
     remote = Remote()
     remote.env.num_scan_steps = 42
@@ -126,4 +126,4 @@ def test_simulator_apply_change(simulator_from_config):
     changes = remote.fetch_changes()
     simulator.set_changes(changes)
     assert simulator.env.box_size == 42.
-    assert simulator.freq == -10.
+    assert simulator.controller_parameters.simulator.freq == -10.

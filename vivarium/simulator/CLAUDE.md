@@ -9,7 +9,7 @@ Bridge between JAX-based simulation (`vivarium/environment/`) and client control
 | File | Status | Purpose |
 |------|--------|---------|
 | `__init__.py` | Solid | Exports `Simulator` |
-| `simulator.py` | Brittle | Core orchestrator: state management, run loop, controller parameters |
+| `simulator.py` | Solid | Core orchestrator: state management, run loop, controller parameters |
 | `controller.py` | Solid | `SimulatorController` — wraps simulator controller_parameters for client-side access |
 | `grpc_server/simulator_server.py` | Solid | gRPC servicer: RPC handlers, streaming |
 | `grpc_server/simulator_client.py` | Solid | gRPC client: connects to server, streaming, bidirectional stepping |
@@ -59,6 +59,16 @@ Built in `Simulator.from_config()` by collecting `controller_kwargs` from simula
 
 Synchronized: server centralizes updates → client fetches copy via RPC or bundled with state.
 
+### Single Source of Truth: `controller_parameters.simulator`
+
+`controller_parameters.simulator` is the single source of truth for shared config fields (`freq`, `scene_name`, `run_from`, `simulation_running`, `client_names`, `subtype_labels`, `env.*`). Simulator never stores these as instance attributes.
+
+- **`__init__`**: builds a default `controller_parameters` when none is provided (headless path: `Simulator(env=env, freq=10)`), so both headless and config paths are uniform.
+- **`__setattr__` safeguard**: blocks creation of new instance attributes that shadow fields on `controller_parameters.simulator`, preventing ghost attribute regression. Existing instance attributes (e.g. `self.env`) and properties (e.g. `scene_name`) are allowed through.
+- **`set_changes()`**: applies changes via `update_dataclass_from_change_list`, then explicitly syncs derived state: `sleep_timer.frequency` from `freq`, and env config fields (box_size, etc.) to the actual `Environment` via `sync_dataclass_fields()`.
+- **`scene_name`**: read-only property delegating to `controller_parameters.simulator.scene_name` (part of duck-typed interface with `SimulatorGRPCClient`).
+- **`freq`**: no property — accessed as `controller_parameters.simulator.freq` everywhere. Clients access it via `SimulatorController`, not directly on Simulator.
+
 ## Public API
 
 ### Simulator (server-side)
@@ -102,6 +112,7 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 | Changes serialization | `test_grpc.py` | Covered |
 | Bidirectional streaming | `test_grpc.py` | Covered |
 | `set_changes()` with update | `test_grpc.py` | Covered |
+| `__setattr__` ghost attribute safeguard | `test_simulator.py` | Covered |
 | Multi-client registration | `test_edu_sessions.py` | Covered |
 | Streaming rate limiting | — | Not tested |
 
