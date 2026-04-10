@@ -1,4 +1,3 @@
-use_streaming: true
 dark_mode: false
 include_prereleases: false  # Set to true to receive pre-release updates (alpha, beta, rc)
 notebook:

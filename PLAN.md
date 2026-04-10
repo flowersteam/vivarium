@@ -67,31 +67,6 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 
 
-#### P2.12 — Streaming cleanup
-- **Status:** [ ]
-- **Dependencies:** P2.11 (dynamic dataclass fixes — simulator stabilized)
-- **Key files:** `vivarium/simulator/grpc_server/simulator_client.py`, `vivarium/simulator/grpc_server/simulator_server.py`, `vivarium/simulator/grpc_server/protos/simulator.proto`, `vivarium/interface/panel_app.py`, `vivarium/controllers/vivarium_controller.py`, `conf/scene/interface/base_interface.yaml`, `scripts/dev/benchmark_streaming_real.py`
-- **CLAUDE.md updates:** `vivarium/simulator/CLAUDE.md` — update gRPC RPCs section (remove BidirectionalStep). `vivarium/interface/CLAUDE.md` — update architecture section (streaming always on, pending_state_update wired in).
-
-Remove bidirectional streaming (dormant code), clean up dead UI code, and fix the pending state update flag.
-
-**Remove (bidirectional streaming — fully implemented but no active code path uses it):**
-- `bidirectional_step_sync()` and `bidirectional_step_generator()` in `simulator_client.py`
-- `BidirectionalStep` RPC handler in `simulator_server.py` + proto definition (regenerate proto)
-- `use_streaming` parameter in `VivariumController.start_controller_thread()`
-- `scripts/dev/benchmark_streaming_real.py`
-
-**Remove (dead UI code):**
-- `streaming_toggle` widget + `streaming_toggle_cb` callback in `panel_app.py`
-- `use_streaming` config key in `conf/scene/interface/base_interface.yaml` (streaming is always on in Panel UI)
-
-**Fix:**
-- Wire `_pending_state_update` flag into `update_plot_cb()` — skip repaint when no new state has arrived. The flag is already set by the streaming callback but never checked by the update loop.
-
-**Keep as-is:**
-- `StreamState` RPC, `start_state_stream()`/`stop_state_stream()`, `_start_streaming()`/`_stop_streaming()`
-- `is_streaming` conditional in `apply_changes()` / `set_changes()` — correctly distinguishes Panel UI (streaming, fire-and-forget changes) from notebooks (no streaming, `SetChangesReturnsState`)
-
 #### P2.13 — utils → runtime package split
 - **Status:** [ ]
 - **Dependencies:** P2.12 (streaming cleanup — simulator/interface stabilized)
@@ -548,3 +523,6 @@ Moved `vivarium/environment/components/` → `vivarium/components/` (top-level p
 
 #### P2.11 — Dynamic dataclass fixes
 Eliminated ghost attributes in `Simulator` by making `controller_parameters.simulator` the single source of truth. Removed `update_from_dataclass()` (blanket field copier that created ghost attrs like `self.freq`, `self.simulation_running`, `self.run_from`). Removed `_freq` backing store and `freq` property — freq now accessed as `controller_parameters.simulator.freq` everywhere. Added `__setattr__` safeguard blocking new instance attributes that shadow `controller_parameters.simulator` fields (allows existing attrs like `self.env` and properties like `scene_name`). Built default `controller_parameters` in `__init__` for the headless path. Rewrote `set_changes()` with explicit syncs: `sleep_timer.frequency` from freq, env config fields via `sync_dataclass_fields()`. Simplified `from_config()` — no separate freq/scene_name extraction. Updated `pause()`, `to_config()`, `_run()` to read from `controller_parameters.simulator`. Added `test_ghost_attribute_blocked`. Updated 3 test files. Updated `vivarium/simulator/CLAUDE.md`. Full pytest green.
+
+#### P2.12 — Streaming cleanup
+Removed bidirectional streaming (dormant code): `bidirectional_step_generator()` and `bidirectional_step_sync()` from `simulator_client.py`, `BidirectionalStep` RPC handler from `simulator_server.py`, proto definition (regenerated), `use_streaming` parameter from `start_controller_thread()`/`_run_controller_thread()`, `scripts/dev/benchmark_streaming_real.py`, bidirectional benchmarks from `benchmark_grpc.py`, `test_bidirectional_streaming` test. Removed dead UI code: `streaming_toggle` widget + `streaming_toggle_cb` callback from `panel_app.py`, `use_streaming` config key from `base_interface.yaml`. Streaming now starts unconditionally on connect. Wired `_pending_state_update` flag into `update_plot_cb()` — skips repaint when streaming is active but no new state has arrived; `apply_changes()` runs before the check so UI changes always reach the server. Updated `vivarium/simulator/CLAUDE.md`, `vivarium/interface/CLAUDE.md`, `scripts/CLAUDE.md`. Full pytest green (272 passed).

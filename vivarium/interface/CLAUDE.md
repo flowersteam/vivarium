@@ -30,9 +30,12 @@ scripts/run_interface.py
 
 **State sync loop** (periodic callback, default 33ms / ~30 FPS):
 1. `update_plot_cb()` runs periodically
-2. Calls `renderer.update_cds(state)` for each component interface → updates Bokeh plot
-3. Calls `controller.apply_changes()` → sends UI changes to server
-4. ParamSimulator/ParamEnvironment handle slider↔controller sync via Param watchers
+2. Calls `controller.apply_changes()` → sends UI changes to server (always, even if no new state)
+3. Checks `_pending_state_update` flag — skips repaint if streaming is active but no new state arrived
+4. Calls `renderer.update_cds(state)` for each component interface → updates Bokeh plot
+5. ParamSimulator/ParamEnvironment handle slider↔controller sync via Param watchers
+
+**Streaming** is always on in the Panel UI (no toggle). `_start_streaming()` is called unconditionally on connect. The `_pending_state_update` flag (set by the streaming callback, cleared by `update_plot_cb()`) prevents redundant repaints.
 
 **Component interfaces** are loaded dynamically via Hydra: `hydra.utils.get_class(config.client.interface_cls)`. Interface classes live in `vivarium/components/*/interface.py`.
 

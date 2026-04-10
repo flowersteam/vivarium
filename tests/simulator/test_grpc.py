@@ -111,29 +111,6 @@ def test_controller_parameters(simulator):
     assert cp.agents.color[1] == cp_2.agents.color[1]
 
 
-@pytest.mark.slow
-def test_bidirectional_streaming(grpc_client):
-    """Test bidirectional streaming RPC."""
-    client = grpc_client(scene_name)
-    
-    num_steps = 5
-    received_states = []
-    
-    def changes_generator():
-        for i in range(num_steps):
-            yield []  # No changes, just step
-    
-    for state_and_cp in client.bidirectional_step_generator(changes_generator()):
-        received_states.append(state_and_cp)
-    
-    # Should receive one state per step
-    assert len(received_states) == num_steps
-    
-    # Each state should be valid
-    for state_and_cp in received_states:
-        assert state_and_cp.state is not None
-        assert state_and_cp.controller_parameters is not None
-    
 
 @pytest.mark.slow
 def test_set_changes(grpc_client):

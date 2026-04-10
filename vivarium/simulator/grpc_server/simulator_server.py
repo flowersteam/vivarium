@@ -170,37 +170,6 @@ class SimulatorServerServicer(simulator_pb2_grpc.SimulatorServerServicer):
 
         lg.info("StreamState ended")
 
-    def BidirectionalStep(self, request_iterator, context):
-        """Bidirectional streaming: Client sends changes, server responds with state.
-
-        Each message from client triggers:
-        1. Apply changes (if any)
-        2. Execute one step
-        3. Return new state
-
-        This is essentially a streaming version of SetChangesAndStep.
-        """
-        lg.info("BidirectionalStep stream started")
-
-        try:
-            for request in request_iterator:
-                if not context.is_active():
-                    break
-
-                # Apply changes and step
-                changes = proto_to_changes(request)
-                self._set_changes(changes)
-                self._step()
-
-                # Yield the new state
-                state_and_cp = self.simulator.get_state_and_controller_parameters()
-                yield dataclass_to_proto(state_and_cp)
-        except Exception as e:
-            lg.exception("RPC BidirectionalStep failed")
-            context.abort(grpc.StatusCode.INTERNAL, str(e))
-
-        lg.info("BidirectionalStep stream ended")
-
 
 def create_grpc_server(simulator, port=50051):
     """

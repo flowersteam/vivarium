@@ -628,7 +628,6 @@ class WindowManager(Parameterized):
         client = self.controller.client
         self.scene_config = load_scene_config(client.scene_name)
 
-        self.use_streaming = self.scene_config.interface.use_streaming
         self.controller_names = list(self.controller.controllers.keys())
 
         self.interfaces = create_interfaces(
@@ -660,9 +659,7 @@ class WindowManager(Parameterized):
 
         if not self.testing_mode:
             self.set_callbacks()
-            # Start streaming if enabled
-            if self.use_streaming:
-                self._start_streaming()
+            self._start_streaming()
         self.update_plot_cb()
 
     def _setup_simulation_widgets(self):
@@ -678,13 +675,6 @@ class WindowManager(Parameterized):
 
         self.plot_fps = pn.widgets.FloatInput(
             name="Plot FPS", value=10, width=80
-        )
-
-        # Currently not displayed
-        self.streaming_toggle = pn.widgets.Toggle(
-            name="Use Streaming" if not self.use_streaming else "Using Streaming",
-            value=self.use_streaming,
-            align="center",
         )
 
         self.drag_n_drop = pn.widgets.Toggle(name="Start Drag & Drop", value=False, align="center")
@@ -966,15 +956,6 @@ class WindowManager(Parameterized):
         self._stop_streaming()
         self._start_streaming()
 
-    def streaming_toggle_cb(self, event):
-        """Callback for the streaming toggle."""
-        if event.new:
-            self._start_streaming()
-            self.streaming_toggle.name = "Using Streaming"
-        else:
-            self._stop_streaming()
-            self.streaming_toggle.name = "Use Streaming"
-
     def update_plot_cb(self):
         """Periodic callback for the plot update.
 
@@ -988,14 +969,19 @@ class WindowManager(Parameterized):
         if self.controller is None:
             return
 
+        # Always apply pending UI changes to the server
+        if self.apply_changes:
+            self.controller.apply_changes()
+
+        # Skip repaint when streaming is active but no new state has arrived
+        if self._streaming_active and not self._pending_state_update.is_set():
+            return
+        self._pending_state_update.clear()
+
         for interface in self.interfaces.values():
             if interface.renderer is not None:
                 interface.renderer.update()
-        if self.apply_changes:
-            self.controller.apply_changes()
         state = self.controller.client.state
-        # if self.param_simulator.config_update:  # TODO: (2025-08-26) To change
-        #     self.controller.pull_selected_entities()
         for interface in self.interfaces.values():
             renderer = interface.renderer
             if renderer is not None:
@@ -1369,7 +1355,6 @@ class WindowManager(Parameterized):
                 pn.Row(
                     self.start_toggle,
                     self.plot_fps,
-                    # self.streaming_toggle,
                     self.drag_n_drop,
                     pn.layout.Spacer(width=20),
                     self.stop_server_btn,
@@ -1392,7 +1377,6 @@ class WindowManager(Parameterized):
         self.controller_toggle.param.watch(self.controller_toggle_cb, "value")
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
         self.plot_fps.param.watch(self.update_plot_fps, "value")
-        # self.streaming_toggle.param.watch(self.streaming_toggle_cb, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
         # Notebook callbacks
         self.check_jupyter_btn.on_click(self.check_jupyter_cb)

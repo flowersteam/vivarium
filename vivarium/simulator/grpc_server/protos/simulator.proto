@@ -44,9 +44,6 @@ service SimulatorServer {
   // Server pushes state whenever it changes (after each step)
   rpc StreamState(StreamConfig) returns (stream Dataclass) {}
   
-  // Bidirectional streaming: Send commands, receive state updates
-  // Client sends changes, server responds with updated state after each step
-  rpc BidirectionalStep(stream StateChangeList) returns (stream Dataclass) {}
 }
 
 // Configuration for streaming RPCs

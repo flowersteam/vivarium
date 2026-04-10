@@ -16,7 +16,6 @@ Entry points for the vivarium application. Three primary scripts (server, interf
 | `profiling.py` | Solid | JAX profiler — profiles braitenberg scene step |
 | `rthook_jupyter_matplotlib.py` | Solid | PyInstaller runtime hook for matplotlib/ipykernel |
 | `dev/benchmark_grpc.py` | Solid | gRPC communication pattern benchmarks |
-| `dev/benchmark_streaming_real.py` | Solid | Real-world streaming benchmark with behaviors |
 
 ## Invocation Patterns
 

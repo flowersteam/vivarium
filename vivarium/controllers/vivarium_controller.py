@@ -346,15 +346,14 @@ class VivariumController:
             self._server_process = None
             lg.info("Server stopped")
 
-    def start_controller_thread(self, threaded=True, num_steps=math.inf, debug_mode=False, use_streaming=False):
+    def start_controller_thread(self, threaded=True, num_steps=math.inf, debug_mode=False):
         """
         Start the controller thread to maintain synchronization with the simulator server.
         The simulator step will be called from this controller if `self.simulator.run_from == self.client.name` (synchronous mode).
         :param threaded: Whether to run in a separate thread or not, defaults to True
-        :param use_streaming: Use bidirectional streaming (True) or unary RPC (False), defaults to True
         :raises RuntimeError: if the simulator is already started
         """
-        
+
         self.ensure_connected()
 
         if self.is_controller_thread_running():
@@ -367,45 +366,25 @@ class VivariumController:
         self._controller_thread_stop_event.clear()
         if threaded:
             self._controller_thread = threading.Thread(
-                target=self._run_controller_thread, args=(num_steps, catch_errors, use_streaming)
+                target=self._run_controller_thread, args=(num_steps, catch_errors)
             )
             self._controller_thread.daemon = True
             self._controller_thread.start()
         else:
-            self._run_controller_thread(num_steps=num_steps, catch_errors=catch_errors, use_streaming=use_streaming)
+            self._run_controller_thread(num_steps=num_steps, catch_errors=catch_errors)
         lg.info("Controller thread started on client")
 
-    def _run_controller_thread(self, num_steps=math.inf, catch_errors=True, use_streaming=False):
+    def _run_controller_thread(self, num_steps=math.inf, catch_errors=True):
         """Run the simulation for a given number of steps.
 
         :param num_steps: num_steps, defaults to math.inf
         :param catch_errors: whether to catch errors or not, defaults to False
-        :param use_streaming: Use bidirectional streaming (True) or unary RPC (False)
         """
-
-        if use_streaming:
-            # Use synchronized bidirectional streaming
-            def compute_changes():
-                """Compute motor commands and return changes for the next step."""
-                if self._controller_thread_stop_event.is_set():
-                    return None  # Signal to stop
-
-                with sleep_timer(freq=self.controllers['simulator'].freq):
-                    self.controller_step(catch_errors=catch_errors)
-                    self.time += 1
-
-                return self.fetch_changes()
-
-            for state_and_cp in self.client.bidirectional_step_sync(num_steps, compute_changes):
-                if self._controller_thread_stop_event.is_set():
-                    break  # Stop if we've been told to stop
-        else:
-            # Use unary RPC (original approach)
-            run_time = 0
-            while run_time < num_steps and not self._controller_thread_stop_event.is_set():
-                with sleep_timer(freq=self.controllers['simulator'].freq):
-                    self.step(catch_errors=catch_errors)
-                    run_time += 1
+        run_time = 0
+        while run_time < num_steps and not self._controller_thread_stop_event.is_set():
+            with sleep_timer(freq=self.controllers['simulator'].freq):
+                self.step(catch_errors=catch_errors)
+                run_time += 1
 
         # finally stop the simulation
         if self.is_controller_thread_running():

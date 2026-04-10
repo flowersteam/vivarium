@@ -12,7 +12,7 @@ Bridge between JAX-based simulation (`vivarium/environment/`) and client control
 | `simulator.py` | Solid | Core orchestrator: state management, run loop, controller parameters |
 | `controller.py` | Solid | `SimulatorController` — wraps simulator controller_parameters for client-side access |
 | `grpc_server/simulator_server.py` | Solid | gRPC servicer: RPC handlers, streaming |
-| `grpc_server/simulator_client.py` | Solid | gRPC client: connects to server, streaming, bidirectional stepping |
+| `grpc_server/simulator_client.py` | Solid | gRPC client: connects to server, state streaming |
 | `grpc_server/converters.py` | Solid | Dataclass ↔ protobuf serialization |
 | `grpc_server/simulator_pb2.py` | Generated | Protobuf Python code (do not edit) |
 | `grpc_server/simulator_pb2_grpc.py` | Generated | gRPC Python code (do not edit) |
@@ -51,7 +51,7 @@ SimulatorGRPCClient                      Simulator
 
 **Unary:** `Step`, `GetState`, `GetControllerParameters`, `GetStateAndControllerParameters`, `SetChanges`, `SetChangesAndStep`, `SetChangesReturnsState`, `GetSceneName`, `RegisterClient`, `UnregisterClient`, `Start`, `Stop`, `IsRunning`
 
-**Streaming:** `StreamState` (server→client push), `BidirectionalStep` (two-way synchronized stepping)
+**Streaming:** `StreamState` (server→client push)
 
 ### Controller Parameters
 
@@ -87,7 +87,6 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 - `get_state()`, `get_controller_parameters()`
 - `set_changes(changes, update_from_server)`
 - `start_state_stream(callback, max_fps)` / `stop_state_stream()` — async observation
-- `bidirectional_step_sync(num_steps, compute_changes_fn)` — synchronized stepping
 - `close()` — disconnect
 
 ### SimulatorController
@@ -100,7 +99,7 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 - **Controllers**: `vivarium_controller.py` — `SimulatorGRPCClient`, `SimulatorController`
 - **Interface**: `panel_app.py` — `SimulatorGRPCClient`
 - **Tests**: `conftest.py`, `test_simulator.py`, `test_grpc.py`, `test_edu_sessions.py`, `test_scene_config.py`
-- **Dev scripts**: `benchmark_grpc.py`, `benchmark_streaming_real.py`
+- **Dev scripts**: `benchmark_grpc.py`
 
 ## Test Coverage
 
@@ -110,7 +109,6 @@ Synchronized: server centralizes updates → client fetches copy via RPC or bund
 | State serialization (dataclass ↔ proto) | `test_grpc.py` | Covered |
 | Controller parameters serialization | `test_grpc.py` | Covered |
 | Changes serialization | `test_grpc.py` | Covered |
-| Bidirectional streaming | `test_grpc.py` | Covered |
 | `set_changes()` with update | `test_grpc.py` | Covered |
 | `__setattr__` ghost attribute safeguard | `test_simulator.py` | Covered |
 | Multi-client registration | `test_edu_sessions.py` | Covered |
