@@ -6,7 +6,7 @@ import urllib.error
 import pytest
 from unittest.mock import patch, MagicMock
 
-from vivarium.utils.updater import (
+from vivarium.runtime.updater import (
     check_for_updates,
     get_defaults_update_info,
     find_latest_backup_dir,
@@ -29,7 +29,7 @@ class TestCheckForUpdates:
         mock_response.__enter__ = lambda s: s
         mock_response.__exit__ = MagicMock()
 
-        with patch('vivarium.utils.updater.get_version', return_value='0.2.0'):
+        with patch('vivarium.runtime.updater.get_version', return_value='0.2.0'):
             with patch('urllib.request.urlopen', return_value=mock_response):
                 result = check_for_updates()
 
@@ -49,7 +49,7 @@ class TestCheckForUpdates:
         mock_response.__enter__ = lambda s: s
         mock_response.__exit__ = MagicMock()
 
-        with patch('vivarium.utils.updater.get_version', return_value='0.2.0'):
+        with patch('vivarium.runtime.updater.get_version', return_value='0.2.0'):
             with patch('urllib.request.urlopen', return_value=mock_response):
                 with patch('sys.platform', 'darwin'):
                     result = check_for_updates()
@@ -61,7 +61,7 @@ class TestCheckForUpdates:
 
     def test_check_for_updates_handles_network_error(self):
         """Should return None on network errors (not raise)."""
-        with patch('vivarium.utils.updater.get_version', return_value='0.2.0'):
+        with patch('vivarium.runtime.updater.get_version', return_value='0.2.0'):
             with patch('urllib.request.urlopen', side_effect=urllib.error.URLError('Network error')):
                 result = check_for_updates()
 
@@ -69,7 +69,7 @@ class TestCheckForUpdates:
 
     def test_check_for_updates_handles_timeout(self):
         """Should return None on timeout (not raise)."""
-        with patch('vivarium.utils.updater.get_version', return_value='0.2.0'):
+        with patch('vivarium.runtime.updater.get_version', return_value='0.2.0'):
             with patch('urllib.request.urlopen', side_effect=TimeoutError()):
                 result = check_for_updates()
 
@@ -96,11 +96,11 @@ class TestGetDefaultsUpdateInfo:
         # Create manifest that doesn't include the new file (simulating old version)
         manifest = {}  # Empty = file is new in this version
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults)):
-                    with patch('vivarium.utils.updater.load_defaults_manifest', return_value=manifest):
-                        with patch('vivarium.utils.updater.clear_defaults_manifest'):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults)):
+                    with patch('vivarium.runtime.updater.load_defaults_manifest', return_value=manifest):
+                        with patch('vivarium.runtime.updater.clear_defaults_manifest'):
                             result = get_defaults_update_info()
 
         assert result is not None
@@ -116,10 +116,10 @@ class TestGetDefaultsUpdateInfo:
         (defaults / 'conf').mkdir(parents=True)
         (defaults / 'conf' / 'new_scene.yaml').write_text('new: true')
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults)):
-                    with patch('vivarium.utils.updater.load_defaults_manifest', return_value=None):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults)):
+                    with patch('vivarium.runtime.updater.load_defaults_manifest', return_value=None):
                         result = get_defaults_update_info()
 
         assert result is not None
@@ -147,11 +147,11 @@ class TestGetDefaultsUpdateInfo:
             'conf/config.yaml': old_hash
         }
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults)):
-                    with patch('vivarium.utils.updater.load_defaults_manifest', return_value=manifest):
-                        with patch('vivarium.utils.updater.clear_defaults_manifest'):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults)):
+                    with patch('vivarium.runtime.updater.load_defaults_manifest', return_value=manifest):
+                        with patch('vivarium.runtime.updater.clear_defaults_manifest'):
                             result = get_defaults_update_info()
 
         assert result is not None
@@ -159,7 +159,7 @@ class TestGetDefaultsUpdateInfo:
 
     def test_no_conflict_when_only_user_modified(self, tmp_path):
         """Should NOT report conflict when user modified but defaults unchanged."""
-        from vivarium.utils.updater import _compute_file_hash
+        from vivarium.runtime.updater import _compute_file_hash
         import hashlib
 
         # Create user conf with modifications
@@ -178,11 +178,11 @@ class TestGetDefaultsUpdateInfo:
             'conf/config.yaml': old_hash
         }
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults)):
-                    with patch('vivarium.utils.updater.load_defaults_manifest', return_value=manifest):
-                        with patch('vivarium.utils.updater.clear_defaults_manifest'):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults)):
+                    with patch('vivarium.runtime.updater.load_defaults_manifest', return_value=manifest):
+                        with patch('vivarium.runtime.updater.clear_defaults_manifest'):
                             result = get_defaults_update_info()
 
         # No conflict because defaults didn't change - user's modification is fine
@@ -207,11 +207,11 @@ class TestGetDefaultsUpdateInfo:
             'conf/config.yaml': content_hash
         }
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults)):
-                    with patch('vivarium.utils.updater.load_defaults_manifest', return_value=manifest):
-                        with patch('vivarium.utils.updater.clear_defaults_manifest'):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults)):
+                    with patch('vivarium.runtime.updater.load_defaults_manifest', return_value=manifest):
+                        with patch('vivarium.runtime.updater.clear_defaults_manifest'):
                             result = get_defaults_update_info()
 
         assert result is None
@@ -222,14 +222,14 @@ class TestFindLatestBackupDir:
 
     def test_returns_none_when_not_frozen(self):
         """In dev mode (not frozen), should return None."""
-        with patch('vivarium.utils.updater.is_frozen', return_value=False):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=False):
             result = find_latest_backup_dir()
             assert result is None
 
     def test_returns_none_when_no_backups(self, tmp_path):
         """When no backup directories exist, should return None."""
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
                 result = find_latest_backup_dir()
                 assert result is None
 
@@ -238,8 +238,8 @@ class TestFindLatestBackupDir:
         backup_dir = tmp_path / 'update_backup_20250101_120000'
         backup_dir.mkdir()
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
                 result = find_latest_backup_dir()
                 assert result == str(backup_dir)
 
@@ -250,8 +250,8 @@ class TestFindLatestBackupDir:
         latest = tmp_path / 'update_backup_20250103_120000'
         latest.mkdir()
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
                 result = find_latest_backup_dir()
                 assert result == str(latest)
 
@@ -263,8 +263,8 @@ class TestFindLatestBackupDir:
         backup_dir = tmp_path / 'update_backup_20250101_120000'
         backup_dir.mkdir()
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
                 result = find_latest_backup_dir()
                 assert result == str(backup_dir)
 
@@ -279,14 +279,14 @@ class TestPerformPostUpdateMerge:
 
     def test_returns_none_when_not_frozen(self):
         """In dev mode (not frozen), should return None."""
-        with patch('vivarium.utils.updater.is_frozen', return_value=False):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=False):
             result = perform_post_update_merge()
             assert result is None
 
     def test_returns_none_when_no_backup(self, tmp_path):
         """When no backup directory exists, should return None."""
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
                 result = perform_post_update_merge()
                 assert result is None
 
@@ -297,9 +297,9 @@ class TestPerformPostUpdateMerge:
         (backup_dir / 'conf').mkdir()
         (backup_dir / 'conf' / 'test.yaml').write_text('user content')
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(tmp_path)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(tmp_path / '_defaults')):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(tmp_path)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(tmp_path / '_defaults')):
                     result = perform_post_update_merge()
                     assert result is None
 
@@ -333,9 +333,9 @@ class TestPerformPostUpdateMerge:
         # Current user file (from extraction) has new default content
         (app_root / 'conf' / 'test.yaml').write_text(old_content)
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     result = perform_post_update_merge()
 
         # Should restore user's file
@@ -378,9 +378,9 @@ class TestPerformPostUpdateMerge:
         # Current user file (from extraction) has new default content
         (app_root / 'conf' / 'test.yaml').write_text(new_content)
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     result = perform_post_update_merge()
 
         # Should report conflict, not restore
@@ -421,9 +421,9 @@ class TestPerformPostUpdateMerge:
         (defaults_dir / 'conf' / 'test.yaml').write_text(new_content)
         (app_root / 'conf' / 'test.yaml').write_text(new_content)
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     result = perform_post_update_merge()
 
         # Should return None (no action needed)
@@ -474,9 +474,9 @@ class TestPerformPostUpdateMerge:
         }
         (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     result = perform_post_update_merge()
 
         assert result is not None
@@ -510,9 +510,9 @@ class TestPerformPostUpdateMerge:
         manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
         manifest_path.write_text(json.dumps(manifest))
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     perform_post_update_merge()
 
         # Manifest should be cleared
@@ -537,9 +537,9 @@ class TestPerformPostUpdateMerge:
         manifest = {'conf/test.yaml': _compute_hash_from_content(old_content)}
         (app_root / DEFAULTS_MANIFEST_FILE).write_text(json.dumps(manifest))
 
-        with patch('vivarium.utils.updater.is_frozen', return_value=True):
-            with patch('vivarium.utils.updater.get_app_root', return_value=str(app_root)):
-                with patch('vivarium.utils.updater.get_defaults_dir', return_value=str(defaults_dir)):
+        with patch('vivarium.runtime.updater.is_frozen', return_value=True):
+            with patch('vivarium.runtime.updater.get_app_root', return_value=str(app_root)):
+                with patch('vivarium.runtime.updater.get_defaults_dir', return_value=str(defaults_dir)):
                     result = perform_post_update_merge()
 
         assert result is not None

@@ -4,7 +4,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from vivarium.utils.runtime import (
+from vivarium.runtime.paths import (
     is_frozen,
     get_bundle_root,
     get_app_root,
@@ -13,7 +13,7 @@ from vivarium.utils.runtime import (
     get_defaults_dir,
     initialize_user_data,
 )
-from vivarium.utils.updater import _version_is_newer
+from vivarium.runtime.updater import _version_is_newer
 
 
 class TestPathResolution:
@@ -60,7 +60,7 @@ class TestFrozenModePaths:
         fake_exe = tmp_path / 'vivarium-interface'
         fake_exe.touch()
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 assert get_app_root() == str(tmp_path)
 
@@ -69,7 +69,7 @@ class TestFrozenModePaths:
         fake_exe = tmp_path / 'vivarium-interface'
         fake_exe.touch()
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 assert get_config_dir() == os.path.join(str(tmp_path), 'conf')
 
@@ -78,7 +78,7 @@ class TestFrozenModePaths:
         fake_exe = tmp_path / 'vivarium-interface'
         fake_exe.touch()
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 assert get_notebooks_dir() == os.path.join(str(tmp_path), 'notebooks')
 
@@ -87,7 +87,7 @@ class TestFrozenModePaths:
         fake_exe = tmp_path / 'vivarium-interface'
         fake_exe.touch()
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 assert get_defaults_dir() == os.path.join(str(tmp_path), '_defaults')
 
@@ -111,7 +111,7 @@ class TestInitializeUserData:
         (defaults / 'notebooks').mkdir()
         (defaults / 'notebooks' / 'test.ipynb').write_text('{}')
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 result = initialize_user_data()
 
@@ -133,7 +133,7 @@ class TestInitializeUserData:
         (defaults / 'conf').mkdir(parents=True)
         (defaults / 'conf' / 'config.yaml').write_text('default: config')
 
-        with patch('vivarium.utils.runtime.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.is_frozen', return_value=True):
             with patch('sys.executable', str(fake_exe)):
                 result = initialize_user_data()
 

@@ -40,12 +40,14 @@ tests/
     __init__.py
     test_panel_app.py                # WindowManager initialization
     test_param.py                    # Parameterized UI integration
-  utils/
+  runtime/
     __init__.py
     test_runtime.py                  # Path resolution, frozen mode detection
     test_version.py                  # Version parsing
+    test_updater.py                  # vivarium.runtime.updater (mocked)
+  utils/
+    __init__.py
     test_scene_config.py             # Config loading, state creation
-    test_updater.py                  # vivarium.utils.updater (mocked)
     test_dataclass_wrapper.py        # dataclass_wrapper.py, gRPC converters
   scripts/
     __init__.py
@@ -112,7 +114,9 @@ Test directory mirrors source structure, so mapping is self-evident. Below lists
 | `vivarium/controllers/controller.py` | Base class, no direct tests |
 | `vivarium/controllers/handlers.py` | RoutineHandler, BehaviorHandler tested indirectly via test_routines.py / test_behaviors.py |
 | `vivarium/simulator/controller.py` | SimulatorController untested |
-| `vivarium/utils/converters.py` | No tests |
+| `vivarium/runtime/_process.py` | No tests |
+| `vivarium/runtime/_jupyter.py` | No tests |
+| `vivarium/runtime/_ngrok.py` | No tests |
 | `vivarium/utils/jax_utils.py` | No tests |
 | `vivarium/utils/timer.py` | No tests |
 | All interface components | No tests |

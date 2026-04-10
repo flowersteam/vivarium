@@ -6,7 +6,7 @@ from hydra import initialize_config_dir, compose
 
 from vivarium.simulator import Simulator
 from vivarium.simulator.grpc_server.simulator_server import serve
-from vivarium.utils.runtime import get_config_dir, initialize_user_data, is_frozen
+from vivarium.runtime.paths import get_config_dir, initialize_user_data, is_frozen
 
 if not sys.warnoptions:
     import warnings

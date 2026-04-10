@@ -8,11 +8,31 @@ import jax.numpy as jnp
 from jax_md import partition, space
 
 from vivarium.environment.state import BaseState, create_state_cls
-from vivarium.utils.converters import access_nested_fields
 from vivarium.utils.scene_configs import component_factories_from_config
 
 
 lg = logging.getLogger(__name__)
+
+
+def access_nested_fields(field_map):
+    """Class decorator that creates properties delegating to nested object attributes.
+
+    For each (obj_name, field_names) pair, creates a property on the decorated class
+    that reads/writes ``getattr(self.<obj_name>, <field_name>)``.
+    """
+    def decorator(cls):
+        for obj_name, field_names in field_map.items():
+            for field_name in field_names:
+                @property
+                def prop(self, obj_name=obj_name, field_name=field_name):
+                    return getattr(getattr(self, obj_name), field_name)
+
+                @prop.setter
+                def prop(self, value, obj_name=obj_name, field_name=field_name):
+                    setattr(getattr(self, obj_name), field_name, value)
+                setattr(cls, field_name, prop)
+        return cls
+    return decorator
 
 
 # Generic mask function factory

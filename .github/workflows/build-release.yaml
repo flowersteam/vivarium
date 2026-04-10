@@ -310,7 +310,7 @@ jobs:
 
           # Check if interface is responding to HTTP (more retries for Windows)
           python -c "
-          from vivarium.utils.handle_server_interface import wait_for_http
+          from vivarium.runtime import wait_for_http
           import sys
           import os
           retries = 12 if os.name == 'nt' else 6
@@ -338,7 +338,7 @@ jobs:
           sleep 60
           # Check if server is responding (using grpc health check)
           python -c "
-          from vivarium.utils.handle_server_interface import check_server_running
+          from vivarium.runtime import check_server_running
           import sys
           if check_server_running():
               print('[OK] Server health check passed')
@@ -364,7 +364,7 @@ jobs:
           sleep 15
           # Check if Jupyter is responding
           python -c "
-          from vivarium.utils.handle_server_interface import check_jupyter_running
+          from vivarium.runtime import check_jupyter_running
           import sys
           if check_jupyter_running(8889):
               print('[OK] Jupyter health check passed')

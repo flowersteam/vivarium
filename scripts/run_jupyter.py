@@ -6,7 +6,10 @@ This script handles two modes:
 
 Uses notebook 7.x API (JupyterNotebookApp) which is built on jupyter_server.
 """
+import argparse
 import sys
+
+from vivarium.runtime.paths import DEFAULT_JUPYTER_PORT
 
 
 def run_kernel():
@@ -23,11 +26,10 @@ def run_kernel():
 
 def run_server():
     """Launch Jupyter notebook server."""
-    import argparse
     from notebook.app import JupyterNotebookApp
 
     parser = argparse.ArgumentParser(description='Start Jupyter notebook server')
-    parser.add_argument('--port', type=int, default=8889, help='Port to run Jupyter on')
+    parser.add_argument('--port', type=int, default=DEFAULT_JUPYTER_PORT, help='Port to run Jupyter on')
     parser.add_argument('--notebook-dir', type=str, default=None, help='Directory to start Jupyter in')
     parser.add_argument('--config', type=str, default=None, help='Path to Jupyter config file')
     args = parser.parse_args()

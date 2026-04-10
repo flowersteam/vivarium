@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch
 
 import vivarium
-from vivarium.utils.runtime import get_version, get_app_root
+from vivarium.runtime.paths import get_version, get_app_root
 
 
 def test_version_file_exists():
@@ -52,7 +52,7 @@ def test_package_version_matches_get_version():
 
 def test_get_version_raises_when_file_missing(tmp_path):
     """Verify get_version() raises FileNotFoundError when VERSION missing."""
-    with patch('vivarium.utils.runtime.get_app_root', return_value=str(tmp_path)):
+    with patch('vivarium.runtime.paths.get_app_root', return_value=str(tmp_path)):
         with pytest.raises(FileNotFoundError):
             get_version()
 
@@ -62,7 +62,7 @@ def test_get_version_frozen_mode_uses_app_root(tmp_path):
     version_file = tmp_path / 'VERSION'
     version_file.write_text('1.2.3rc1')
 
-    with patch('vivarium.utils.runtime.is_frozen', return_value=True):
-        with patch('vivarium.utils.runtime.get_app_root', return_value=str(tmp_path)):
+    with patch('vivarium.runtime.paths.is_frozen', return_value=True):
+        with patch('vivarium.runtime.paths.get_app_root', return_value=str(tmp_path)):
             version = get_version()
             assert version == '1.2.3rc1'

@@ -6,8 +6,8 @@ import logging
 
 import panel as pn
 from vivarium.interface.panel_app import WindowManager
-from vivarium.utils.handle_server_interface import kill_vivarium_processes, get_started_jupyter_ports, kill_port_processes
-from vivarium.utils.runtime import initialize_user_data, is_frozen
+from vivarium.runtime import kill_vivarium_processes, get_started_jupyter_ports, kill_port_processes
+from vivarium.runtime.paths import initialize_user_data, is_frozen
 
 lg = logging.getLogger(__name__)
 

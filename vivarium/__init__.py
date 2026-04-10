@@ -1,4 +1,4 @@
-from vivarium.utils.runtime import get_version
+from vivarium.runtime.paths import get_version
 
 __version__ = get_version()
 

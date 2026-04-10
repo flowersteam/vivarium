@@ -15,12 +15,8 @@ from bokeh.models import (
 
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_config, load_scene_config, get_available_scenes
-from vivarium.utils.runtime import (
-    get_app_root,
-    get_version,
-    is_frozen,
-)
-from vivarium.utils.updater import (
+from vivarium.runtime.paths import get_app_root, get_version, is_frozen, DEFAULT_JUPYTER_PORT
+from vivarium.runtime.updater import (
     check_for_updates,
     download_update,
     apply_downloaded_update,
@@ -31,20 +27,21 @@ from vivarium.utils.updater import (
     perform_post_update_merge,
     UpdateDownloadError,
 )
-from vivarium.utils.handle_server_interface import (
+from vivarium.runtime import (
     check_server_running,
-    get_server_interface_pids,
-    terminate_process,
     kill_vivarium_processes,
+    kill_port_processes,
     check_jupyter_running,
     register_jupyter_port,
     unregister_jupyter_port,
     find_next_available_port,
+    start_jupyter_server,
+    stop_jupyter_server,
 )
+from vivarium.runtime._process import get_server_interface_pids, terminate_process
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
-from vivarium.utils.handle_server_interface import start_jupyter_server
 
 
 lg = logging.getLogger(__name__)
@@ -713,7 +710,7 @@ class WindowManager(Parameterized):
         # Notebook configuration - load from config
         self.notebook_config = getattr(self.scene_config.interface, 'notebook', None)
         self.notebook_path = None
-        self.jupyter_port = 8889
+        self.jupyter_port = DEFAULT_JUPYTER_PORT
 
         if self.notebook_config is not None:
             if hasattr(self.notebook_config, 'path'):
@@ -1103,8 +1100,6 @@ class WindowManager(Parameterized):
 
     def _jupyter_kill_only_cb(self, event):
         """Kill the existing Jupyter server without starting a new one."""
-        from vivarium.utils.handle_server_interface import kill_port_processes
-
         port = self._conflict_port
         self.jupyter_conflict_panel.visible = False
 
@@ -1126,8 +1121,6 @@ class WindowManager(Parameterized):
 
     def _jupyter_kill_restart_cb(self, event):
         """Kill existing server and start a new one (tracked)."""
-        from vivarium.utils.handle_server_interface import kill_port_processes
-
         port = self._conflict_port
         self.jupyter_conflict_panel.visible = False
 
@@ -1174,8 +1167,6 @@ class WindowManager(Parameterized):
 
     def stop_jupyter_cb(self, event):
         """Callback for stopping Jupyter server"""
-        from vivarium.utils.handle_server_interface import stop_jupyter_server
-
         lg.info("Stopping Jupyter server...")
         self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping..."
 
@@ -1222,8 +1213,6 @@ class WindowManager(Parameterized):
 
     def _check_jupyter_status(self):
         """Check if Jupyter server is running and update UI accordingly"""
-        from vivarium.utils.handle_server_interface import check_jupyter_running
-
         is_running = check_jupyter_running(self.jupyter_port)
 
         if is_running:

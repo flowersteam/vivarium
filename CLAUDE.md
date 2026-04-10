@@ -17,17 +17,18 @@ JAX 0.8.2 + JAX-MD 0.2.27 (physics), gRPC 1.71.2 (client-server), Panel 1.8.5 + 
 ### Package Dependency Map
 
 ```
-vivarium/utils/          ← foundation (no vivarium deps)
+vivarium/utils/          ← foundation utilities (no vivarium deps except runtime.paths)
+vivarium/runtime/        ← deployment & process lifecycle (no vivarium deps)
   ↑
 vivarium/environment/    ← JAX simulation core (depends on utils)
   ↑
 vivarium/components/     ← component implementations (depends on environment, controllers, utils)
   ↑
-vivarium/simulator/      ← state management, gRPC bridge (depends on environment, utils)
+vivarium/simulator/      ← state management, gRPC bridge (depends on environment, utils, runtime)
   ↑
-vivarium/controllers/    ← user-facing Python API (depends on simulator, environment, utils)
+vivarium/controllers/    ← user-facing Python API (depends on simulator, environment, utils, runtime)
   ↑
-vivarium/interface/      ← Panel web UI (depends on controllers, simulator, environment, utils)
+vivarium/interface/      ← Panel web UI (depends on controllers, simulator, environment, utils, runtime)
   ↑
 scripts/                 ← entry points (depends on all packages)
 ```
@@ -193,6 +194,7 @@ Each package has a `CLAUDE.md` with purpose, structure, API, dependencies, and t
 | `vivarium/simulator/` | [CLAUDE.md](vivarium/simulator/CLAUDE.md) | State management, gRPC bridge |
 | `vivarium/controllers/` | [CLAUDE.md](vivarium/controllers/CLAUDE.md) | User-facing Python API |
 | `vivarium/interface/` | [CLAUDE.md](vivarium/interface/CLAUDE.md) | Panel web UI |
+| `vivarium/runtime/` | [CLAUDE.md](vivarium/runtime/CLAUDE.md) | Deployment & process lifecycle |
 | `vivarium/utils/` | [CLAUDE.md](vivarium/utils/CLAUDE.md) | Shared utilities |
 | `conf/` | [CLAUDE.md](conf/CLAUDE.md) | Hydra configs |
 | `scripts/` | [CLAUDE.md](scripts/CLAUDE.md) | Entry points |

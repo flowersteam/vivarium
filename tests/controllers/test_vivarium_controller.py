@@ -5,7 +5,7 @@ import jax.numpy as jnp
 
 from vivarium.components.entities.braitenberg.behaviors import Behaviors, behavior_params
 from vivarium.controllers.vivarium_controller import VivariumController
-from vivarium.utils.handle_server_interface import (
+from vivarium.runtime import (
     check_server_running,
     stop_server_and_interface,
     stop_simulation_server,

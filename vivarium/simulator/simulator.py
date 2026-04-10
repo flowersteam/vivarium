@@ -14,7 +14,7 @@ from vivarium.utils.dataclass_wrapper import (
 from vivarium.utils.scene_configs import extend_controller_kwargs
 
 from vivarium.utils.timer import SleepTimer, sleep_timer
-from vivarium.utils.runtime import get_config_dir
+from vivarium.runtime.paths import get_config_dir
 
 lg = logging.getLogger(__name__)
 # lg.setLevel(logging.DEBUG)

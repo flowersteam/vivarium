@@ -7,7 +7,7 @@ tests to ensure the server and interface can start and respond to requests.
 
 import pytest
 
-from vivarium.utils.handle_server_interface import check_server_running, wait_for_http
+from vivarium.runtime import check_server_running, wait_for_http
 
 pytestmark = pytest.mark.slow
 

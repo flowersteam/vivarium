@@ -44,7 +44,7 @@ import time
 
 from vivarium.interface.utils import cleanup_parameterized_class
 from vivarium.utils.scene_configs import load_config, component_factories_from_config
-from vivarium.utils.handle_server_interface import (
+from vivarium.runtime import (
     wait_for_grpc_server,
     kill_all_vivarium_processes,
     start_simulation_server,

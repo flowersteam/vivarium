@@ -23,7 +23,7 @@ from typing import Callable, Optional
 
 import certifi
 
-from vivarium.utils.runtime import get_app_root, get_defaults_dir, get_version, is_frozen
+from vivarium.runtime.paths import get_app_root, get_defaults_dir, get_version, is_frozen
 
 
 def _get_ssl_context() -> ssl.SSLContext:

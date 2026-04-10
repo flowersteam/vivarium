@@ -226,7 +226,7 @@ jupyter_analysis = Analysis(
       + collect_submodules('matplotlib_inline')
       + collect_submodules('vivarium'),
     hookspath=[],
-    runtime_hooks=[os.path.join(project_root, 'scripts', 'rthook_jupyter_matplotlib.py')],
+    runtime_hooks=[os.path.join(project_root, 'vivarium', 'runtime', 'rthook_jupyter_matplotlib.py')],
     excludes=[],
     noarchive=False,
     # Tell the matplotlib backends hook to collect matplotlib_inline.

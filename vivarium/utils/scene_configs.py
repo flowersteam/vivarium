@@ -8,7 +8,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 import hydra
 
-from vivarium.utils.runtime import get_config_dir
+from vivarium.runtime.paths import get_config_dir
 
 OmegaConf.register_new_resolver("range", lambda start, end: list(range(start, end)))
 

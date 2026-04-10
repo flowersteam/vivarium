@@ -5,7 +5,7 @@ import logging
 import threading
 from time import sleep
 
-from vivarium.utils.handle_server_interface import (
+from vivarium.runtime import (
     start_simulation_server,
     stop_simulation_server,
     check_server_running,
@@ -488,7 +488,7 @@ class VivariumController:
         # Create ngrok tunnel if requested
         if use_ngrok:
             try:
-                from vivarium.utils.handle_server_interface import create_ngrok_tunnel
+                from vivarium.runtime import create_ngrok_tunnel
                 ngrok_url = create_ngrok_tunnel(port=5006, token=ngrok_token)
                 self.interface_url = ngrok_url
                 self._ngrok_active = True
@@ -508,7 +508,7 @@ class VivariumController:
             
             # Close ngrok tunnel if one was created
             if getattr(self, '_ngrok_active', False):
-                from vivarium.utils.handle_server_interface import close_ngrok_tunnel
+                from vivarium.runtime import close_ngrok_tunnel
                 close_ngrok_tunnel()
                 self._ngrok_active = False            
             

@@ -1,11 +1,11 @@
 """
-Runtime environment utilities for development and PyInstaller compatibility.
+Runtime path resolution and environment detection.
 
-This module centralizes all logic that differs between development mode
-and frozen (PyInstaller) mode, including path resolution and command building.
-It also handles first-run initialization for frozen builds.
+Centralizes all logic that differs between development mode and frozen
+(PyInstaller) mode, including path resolution and command building.
+Also handles first-run initialization for frozen builds.
 
-Update-related functionality is in vivarium.utils.updater.
+Update-related functionality is in vivarium.runtime.updater.
 """
 
 import os
@@ -15,6 +15,9 @@ import logging
 
 
 lg = logging.getLogger(__name__)
+
+# Default port for Jupyter notebook servers started by Vivarium
+DEFAULT_JUPYTER_PORT = 8889
 
 
 def is_frozen() -> bool:
@@ -206,7 +209,7 @@ def get_interface_command(allow_external_origins: bool = False) -> list:
         return command
 
 
-def get_jupyter_command(port: int = 8889, notebook_dir: str = None, config_path: str = None) -> list:
+def get_jupyter_command(port: int = DEFAULT_JUPYTER_PORT, notebook_dir: str = None, config_path: str = None) -> list:
     """
     Get the command to start the Jupyter server.
 

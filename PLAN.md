@@ -67,60 +67,10 @@ _Completed. Per-package audits, cross-package synthesis, and planning discussion
 
 
 
-#### P2.13 — utils → runtime package split
-- **Status:** [ ]
-- **Dependencies:** P2.12 (streaming cleanup — simulator/interface stabilized)
-- **Key files:** `vivarium/utils/handle_server_interface.py`, `vivarium/utils/runtime.py`, `vivarium/utils/updater.py`, `vivarium/utils/converters.py`, `vivarium/utils/__init__.py`, `scripts/rthook_jupyter_matplotlib.py`
-- **CLAUDE.md updates:** `vivarium/utils/CLAUDE.md` — update structure, file table, and dependency graph (moved files removed, converters.py deleted). `CLAUDE.md` (global) — update package dependency map to include `vivarium/runtime/`. Create `vivarium/runtime/CLAUDE.md` with purpose, structure, and public API.
-
-Create a new top-level `vivarium/runtime/` package. Split `handle_server_interface.py` into modules, move it there along with `runtime.py` (renamed `paths.py`) and `updater.py`. Clean up `converters.py`.
-
-**New `vivarium/runtime/` package:**
-```
-vivarium/runtime/
-  __init__.py       # re-exports public API
-  paths.py          # is_frozen, get_app_root, get_*_command (was utils/runtime.py)
-  updater.py        # update checking, download, post-update merge (was utils/updater.py)
-  _process.py       # PID lookup, kill, terminate
-  _server.py        # gRPC server start/stop/wait
-  _interface.py     # Panel interface start/stop
-  _jupyter.py       # Jupyter start/stop/check, port management
-  _ngrok.py         # tunnel creation, colab detection
-```
-
-**Resulting `vivarium/utils/`:**
-```
-vivarium/utils/
-  __init__.py
-  scene_configs.py      # Hydra config loading, scene enumeration, template expansion
-  dataclass_wrapper.py  # Remote proxy, change protocol, dataclass updates
-  timer.py              # SleepTimer
-  jax_utils.py          # JAX-MD dataclass detection
-```
-
-**Clean up `converters.py`:** Most functions are dead code (`upper_camel_to_snake`, `snake_to_upper_camel`, `class_import_path`, `import_class` — none used anywhere). Only `access_nested_fields` is live (used by `environment.py`). Move it to an appropriate location (e.g., inline in `environment.py` or keep in utils under a better name), then delete `converters.py`.
-
-**Move `scripts/rthook_jupyter_matplotlib.py` → `vivarium/runtime/`** — it's a PyInstaller runtime hook, not a user-facing entry point. `vivarium/runtime/` (the deployment package) is its natural home.
-
-**Extract `DEFAULT_JUPYTER_PORT = 8889`** in `vivarium/runtime/_jupyter.py` (or `paths.py`). Replace ~7 occurrences of the hardcoded `8889` across function signatures and `panel_app.py` with an import of this constant.
-
-**Workflow:**
-1. Create `vivarium/runtime/` package with `__init__.py`
-2. Move and rename `utils/runtime.py` → `runtime/paths.py`
-3. Move `utils/updater.py` → `runtime/updater.py`
-4. Split `utils/handle_server_interface.py` into the 5 internal modules
-5. Move `scripts/rthook_jupyter_matplotlib.py` → `vivarium/runtime/`
-6. Extract `DEFAULT_JUPYTER_PORT` constant
-7. Clean up `converters.py` (move `access_nested_fields`, delete file)
-8. Update `runtime/__init__.py` to re-export public API
-9. Update all imports across the codebase
-10. Run tests
-
-**Note from the developer:** It might be more efficient to leverage VSCode refactoring for moving modules/functions — VSCode should adapt imports automatically. This can only be done by the user.
 
 #### P2.14 — panel_app.py monolith split
 - **Status:** [ ]
-- **Dependencies:** P2.13 (runtime split — interface imports from runtime are stable)
+- **Dependencies:** P2.13 ✓ (runtime split — interface imports from runtime are stable)
 - **Key files:** `vivarium/interface/panel_app.py`
 - **CLAUDE.md updates:** `vivarium/interface/CLAUDE.md` — update structure and file table to reflect new modules.
 
@@ -432,7 +382,7 @@ Component `client:` blocks in YAML configs are not visible when reading a scene 
 Sessions 1-4 are numbered and reference prior sessions when building on earlier concepts, but nothing prevents a student from running them out of order. Code-level enforcement (e.g. checking session completion markers) would be fragile and over-engineered. The tutorial progression is documented in P3.04.
 
 **D.09 — `--version` flag for CLI scripts.**
-`get_version()` exists in `runtime.py` (or `runtime/paths.py` after P2.13). Adding a `--version` flag to `run_server.py` and `run_interface.py` is trivial but not needed for any audience journey.
+`get_version()` exists in `vivarium/runtime/paths.py`. Adding a `--version` flag to `run_server.py` and `run_interface.py` is trivial but not needed for any audience journey.
 
 **D.10 — Checksum validation for PyInstaller updates.**
 The updater downloads new PyInstaller binaries but doesn't verify checksums. Requires server-side changes (hosting checksums alongside binaries) in addition to client-side validation.
@@ -526,3 +476,6 @@ Eliminated ghost attributes in `Simulator` by making `controller_parameters.simu
 
 #### P2.12 — Streaming cleanup
 Removed bidirectional streaming (dormant code): `bidirectional_step_generator()` and `bidirectional_step_sync()` from `simulator_client.py`, `BidirectionalStep` RPC handler from `simulator_server.py`, proto definition (regenerated), `use_streaming` parameter from `start_controller_thread()`/`_run_controller_thread()`, `scripts/dev/benchmark_streaming_real.py`, bidirectional benchmarks from `benchmark_grpc.py`, `test_bidirectional_streaming` test. Removed dead UI code: `streaming_toggle` widget + `streaming_toggle_cb` callback from `panel_app.py`, `use_streaming` config key from `base_interface.yaml`. Streaming now starts unconditionally on connect. Wired `_pending_state_update` flag into `update_plot_cb()` — skips repaint when streaming is active but no new state has arrived; `apply_changes()` runs before the check so UI changes always reach the server. Updated `vivarium/simulator/CLAUDE.md`, `vivarium/interface/CLAUDE.md`, `scripts/CLAUDE.md`. Full pytest green (272 passed).
+
+#### P2.13 — utils → runtime package split
+Created `vivarium/runtime/` package by splitting the 882-LOC `handle_server_interface.py` monolith into 5 focused modules (`_process.py`, `_server.py`, `_interface.py`, `_jupyter.py`, `_ngrok.py`). Moved `utils/runtime.py` → `runtime/paths.py`, `utils/updater.py` → `runtime/updater.py`, `scripts/rthook_jupyter_matplotlib.py` → `runtime/`. Extracted `DEFAULT_JUPYTER_PORT = 8889` constant in `paths.py`, replacing 7 hardcoded occurrences across function signatures and `panel_app.py`. Inlined `access_nested_fields` decorator into `environment.py` and deleted `converters.py` (remaining functions were dead code). Updated all imports across ~20 source files, 3 notebooks, CI workflow, `.spec` file, and 3 test files (moved to `tests/runtime/`). Updated CLAUDE.md files (global, utils, scripts, notebooks, tests; new `runtime/CLAUDE.md`). Full pytest green (272 passed).
