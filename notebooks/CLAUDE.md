@@ -86,7 +86,7 @@ controller.step()
 ### Deprecated Pattern (tutorials, session_6)
 ```python
 from vivarium.controllers.notebook_controller import NotebookController
-from vivarium.utils.handle_server_interface import start_server_and_interface
+from vivarium.runtime import stop_server_and_interface
 controller = NotebookController()
 ```
 
