@@ -5,7 +5,7 @@ import atexit
 import logging
 
 import panel as pn
-from vivarium.interface.panel_app import WindowManager
+from vivarium.interface.panel_app import PanelApp
 from vivarium.runtime import kill_vivarium_processes, get_started_jupyter_ports, kill_port_processes
 from vivarium.runtime.paths import initialize_user_data, is_frozen
 
@@ -19,7 +19,7 @@ if is_frozen() and initialize_user_data():
 # Track if cleanup has already run (avoid double cleanup)
 _cleanup_done = False
 
-# Store the active WindowManager instance for cleanup
+# Store the active PanelApp instance for cleanup
 _window_manager = None
 
 
@@ -32,7 +32,7 @@ def cleanup():
 
     lg.info("Cleaning up Vivarium processes...")
 
-    # First, try to close the controller properly via WindowManager
+    # First, try to close the controller properly via PanelApp
     if _window_manager is not None and _window_manager.controller is not None:
         try:
             lg.info("Closing controller...")
@@ -97,7 +97,7 @@ if args.no_cleanup:
 
 def create_app():
     global _window_manager
-    _window_manager = WindowManager(server_timeout=args.server_timeout)
+    _window_manager = PanelApp(server_timeout=args.server_timeout)
     return _window_manager.app
 
 

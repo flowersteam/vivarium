@@ -1,8 +1,7 @@
-import os
-import time
-import hydra
 import logging
 import threading
+
+import hydra
 import panel as pn
 from param import Parameterized
 
@@ -15,32 +14,13 @@ from bokeh.models import (
 
 from vivarium.controllers import VivariumController
 from vivarium.utils.scene_configs import load_config, load_scene_config, get_available_scenes
-from vivarium.runtime.paths import get_app_root, get_version, is_frozen, DEFAULT_JUPYTER_PORT
-from vivarium.runtime.updater import (
-    check_for_updates,
-    download_update,
-    apply_downloaded_update,
-    get_defaults_update_info,
-    is_update_pending,
-    get_update_pending_info,
-    clear_update_pending,
-    perform_post_update_merge,
-    UpdateDownloadError,
-)
-from vivarium.runtime import (
-    check_server_running,
-    kill_vivarium_processes,
-    kill_port_processes,
-    check_jupyter_running,
-    register_jupyter_port,
-    unregister_jupyter_port,
-    find_next_available_port,
-    start_jupyter_server,
-    stop_jupyter_server,
-)
+from vivarium.runtime.paths import get_version, is_frozen, DEFAULT_JUPYTER_PORT
+from vivarium.runtime import check_server_running, kill_vivarium_processes
 from vivarium.runtime._process import get_server_interface_pids, terminate_process
 from vivarium.interface.parameterized import ParamSimulator
 from vivarium.interface.utils import cleanup_parameterized_class
+from vivarium.interface.update_manager import UpdateManager
+from vivarium.interface.jupyter_manager import JupyterManager
 from vivarium.simulator.grpc_server.simulator_client import SimulatorGRPCClient
 
 
@@ -61,7 +41,7 @@ def create_interfaces(component_list_config, controllers, state, panel_cls=pn.Co
     return interfaces
 
 
-class WindowManager(Parameterized):
+class PanelApp(Parameterized):
 
     def __init__(self, controller=None, apply_changes=True, testing_mode=False, server_timeout=30.0, **kwargs):
         super().__init__(**kwargs)
@@ -84,7 +64,7 @@ class WindowManager(Parameterized):
             self.dark_theme = (query_params['theme'] == 'dark')
         else:
             self.dark_theme =  load_config("scene/interface", "base_interface").dark_mode
-                    
+
         if self.dark_theme:
             pn.config.theme = 'dark'
         else:
@@ -101,17 +81,15 @@ class WindowManager(Parameterized):
         # Create scene selection UI components
         self._setup_scene_selection_ui()
 
-        # Create update notification UI (hidden by default)
-        self._setup_update_notification_ui()
+        # Create update manager (frozen/PyInstaller builds only)
+        if is_frozen():
+            self.update_manager = UpdateManager()
+            self.update_manager.start_update_check()
+        else:
+            self.update_manager = None
 
         # Create main container that will hold either scene selection or simulation UI
         self.main_container = pn.Column(sizing_mode="stretch_both")
-
-        # Check for updates in background (only in frozen/PyInstaller builds)
-        self._update_info = None
-        self._defaults_info = None
-        if is_frozen():
-            self._start_update_check()
 
         # Determine initial state and initialize appropriately
         if controller is not None:
@@ -194,16 +172,16 @@ class WindowManager(Parameterized):
             styles={'color': 'gray', 'font-size': '0.9em'},
             align="center",
         )
-        
+
         self.dark_theme_switch = pn.widgets.Switch(
             name="Light/Dark theme",
             value=self.dark_theme,
             align="center",
         )
-        
+
         self.dark_theme_switch.param.watch(self.dark_theme_switch_cb, "value")
 
-        # Scene selection panel layout (update_notification_panel added in _setup_update_notification_ui)
+        # Scene selection panel layout
         self.scene_selection_panel = pn.Column(
             pn.pane.Markdown("# Vivarium", align="center", styles={'font-size': '2em'}),
             self.version_label,
@@ -221,347 +199,6 @@ class WindowManager(Parameterized):
             align="center",
             sizing_mode="stretch_both",
         )
-
-    def _setup_update_notification_ui(self):
-        """Setup UI components for update notifications."""
-        # Track download state
-        self._download_thread = None
-        self._download_cancelled = False
-
-        # Update notification banner (hidden by default)
-        self.update_banner = pn.pane.Markdown(
-            "",
-            styles={
-                'background-color': '#1a73e8',
-                'color': 'white',
-                'padding': '10px 20px',
-                'border-radius': '5px',
-                'text-align': 'center',
-            },
-            sizing_mode="stretch_width",
-        )
-
-        self.update_download_btn = pn.widgets.Button(
-            name="Download Update",
-            button_type="success",
-            width=150,
-        )
-        self.update_download_btn.on_click(self._download_update)
-
-        self.update_dismiss_btn = pn.widgets.Button(
-            name="Dismiss",
-            button_type="default",
-            width=100,
-        )
-        self.update_dismiss_btn.on_click(self._dismiss_update_notification)
-
-        # Progress bar for download (hidden by default)
-        self.update_progress = pn.widgets.Progress(
-            name="Downloading...",
-            value=0,
-            max=100,
-            sizing_mode="stretch_width",
-            visible=False,
-        )
-
-        # Status text for download progress
-        self.update_status_text = pn.pane.Markdown(
-            "",
-            styles={'text-align': 'center'},
-            visible=False,
-        )
-
-        # Cancel button (visible during download)
-        self.update_cancel_btn = pn.widgets.Button(
-            name="Cancel",
-            button_type="warning",
-            width=100,
-            visible=False,
-        )
-        self.update_cancel_btn.on_click(self._cancel_download)
-
-        # Restart button (visible after successful download)
-        self.update_restart_btn = pn.widgets.Button(
-            name="Restart to Apply",
-            button_type="success",
-            width=150,
-            visible=False,
-        )
-        self.update_restart_btn.on_click(self._request_restart)
-
-        self.update_notification_panel = pn.Column(
-            self.update_banner,
-            pn.Row(
-                self.update_download_btn,
-                self.update_cancel_btn,
-                self.update_restart_btn,
-                self.update_dismiss_btn,
-                align="center",
-            ),
-            self.update_progress,
-            self.update_status_text,
-            visible=False,
-            sizing_mode="stretch_width",
-        )
-
-        # Defaults change notification (separate from update notification)
-        self.defaults_banner = pn.pane.Markdown(
-            "",
-            styles={
-                'background-color': '#2e7d32',
-                'color': 'white',
-                'padding': '10px 20px',
-                'border-radius': '5px',
-                'text-align': 'center',
-            },
-            sizing_mode="stretch_width",
-        )
-
-        self.defaults_dismiss_btn = pn.widgets.Button(
-            name="Got it",
-            button_type="default",
-            width=100,
-        )
-        self.defaults_dismiss_btn.on_click(self._dismiss_defaults_notification)
-
-        self.defaults_notification_panel = pn.Column(
-            self.defaults_banner,
-            pn.Row(self.defaults_dismiss_btn, align="center"),
-            visible=False,
-            sizing_mode="stretch_width",
-        )
-
-    def _start_update_check(self):
-        """Start checking for updates and defaults changes in a background thread."""
-        def check_updates():
-            try:
-                # First, check if an update was recently applied
-                if is_update_pending():
-                    pending_info = get_update_pending_info()
-                    if pending_info:
-                        lg.info(f"Update pending from {pending_info.get('previous_version')} to {pending_info.get('new_version')}")
-
-                    # Perform smart merge: restore user modifications for files not changed by update
-                    # Files changed by both user and update will use new version (conflicts)
-                    merge_info = perform_post_update_merge()
-                    if merge_info:
-                        self._merge_info = merge_info
-                        if pn.state.curdoc:
-                            pn.state.curdoc.add_next_tick_callback(self._show_defaults_notification)
-                        else:
-                            self._show_defaults_notification()
-
-                    # Clear the pending marker
-                    clear_update_pending()
-
-                # Check for new updates
-                interface_cfg = load_config("scene/interface", "base_interface")
-                include_prereleases = getattr(interface_cfg, 'include_prereleases', False)
-                update_info = check_for_updates(timeout=5.0, include_prereleases=include_prereleases)
-                if update_info:
-                    self._update_info = update_info
-                    # Schedule UI update on main thread
-                    if pn.state.curdoc:
-                        pn.state.curdoc.add_next_tick_callback(self._show_update_notification)
-                    else:
-                        self._show_update_notification()
-            except Exception as e:
-                lg.debug(f"Update check failed: {e}")
-
-        thread = threading.Thread(target=check_updates, daemon=True)
-        thread.start()
-
-    def _show_update_notification(self):
-        """Display the update notification banner."""
-        if not self._update_info:
-            return
-
-        current = self._update_info['current_version']
-        latest = self._update_info['latest_version']
-
-        self.update_banner.object = (
-            f"**Update Available:** A new version of Vivarium ({latest}) is available. "
-            f"You are running version {current}."
-        )
-        self.update_notification_panel.visible = True
-
-        # Insert at the top of scene selection panel if not already there
-        if self.update_notification_panel not in self.scene_selection_panel:
-            self.scene_selection_panel.insert(0, self.update_notification_panel)
-
-    def _download_update(self, _event):
-        """Start downloading the update in a background thread."""
-        if not self._update_info or not self._update_info.get('download_url'):
-            lg.warning("No download URL available")
-            return
-
-        # Reset state
-        self._download_cancelled = False
-
-        # Update UI for download state
-        self.update_download_btn.disabled = True
-        self.update_download_btn.visible = False
-        self.update_cancel_btn.visible = True
-        self.update_dismiss_btn.visible = False
-        self.update_progress.visible = True
-        self.update_progress.value = 0
-        self.update_status_text.object = "Starting download..."
-        self.update_status_text.visible = True
-
-        def do_download():
-            try:
-                url = self._update_info['download_url']
-                new_version = self._update_info['latest_version']
-
-                def progress_callback(downloaded, total):
-                    if total > 0:
-                        percent = int(downloaded * 100 / total)
-                        mb_downloaded = downloaded / (1024 * 1024)
-                        mb_total = total / (1024 * 1024)
-
-                        def update_ui():
-                            self.update_progress.value = percent
-                            self.update_status_text.object = f"Downloading: {mb_downloaded:.1f} / {mb_total:.1f} MB ({percent}%)"
-
-                        if pn.state.curdoc:
-                            pn.state.curdoc.add_next_tick_callback(update_ui)
-                        else:
-                            update_ui()
-
-                def cancel_check():
-                    return self._download_cancelled
-
-                # Download the update
-                archive_path = download_update(
-                    url,
-                    progress_callback=progress_callback,
-                    cancel_flag=cancel_check,
-                )
-
-                # Apply the update (extract outer archive)
-                apply_downloaded_update(archive_path, new_version)
-
-                # Show restart prompt
-                if pn.state.curdoc:
-                    pn.state.curdoc.add_next_tick_callback(self._show_restart_prompt)
-                else:
-                    self._show_restart_prompt()
-
-            except UpdateDownloadError as e:
-                lg.error(f"Update download failed: {e}")
-                if pn.state.curdoc:
-                    pn.state.curdoc.add_next_tick_callback(lambda: self._show_download_error(str(e)))
-                else:
-                    self._show_download_error(str(e))
-            except Exception as e:
-                lg.exception(f"Unexpected error during update: {e}")
-                if pn.state.curdoc:
-                    pn.state.curdoc.add_next_tick_callback(lambda: self._show_download_error(f"Unexpected error: {e}"))
-                else:
-                    self._show_download_error(f"Unexpected error: {e}")
-
-        self._download_thread = threading.Thread(target=do_download, daemon=True)
-        self._download_thread.start()
-
-    def _show_restart_prompt(self):
-        """Show UI prompting user to restart to apply update."""
-        self.update_progress.visible = False
-        self.update_cancel_btn.visible = False
-        self.update_restart_btn.visible = True
-        self.update_dismiss_btn.visible = True
-        self.update_status_text.object = "**Update downloaded!** Restart Vivarium to complete the installation."
-        self.update_banner.object = (
-            f"**Update Ready:** Version {self._update_info['latest_version']} is ready to install."
-        )
-
-    def _show_download_error(self, error_msg: str):
-        """Show download error and offer retry."""
-        self.update_progress.visible = False
-        self.update_cancel_btn.visible = False
-        self.update_download_btn.disabled = False
-        self.update_download_btn.visible = True
-        self.update_download_btn.name = "Retry Download"
-        self.update_dismiss_btn.visible = True
-        self.update_status_text.object = f"**Error:** {error_msg}"
-        self._download_thread = None
-
-    def _cancel_download(self, _event):
-        """Cancel an in-progress download."""
-        self._download_cancelled = True
-        self.update_status_text.object = "Cancelling download..."
-
-    def _request_restart(self, _event):
-        """Request app restart to apply update."""
-        # Show message that user needs to manually restart
-        self.update_status_text.object = (
-            "**Please close Vivarium from the terminal (Ctrl-C) and restart it using the launcher script.**"
-        )
-        self.update_restart_btn.visible = False
-
-    def _show_defaults_notification(self):
-        """Display notification about merge results after an update."""
-        if not hasattr(self, '_merge_info') or not self._merge_info:
-            return
-
-        backup_dir = self._merge_info.get('backup_dir', '')
-        backup_name = os.path.basename(backup_dir) if backup_dir else 'backup folder'
-
-        # Collect conflicts and restored files
-        all_conflicts = []
-        restored_count = 0
-
-        for folder in ['conf', 'notebooks']:
-            info = self._merge_info.get(folder, {})
-            conflicts = info.get('conflicts', [])
-            restored = info.get('restored', [])
-
-            # Add folder prefix to each conflict file (skip hidden files/dirs)
-            for filename in conflicts:
-                parts = filename.replace("\\", "/").split("/")
-                if any(part.startswith(".") for part in parts):
-                    continue
-                all_conflicts.append(f"{folder}/{filename}")
-            restored_count += len(restored)
-
-        # Only show notification if there are conflicts
-        # (restored files are silently handled - user's modifications preserved)
-        if not all_conflicts:
-            # Just log if we restored files
-            if restored_count > 0:
-                lg.info(f"Update complete: {restored_count} user modification(s) preserved")
-            return
-
-        # Build message for conflicts with file list
-        file_list = ", ".join(f"`{f}`" for f in all_conflicts)
-        message = (
-            f"**Update applied:** The following files you modified were also updated: {file_list}. "
-            f"The new versions are now in use. "
-            f"Your previous versions are saved in the **{backup_name}** folder "
-            f"(located next to the `Start-Vivarium` script)."
-        )
-
-        self.defaults_banner.object = message
-        self.defaults_notification_panel.visible = True
-
-        # Insert at the top of scene selection panel
-        if self.defaults_notification_panel not in self.scene_selection_panel:
-            self.scene_selection_panel.insert(0, self.defaults_notification_panel)
-
-    def _dismiss_defaults_notification(self, _event):
-        """Hide the defaults change notification."""
-        self.defaults_notification_panel.visible = False
-
-    def _dismiss_update_notification(self, _event):
-        """Hide the update notification banner."""
-        self.update_notification_panel.visible = False
-        # Reset download UI state
-        self.update_download_btn.disabled = False
-        self.update_download_btn.visible = True
-        self.update_download_btn.name = "Download Update"
-        self.update_progress.visible = False
-        self.update_cancel_btn.visible = False
-        self.update_restart_btn.visible = False
-        self.update_status_text.visible = False
 
     def _show_scene_selection(self, error_message=None):
         """Show the scene selection screen."""
@@ -596,15 +233,19 @@ class WindowManager(Parameterized):
         self.main_container.clear()
         self.main_container.append(self.scene_selection_panel)
 
+        # Insert update notifications if available (frozen builds only)
+        if self.update_manager is not None:
+            self.update_manager.insert_into(self.scene_selection_panel)
+
     def _connect_existing_cb(self, event):
         """Callback to connect to an existing server."""
         try:
             client = SimulatorGRPCClient()
-            
-            # controller.apply_changes() is already called in update_plot_cb and the state is fetched through the state streaming mechanisl
-            # So we don't need the controller thread in addition. 
+
+            # controller.apply_changes() is already called in update_plot_cb and the state is fetched through the state streaming mechanism
+            # So we don't need the controller thread in addition.
             controller = VivariumController(client=client, start_controller_thread=False)
-            
+
             self._initialize_connected_ui(controller)
         except Exception as e:
             lg.error(f"Failed to connect to server: {e}")
@@ -644,8 +285,20 @@ class WindowManager(Parameterized):
         # Create simulation control widgets
         self._setup_simulation_widgets()
 
-        # Create notebook widgets
-        self._setup_notebook_widgets()
+        # Create Jupyter manager with notebook config
+        notebook_config = getattr(self.scene_config.interface, 'notebook', None)
+        notebook_path = None
+        jupyter_port = DEFAULT_JUPYTER_PORT
+        if notebook_config is not None:
+            if hasattr(notebook_config, 'path'):
+                notebook_path = notebook_config.path
+            if hasattr(notebook_config, 'jupyter_port'):
+                jupyter_port = notebook_config.jupyter_port
+
+        self.jupyter_manager = JupyterManager(
+            notebook_path=notebook_path,
+            jupyter_port=jupyter_port,
+        )
 
         self.plot = self.create_plot()
 
@@ -705,115 +358,6 @@ class WindowManager(Parameterized):
         self.stop_confirm_panel[2][0].on_click(self._confirm_stop_cb)
         self.stop_confirm_panel[2][1].on_click(self._cancel_stop_cb)
 
-    def _setup_notebook_widgets(self):
-        """Setup widgets for notebook/Jupyter control."""
-        # Notebook configuration - load from config
-        self.notebook_config = getattr(self.scene_config.interface, 'notebook', None)
-        self.notebook_path = None
-        self.jupyter_port = DEFAULT_JUPYTER_PORT
-
-        if self.notebook_config is not None:
-            if hasattr(self.notebook_config, 'path'):
-                self.notebook_path = self.notebook_config.path
-            if hasattr(self.notebook_config, 'jupyter_port'):
-                self.jupyter_port = self.notebook_config.jupyter_port
-
-        # Jupyter server management
-        self.jupyter_process = None
-        # Track whether we started this Jupyter server (vs connecting to external)
-        self._jupyter_started_by_us = False
-
-        # UI for Jupyter control and notebook display
-        self.jupyter_status = pn.pane.Markdown("**Jupyter Status:** Checking...", sizing_mode="stretch_width")
-
-        self.jupyter_port_input = pn.widgets.IntInput(
-            name="Jupyter Port:",
-            value=self.jupyter_port,
-            start=8888,
-            end=9999,
-            step=1,
-            width=120,
-        )
-
-        # Check Server button for manual status check
-        self.check_jupyter_btn = pn.widgets.Button(
-            name="Check Server",
-            button_type="default",
-            width=120,
-        )
-
-        self.start_jupyter_btn = pn.widgets.Button(
-            name="Start Jupyter Server",
-            button_type="success",
-            width=200,
-        )
-
-        self.stop_jupyter_btn = pn.widgets.Button(
-            name="Stop Jupyter Server",
-            button_type="danger",
-            width=200,
-            visible=False,
-        )
-
-        self.open_configured_notebook_btn = pn.widgets.Button(
-            name=f"Open {os.path.basename(self.notebook_path) if self.notebook_path else 'Configured Notebook'}",
-            button_type="primary",
-            width=250,
-            visible=False,
-        )
-
-        self.open_new_notebook_btn = pn.widgets.Button(
-            name="Open New Notebook",
-            button_type="primary",
-            width=200,
-            visible=False,
-        )
-
-        self.notebook_url = pn.widgets.TextInput(
-            name="Or enter notebook URL:",
-            placeholder=f"http://localhost:{self.jupyter_port}/notebooks/path/to/notebook.ipynb",
-            value="",
-            width=400,
-            visible=False,
-        )
-
-        # Conflict resolution panel (hidden by default)
-        self._conflict_port = None  # Track which port has the conflict
-        self._conflict_message = pn.pane.Markdown("")
-        self._suggested_port_msg = pn.pane.Markdown("")
-
-        self._jupyter_use_existing_btn = pn.widgets.Button(
-            name="Use Existing", button_type="primary", width=120
-        )
-        self._jupyter_kill_only_btn = pn.widgets.Button(
-            name="Kill Server", button_type="danger", width=100
-        )
-        self._jupyter_kill_restart_btn = pn.widgets.Button(
-            name="Kill & Restart", button_type="warning", width=120
-        )
-        self._jupyter_use_different_port_btn = pn.widgets.Button(
-            name="Use Different Port", button_type="success", width=150
-        )
-        self._jupyter_cancel_conflict_btn = pn.widgets.Button(
-            name="Cancel", button_type="default", width=80
-        )
-
-        self.jupyter_conflict_panel = pn.Column(
-            pn.pane.Markdown("### Jupyter Server Already Running", styles={'color': 'orange'}),
-            self._conflict_message,
-            pn.Row(
-                self._jupyter_use_existing_btn,
-                self._jupyter_kill_only_btn,
-                self._jupyter_kill_restart_btn,
-                self._jupyter_use_different_port_btn,
-            ),
-            pn.Row(
-                self._jupyter_cancel_conflict_btn,
-            ),
-            self._suggested_port_msg,
-            visible=False,
-        )
-
     def _start_server_cb(self, event):
         """Callback for starting the simulation server."""
         scene_name = self.scene_select.value
@@ -857,8 +401,8 @@ class WindowManager(Parameterized):
         # Stop streaming if active
         if self._streaming_active:
             self._stop_streaming()
-            
-        self.stop_jupyter_cb(None)  # Stop Jupyter if running
+
+        self.jupyter_manager.stop()
 
         # Close the controller (disconnects and stops server if we started it)
         if self.controller:
@@ -906,7 +450,7 @@ class WindowManager(Parameterized):
 
     def _on_state_stream_update(self, state_and_cp):
         """Callback for state updates from streaming.
-        
+
         This runs in a background thread, so we just set a flag
         and let the periodic callback handle the actual UI update.
         """
@@ -918,7 +462,7 @@ class WindowManager(Parameterized):
         """Start receiving state updates via streaming."""
         if self._streaming_active:
             return
-        
+
         # Only start streaming if we have a gRPC client
         client = self.controller.client
         if hasattr(client, 'start_state_stream'):
@@ -983,8 +527,7 @@ class WindowManager(Parameterized):
             renderer = interface.renderer
             if renderer is not None:
                 renderer.update_cds(state)
-        # self.curdoc.add_next_tick_callback(lambda: None)
-            
+
     def drag_n_drop_cb(self, event):
         if event.new:
             self.plot.toolbar.active_tap = self.point_draw_tool
@@ -1005,7 +548,7 @@ class WindowManager(Parameterized):
 
         :param event: The event for the new value of the button (True if dark theme)
         """
-        
+
         self.dark_theme = event.new
         if event.new:
             pn.state.location.param.update(search="?theme=dark")
@@ -1014,242 +557,6 @@ class WindowManager(Parameterized):
 
         pn.state.location.reload=False
         pn.state.location.reload=True
-
-    def start_jupyter_cb(self, event):
-        """Callback for starting Jupyter server"""
-        port = self.jupyter_port_input.value
-
-        # Check if port is already in use - show conflict panel if so
-        if check_jupyter_running(port):
-            self._show_jupyter_conflict_panel(port)
-            return
-
-        self._do_start_jupyter(port)
-
-    def _do_start_jupyter(self, port):
-        """Actually start the Jupyter server on the given port."""
-
-        # Use distribution dir (where notebooks/ is located in frozen mode)
-        project_root = get_app_root()
-
-        try:
-            lg.info(f"Starting Jupyter server on port {port}...")
-            self.jupyter_status.object = f"**Jupyter Status:** 🔄 Starting on port {port}..."
-
-            self.jupyter_process = start_jupyter_server(
-                port=port,
-                notebook_dir=project_root,
-                show_output=False,
-                return_process_object=True
-            )
-
-            # Update the configured port to match what was actually used
-            self.jupyter_port = port
-            self.jupyter_port_input.value = port
-
-            # Register this port as started by us (for cleanup tracking)
-            register_jupyter_port(port)
-            self._jupyter_started_by_us = True
-
-            # Wait for Jupyter to fully start and bind to the port
-            # PyInstaller builds may take longer to initialize
-            for _ in range(20):
-                time.sleep(0.5)
-                if check_jupyter_running(port):
-                    lg.info(f"Jupyter server confirmed running on port {port}")
-                    break
-
-            # Update UI to reflect running state
-            self._check_jupyter_status()
-        except RuntimeError as e:
-            # Port became busy between check and start - show conflict panel
-            if "already in use" in str(e).lower():
-                self._show_jupyter_conflict_panel(port)
-            else:
-                error_msg = str(e)
-                lg.error(error_msg)
-                self.jupyter_status.object = f"**Jupyter Status:** ❌ {error_msg}"
-
-    def _show_jupyter_conflict_panel(self, port):
-        """Display the conflict resolution panel for the given port."""
-        self._conflict_port = port
-        self._conflict_message.object = f"A Jupyter server is already running on port **{port}**. What would you like to do?"
-
-        # Find next available port for suggestion
-        try:
-            suggested = find_next_available_port(port + 1)
-            self._suggested_port_msg.object = f"*Suggested available port: **{suggested}***"
-        except RuntimeError:
-            self._suggested_port_msg.object = "*No available ports found nearby*"
-
-        self.jupyter_conflict_panel.visible = True
-
-    def _jupyter_use_existing_cb(self, event):
-        """Connect to the existing external Jupyter server without tracking it."""
-        port = self._conflict_port
-        self.jupyter_conflict_panel.visible = False
-
-        # Update port and status - we're using an external server
-        self.jupyter_port = port
-        self.jupyter_port_input.value = port
-        self._jupyter_started_by_us = False  # Don't track - it's external
-        self.jupyter_process = None
-
-        lg.info(f"Using existing Jupyter server on port {port}")
-        self._check_jupyter_status()
-
-    def _jupyter_kill_only_cb(self, event):
-        """Kill the existing Jupyter server without starting a new one."""
-        port = self._conflict_port
-        self.jupyter_conflict_panel.visible = False
-
-        lg.info(f"Killing Jupyter server on port {port}...")
-        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping server on port {port}..."
-
-        killed = kill_port_processes(port, servers_only=True)
-        if killed:
-            lg.info(f"Killed Jupyter processes: {killed}")
-
-        # Unregister if it was tracked
-        unregister_jupyter_port(port)
-
-        # Small delay to let port free up
-        time.sleep(0.5)
-
-        # Update UI to reflect stopped state
-        self._check_jupyter_status()
-
-    def _jupyter_kill_restart_cb(self, event):
-        """Kill existing server and start a new one (tracked)."""
-        port = self._conflict_port
-        self.jupyter_conflict_panel.visible = False
-
-        lg.info(f"Killing existing Jupyter on port {port} and restarting...")
-        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Restarting on port {port}..."
-
-        # Kill existing
-        killed = kill_port_processes(port, servers_only=True)
-        if killed:
-            lg.info(f"Killed existing Jupyter processes: {killed}")
-
-        # Unregister old if tracked
-        unregister_jupyter_port(port)
-
-        # Small delay to let port free up
-        time.sleep(0.5)
-
-        # Start new
-        self._do_start_jupyter(port)
-
-    def _jupyter_use_different_port_cb(self, event):
-        """Use the next available port."""
-        self.jupyter_conflict_panel.visible = False
-
-        try:
-            port = self._conflict_port
-            suggested = find_next_available_port(port + 1)
-            lg.info(f"Using alternative port {suggested}")
-            self._do_start_jupyter(suggested)
-        except RuntimeError as e:
-            lg.error(f"Could not find available port: {e}")
-            self.jupyter_status.object = f"**Jupyter Status:** ❌ {e}"
-
-    def _jupyter_cancel_conflict_cb(self, event):
-        """Cancel and do nothing."""
-        self.jupyter_conflict_panel.visible = False
-        self._check_jupyter_status()
-
-    def check_jupyter_cb(self, event):
-        """Manual check button handler - update Jupyter status display."""
-        port = self.jupyter_port_input.value
-        self.jupyter_port = port
-        self._check_jupyter_status()
-
-    def stop_jupyter_cb(self, event):
-        """Callback for stopping Jupyter server"""
-        lg.info("Stopping Jupyter server...")
-        self.jupyter_status.object = f"**Jupyter Status:** 🔄 Stopping..."
-
-        stop_jupyter_server(self.jupyter_process, port=self.jupyter_port)
-
-        # Unregister from tracking and reset state
-        unregister_jupyter_port(self.jupyter_port)
-        self.jupyter_process = None
-        self._jupyter_started_by_us = False
-
-        # Update UI to reflect stopped state
-        self._check_jupyter_status()
-
-    def open_configured_notebook_cb(self, event):
-        """Callback for opening the configured notebook"""
-        if self.notebook_path:
-            # Use app root (where notebooks/ is located in frozen mode)
-            project_root = get_app_root()
-            if not os.path.isabs(self.notebook_path):
-                notebook_path = os.path.join(project_root, self.notebook_path)
-            else:
-                notebook_path = self.notebook_path
-
-            lg.info(f"Opening notebook: {notebook_path}")
-            notebook_rel_path = os.path.relpath(notebook_path, project_root)
-            url = f"http://localhost:{self.jupyter_port}/notebooks/{notebook_rel_path}"
-            self.notebook_url.value = url
-            self._update_notebook()
-
-    def open_new_notebook_cb(self, event):
-        """Callback for opening a new notebook"""
-        # Open the Jupyter tree/home page in the iframe
-        url = f"http://localhost:{self.jupyter_port}/tree"
-        self.notebook_url.value = url
-        self._update_notebook()
-
-    def notebook_url_cb(self, event):
-        """Callback for when the notebook URL changes
-
-        :param event: The event for the new URL value
-        """
-        if event.new:
-            self._update_notebook()
-
-    def _check_jupyter_status(self):
-        """Check if Jupyter server is running and update UI accordingly"""
-        is_running = check_jupyter_running(self.jupyter_port)
-
-        if is_running:
-            self.jupyter_status.object = f"**Jupyter Status:** ✓ Running on port {self.jupyter_port}"
-            self.jupyter_port_input.visible = False
-            self.start_jupyter_btn.visible = False
-            self.stop_jupyter_btn.visible = True
-            self.open_configured_notebook_btn.visible = bool(self.notebook_path)
-            self.open_new_notebook_btn.visible = True
-            self.notebook_url.visible = True
-        else:
-            self.jupyter_status.object = f"**Jupyter Status:** ✗ Not running"
-            self.jupyter_port_input.visible = True
-            self.start_jupyter_btn.visible = True
-            self.stop_jupyter_btn.visible = False
-            self.open_configured_notebook_btn.visible = False
-            self.open_new_notebook_btn.visible = False
-            self.notebook_url.visible = False
-            self.notebook_iframe.object = ""
-
-    def _update_notebook(self):
-        """Update the notebook iframe with the current URL"""
-        url = self.notebook_url.value
-        if url:
-            # Allow scripts, forms, and same-origin for full Jupyter functionality
-            iframe_html = f'''<iframe
-                src="{url}"
-                width="100%"
-                height="100%"
-                frameborder="0"
-                style="border: 1px solid #ddd;"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-modals allow-popups allow-downloads"
-                allow="clipboard-read; clipboard-write"
-            ></iframe>'''
-            self.notebook_iframe.object = iframe_html
-        else:
-            self.notebook_iframe.object = ""
 
     def create_plot(self):
         """Creates a bokeh plot for the simulator
@@ -1298,41 +605,21 @@ class WindowManager(Parameterized):
             + [interface.widget for interface in self.interfaces.values()]
         )
 
-        # Create the notebook iframe (initially empty)
-        self.notebook_iframe = pn.pane.HTML(
-            "",
-            sizing_mode="stretch_both",
-        )
-
         # Build tabs for the right side
+        notebook_config = getattr(self.scene_config.interface, 'notebook', None)
+
         tabs_list = [
             ("Controllers", pn.Column(
                 pn.Row("### Show Controllers", self.controller_toggle),
                 pn.Row(*self.config_columns),
                 sizing_mode="stretch_both",
             )),
-            ("Notebook", pn.Column(
-                self.jupyter_status,
-                pn.Row(
-                    self.jupyter_port_input,
-                    self.check_jupyter_btn,
-                    self.start_jupyter_btn,
-                    self.stop_jupyter_btn,
-                ),
-                self.jupyter_conflict_panel,
-                pn.Row(
-                    self.open_configured_notebook_btn,
-                    self.open_new_notebook_btn,
-                ),
-                self.notebook_url,
-                self.notebook_iframe,
-                sizing_mode="stretch_both",
-            ))
+            ("Notebook", self.jupyter_manager.create_notebook_tab()),
         ]
 
         right_side_tabs = pn.Tabs(*tabs_list, sizing_mode="stretch_both")
-        
-        if hasattr(self.notebook_config, 'path') and self.notebook_config.path:
+
+        if hasattr(notebook_config, 'path') and notebook_config.path:
             right_side_tabs.active = 1
             self.start_toggle.visible = False
         else:
@@ -1367,21 +654,10 @@ class WindowManager(Parameterized):
         self.start_toggle.param.watch(self.start_toggle_cb, "value")
         self.plot_fps.param.watch(self.update_plot_fps, "value")
         self.drag_n_drop.param.watch(self.drag_n_drop_cb, "value")
-        # Notebook callbacks
-        self.check_jupyter_btn.on_click(self.check_jupyter_cb)
-        self.start_jupyter_btn.on_click(self.start_jupyter_cb)
-        self.stop_jupyter_btn.on_click(self.stop_jupyter_cb)
-        self.open_configured_notebook_btn.on_click(self.open_configured_notebook_cb)
-        self.open_new_notebook_btn.on_click(self.open_new_notebook_cb)
-        self.notebook_url.param.watch(self.notebook_url_cb, "value")
-        # Conflict resolution callbacks
-        self._jupyter_use_existing_btn.on_click(self._jupyter_use_existing_cb)
-        self._jupyter_kill_only_btn.on_click(self._jupyter_kill_only_cb)
-        self._jupyter_kill_restart_btn.on_click(self._jupyter_kill_restart_cb)
-        self._jupyter_use_different_port_btn.on_click(self._jupyter_use_different_port_cb)
-        self._jupyter_cancel_conflict_btn.on_click(self._jupyter_cancel_conflict_cb)
+        # Jupyter callbacks
+        self.jupyter_manager.set_callbacks()
 
 
 if __name__ == "__main__":
-    wm = WindowManager()
+    wm = PanelApp()
     wm.app.servable()

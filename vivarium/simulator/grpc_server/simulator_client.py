@@ -74,7 +74,7 @@ class SimulatorGRPCClient:
             changes: list of changes to apply
             update_from_server: whether to request the state and controller parameters from the server and update them here.
             Disable it when state updates are already being received via streaming,
-        to avoid redundant state serialization (typically in WindowManager).
+        to avoid redundant state serialization (typically in PanelApp).
         """
         if self.channel is None:
             lg.warning("Channel is closed, cannot set changes.")
