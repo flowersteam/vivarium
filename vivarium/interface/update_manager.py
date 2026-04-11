@@ -9,15 +9,12 @@ from vivarium.runtime.updater import (
     check_for_updates,
     download_update,
     apply_downloaded_update,
-    get_defaults_update_info,
     is_update_pending,
     get_update_pending_info,
     clear_update_pending,
     perform_post_update_merge,
     UpdateDownloadError,
 )
-from vivarium.utils.scene_configs import load_config
-
 
 lg = logging.getLogger(__name__)
 
@@ -137,12 +134,16 @@ class UpdateManager:
             sizing_mode="stretch_width",
         )
 
-    def start_update_check(self):
+    def start_update_check(self, include_prereleases, scene_selection_panel):
         """Start checking for updates and defaults changes in a background thread.
 
-        Only meaningful in frozen/PyInstaller builds; call site should guard
-        with ``if is_frozen(): ...``.
+        Args:
+            include_prereleases: Whether to check pre-release versions.
+            scene_selection_panel: The Panel layout to insert notifications into
+                when the background check completes.
         """
+        self._scene_selection_panel = scene_selection_panel
+
         def check_updates():
             try:
                 # First, check if an update was recently applied
@@ -165,8 +166,6 @@ class UpdateManager:
                     clear_update_pending()
 
                 # Check for new updates
-                interface_cfg = load_config("scene/interface", "base_interface")
-                include_prereleases = getattr(interface_cfg, 'include_prereleases', False)
                 update_info = check_for_updates(timeout=5.0, include_prereleases=include_prereleases)
                 if update_info:
                     self._update_info = update_info
@@ -180,15 +179,6 @@ class UpdateManager:
 
         thread = threading.Thread(target=check_updates, daemon=True)
         thread.start()
-
-    def insert_into(self, scene_selection_panel):
-        """Insert notification panels at the top of the given panel (if visible)."""
-        if self.update_notification_panel.visible:
-            if self.update_notification_panel not in scene_selection_panel:
-                scene_selection_panel.insert(0, self.update_notification_panel)
-        if self.defaults_notification_panel.visible:
-            if self.defaults_notification_panel not in scene_selection_panel:
-                scene_selection_panel.insert(0, self.defaults_notification_panel)
 
     # --- Update notification callbacks ---
 
@@ -205,9 +195,10 @@ class UpdateManager:
         )
         self.update_notification_panel.visible = True
 
-        # The panel is inserted lazily by the host app via insert_into(),
-        # but the background thread may resolve after initial layout.
-        # Store a reference so the host can call insert_into() again if needed.
+        # Insert at the top of scene selection panel if not already there
+        panel = self._scene_selection_panel
+        if panel is not None and self.update_notification_panel not in panel:
+            panel.insert(0, self.update_notification_panel)
 
     def _download_update(self, _event):
         if not self._update_info or not self._update_info.get('download_url'):
@@ -346,6 +337,11 @@ class UpdateManager:
 
         self.defaults_banner.object = message
         self.defaults_notification_panel.visible = True
+
+        # Insert at the top of scene selection panel if not already there
+        panel = self._scene_selection_panel
+        if panel is not None and self.defaults_notification_panel not in panel:
+            panel.insert(0, self.defaults_notification_panel)
 
     def _dismiss_defaults_notification(self, _event):
         self.defaults_notification_panel.visible = False

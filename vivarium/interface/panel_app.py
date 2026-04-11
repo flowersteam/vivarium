@@ -81,10 +81,15 @@ class PanelApp(Parameterized):
         # Create scene selection UI components
         self._setup_scene_selection_ui()
 
-        # Create update manager (frozen/PyInstaller builds only)
+        # Create update manager and start background check (frozen/PyInstaller builds only).
         if is_frozen():
             self.update_manager = UpdateManager()
-            self.update_manager.start_update_check()
+            interface_cfg = load_config("scene/interface", "base_interface")
+            include_prereleases = getattr(interface_cfg, 'include_prereleases', False)
+            self.update_manager.start_update_check(
+                include_prereleases=include_prereleases,
+                scene_selection_panel=self.scene_selection_panel,
+            )
         else:
             self.update_manager = None
 
@@ -232,10 +237,6 @@ class PanelApp(Parameterized):
 
         self.main_container.clear()
         self.main_container.append(self.scene_selection_panel)
-
-        # Insert update notifications if available (frozen builds only)
-        if self.update_manager is not None:
-            self.update_manager.insert_into(self.scene_selection_panel)
 
     def _connect_existing_cb(self, event):
         """Callback to connect to an existing server."""
